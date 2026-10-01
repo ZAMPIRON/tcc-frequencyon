@@ -1,0 +1,99 @@
+{% extends 'admin/base.html' %}
+
+{% block title %}Turmas - FrequencyOn{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h1 class="h4 fw-bold text-dark mb-1">Turmas Ativas</h1>
+        <p class="text-muted mb-0 small">Salas de aula e disciplinas integradas</p>
+    </div>
+    <button class="btn btn-primary fw-semibold btn-sm px-3 py-2 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalTurma">
+        <i class="fa-solid fa-plus me-1"></i> Nova Turma
+    </button>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show small" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<div class="row g-3">
+    {% for turma in turmas %}
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-3 h-100">
+            <div class="card-body p-3 d-flex flex-column">
+                <div>
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h6 class="fw-bold text-dark mb-0">{{ turma.nome }}</h6>
+                        <span class="badge {% if turma.frequencia_media < 75 %}bg-danger{% else %}bg-primary{% endif %}">
+                            {{ turma.frequencia_media }}%
+                        </span>
+                        <form method="POST" action="{{ url_for('admin.deletar_turma', id=turma.id) }}" style="display:inline-block;" onsubmit="return confirm('Tem certeza que deseja excluir?');">
+                            <button type="submit" class="btn btn-outline-danger btn-sm border-0">   
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </form>
+                    </div>
+                    
+                    <p class="text-muted small mb-2"><i class="fa-solid fa-graduation-cap me-1"></i> {{ turma.curso }}</p>
+                    <p class="text-muted small mb-2"><i class="fa-solid fa-user-tie me-1"></i> {{ turma.professor.nome if turma.professor else 'Sem Professor' }}</p>
+                    <p class="text-muted small mb-3"><i class="fa-solid fa-users me-1"></i> {{ turma.alunos|length }} Alunos</p>
+                  
+                </div>
+                 
+                <!-- Botão de Acesso à Tela do Detalhe da Turma -->
+                <a href="{{ url_for('admin.detalhes_turma', id=turma.id) }}" class="btn btn-outline-primary btn-sm w-100 fw-semibold mt-2">
+                    <i class="fa-solid fa-eye me-1"></i> Ver Alunos e Detalhes
+                </a>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12"><p class="text-muted">Nenhuma turma cadastrada.</p></div>
+    {% endfor %}
+</div>
+
+<!-- Modal para Nova Turma -->
+<div class="modal fade" id="modalTurma" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('admin.turmas') }}">
+                <div class="modal-header">
+                    <h5 class="modal-title h6 fw-bold">Criar Nova Turma</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Nome da Turma</label>
+                        <input type="text" name="nome" class="form-control form-control-sm" required placeholder="Ex: Programação I">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Curso</label>
+                        <input type="text" name="curso" class="form-control form-control-sm" required placeholder="Ex: Computação">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Professor Responsável</label>
+                        <select name="professor_id" class="form-select form-select-sm">
+                            <option value="">Selecione...</option>
+                            {% for prof in professores %}
+                            <option value="{{ prof.id }}">{{ prof.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Salvar Turma</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

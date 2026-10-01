@@ -1,0 +1,204 @@
+{% extends 'admin/base.html' %}
+
+{% block title %}Relatórios - FrequencyOn{% endblock %}
+
+{% block content %}
+<!-- Cabeçalho e Filtros -->
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-4 gap-3">
+    <div>
+        <h1 class="h4 fw-bold text-dark mb-1">Relatórios Administrativos (BI)</h1>
+        <p class="text-muted mb-0 small">Dados unificados de frequência do campus</p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <div class="input-group input-group-sm">
+            <span class="input-group-text bg-white text-muted border-end-0"><i class="fa-regular fa-calendar"></i></span>
+            <input type="text" class="form-control border-start-0 bg-white" value="Jan 2026 - Jun 2026" readonly style="max-width: 150px;">
+        </div>
+        <button class="btn btn-primary btn-sm px-3 d-flex align-items-center gap-2" onclick="window.print()">
+            <i class="fa-solid fa-download"></i> Exportar
+        </button>
+    </div>
+</div>
+
+<!-- Cards de Métricas Principais Dinâmicos -->
+<div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm rounded-3 p-3 h-100">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <span class="text-muted small fw-semibold">Total Alunos Matriculados</span>
+                <div class="text-primary bg-primary-subtle p-2 rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                    <i class="fa-solid fa-users fs-6"></i>
+                </div>
+            </div>
+            <div class="fs-3 fw-bold text-dark mb-1">{{ total_alunos }}</div>
+            <small class="text-muted" style="font-size: 11px;">Alunos ativos cadastrados</small>
+        </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm rounded-3 p-3 h-100">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <span class="text-muted small fw-semibold">Frequência Institucional</span>
+                <div class="text-success bg-success-subtle p-2 rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                    <i class="fa-solid fa-chart-line fs-6"></i>
+                </div>
+            </div>
+            <div class="fs-3 fw-bold text-dark mb-1">{{ media_geral }}%</div>
+            <small class="{% if media_geral >= 75 %}text-success{% else %}text-danger{% endif %} fw-semibold" style="font-size: 11px;">
+                <i class="fa-solid {% if media_geral >= 75 %}fa-circle-check{% else %}fa-triangle-exclamation{% endif %} me-1"></i>
+                {% if media_geral >= 75 %}Dentro da Meta{% else %}Abaixo da Meta{% endif %}
+            </small>
+        </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm rounded-3 p-3 h-100">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <span class="text-muted small fw-semibold">Taxa de Risco (&lt;75%)</span>
+                <div class="text-danger bg-danger-subtle p-2 rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                    <i class="fa-solid fa-arrow-trend-down fs-6"></i>
+                </div>
+            </div>
+            <div class="fs-3 fw-bold text-dark mb-1">{{ taxa_evasao }}%</div>
+            <small class="text-muted" style="font-size: 11px;">{{ alunos_criticos }} aluno(s) em estado crítico</small>
+        </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm rounded-3 p-3 h-100">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <span class="text-muted small fw-semibold">Alunos em Risco</span>
+                <div class="text-warning bg-warning-subtle p-2 rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                    <i class="fa-solid fa-user-slash fs-6"></i>
+                </div>
+            </div>
+            <div class="fs-3 fw-bold text-dark mb-1">{{ alunos_criticos }}</div>
+            <small class="text-muted" style="font-size: 11px;">Frequência abaixo de 75%</small>
+        </div>
+    </div>
+</div>
+
+<!-- Gráficos Dinâmicos -->
+<div class="row g-3 mb-4">
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm rounded-3 p-4 h-100">
+            <h6 class="fw-bold text-dark mb-3">Evolução Mensal da Frequência (2026)</h6>
+            <div style="height: 220px; width: 100%;">
+                <canvas id="lineChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm rounded-3 p-4 h-100">
+            <h6 class="fw-bold text-dark mb-3">Comparação de Presença por Curso (%)</h6>
+            <div style="height: 220px; width: 100%;">
+                <canvas id="barChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Desempenho por Professor (Top 5 Dinâmico) -->
+<div class="card border-0 shadow-sm rounded-3">
+    <div class="card-body p-4">
+        <h6 class="fw-bold text-dark mb-1">Desempenho por Professor (Top 5 - Frequência de Turmas)</h6>
+        <p class="text-muted small mb-4">Professores com melhores taxas de engajamento acumuladas</p>
+
+        <div class="d-flex flex-column gap-3">
+            {% for prof in top_professores %}
+            <div class="row align-items-center">
+                <div class="col-md-3">
+                    <div class="fw-bold text-dark small mb-0">{{ prof.nome }}</div>
+                    <small class="text-muted" style="font-size: 11px;">{{ prof.departamento or 'Geral' }}</small>
+                </div>
+                <div class="col-md-8">
+                    <div class="progress" style="height: 10px; background-color: #e9ecef;">
+                        <div class="progress-bar {% if prof.media >= 90 %}bg-success{% elif prof.media >= 75 %}bg-primary{% else %}bg-danger{% endif %}" 
+                             role="progressbar" 
+                             style="width: {{ prof.media }}%;">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-1 text-end fw-bold {% if prof.media >= 90 %}text-success{% elif prof.media >= 75 %}text-primary{% else %}text-danger{% endif %} small">
+                    {{ prof.media }}%
+                </div>
+            </div>
+            {% else %}
+            <p class="text-muted small mb-0">Nenhum dado de professor vinculado a turmas e alunos encontrado.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // Dados vindos do Flask
+        const mesesLabels = {{ meses_labels | tojson }};
+        const mesesValores = {{ meses_valores | tojson }};
+        const cursosLabels = {{ cursos_labels | tojson }};
+        const cursosValores = {{ cursos_valores | tojson }};
+
+        // Gráfico de Linha (Evolução Mensal)
+        const ctxLine = document.getElementById('lineChart').getContext('2d');
+        new Chart(ctxLine, {
+            type: 'line',
+            data: {
+                labels: mesesLabels,
+                datasets: [{
+                    data: mesesValores,
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.05)',
+                    borderWidth: 2,
+                    tension: 0.3,
+                    fill: true,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#0d6efd'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { display: false, min: 0, max: 100 },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+
+        // Gráfico de Barras (Presença por Curso)
+        const ctxBar = document.getElementById('barChart').getContext('2d');
+        new Chart(ctxBar, {
+            type: 'bar',
+            data: {
+                labels: cursosLabels.length ? cursosLabels : ['Sem Dados'],
+                datasets: [{
+                    data: cursosValores.length ? cursosValores : [0],
+                    backgroundColor: cursosValores.map(v => v < 75 ? '#dc3545' : '#0d6efd'),
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => ctx.raw + '%'
+                        }
+                    }
+                },
+                scales: {
+                    y: { display: false, min: 0, max: 100 },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

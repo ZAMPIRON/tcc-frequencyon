@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FrequencyON - Totem de Presença</title>
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            background-color: #0f172a;
+        }
+        .video-container {
+            position: relative;
+            overflow: hidden;
+            background-color: #000;
+        }
+        .scanner-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 220px;
+            height: 280px;
+            border: 3px dashed #0dcaf0;
+            border-radius: 50%;
+            pointer-events: none;
+            transition: all 0.3s ease;
+        }
+        .scanner-overlay.success {
+            border: 4px solid #198754;
+            box-shadow: 0 0 30px rgba(25, 135, 84, 0.7);
+        }
+        .avatar-img {
+            width: 120px;
+            height: 120px;
+            object-fit: cover;
+        }
+        .recent-list-container {
+            max-height: 440px;
+            overflow-y: auto;
+        }
+        .recent-list-container::-webkit-scrollbar {
+            width: 6px;
+        }
+        .recent-list-container::-webkit-scrollbar-thumb {
+            background-color: #334155;
+            border-radius: 4px;
+        }
+        .recent-item {
+            background-color: #1e293b;
+            border-color: #334155;
+            animation: fadeIn 0.4s ease-in-out;
+        }
+        .recent-item-img {
+            width: 45px;
+            height: 45px;
+            object-fit: cover;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="d-flex flex-column h-100 text-light">
+
+    <!-- CABEÇALHO -->
+    <header class="navbar navbar-dark bg-dark bg-gradient border-bottom border-secondary px-4 py-3 shadow-sm">
+        <div class="container-fluid d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-3">
+                <i class="fa-solid fa-id-card-clip text-info fs-1"></i>
+                <div>
+                    <h3 class="mb-0 fw-bold text-white">FrequencyON</h3>
+                    <span class="badge bg-secondary text-light">Totem de Presença Facial</span>
+                </div>
+            </div>
+            
+            <div class="d-flex align-items-center gap-4">
+                <button type="button" class="btn btn-outline-info btn-lg fw-bold d-flex align-items-center gap-2 shadow-sm" data-bs-toggle="modal" data-bs-target="#cadastrarFaceModal">
+                    <i class="fa-solid fa-user-plus"></i>
+                    <span>Primeiro Acesso / Cadastrar Face</span>
+                </button>
+
+                <div class="text-end">
+                    <div id="clockTime" class="fs-2 fw-bold text-info">00:00:00</div>
+                    <div id="clockDate" class="small text-secondary">Carregando data...</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <main class="container-fluid my-auto py-3">
+        <div class="row g-3 align-items-stretch justify-content-center">
+
+            <!-- CÂMERA -->
+            <div class="col-lg-5 col-xl-5">
+                <div class="card bg-dark text-white border-secondary shadow-lg h-100">
+                    <div class="card-body p-2 d-flex align-items-center justify-content-center">
+                        <div class="video-container ratio ratio-4x3 border border-2 border-secondary rounded w-100">
+                            <img id="videoStream" src="{{ url_for('reconhecimento.video_feed') }}" class="img-fluid rounded" alt="Câmera do Totem">
+                            <div id="scannerOverlay" class="scanner-overlay"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CARD DE FEEDBACK -->
+            <div class="col-lg-4 col-xl-4">
+                <div id="statusCard" class="card bg-dark bg-gradient text-white border-secondary shadow-lg text-center p-3 h-100">
+                    <div class="card-body d-flex flex-column align-items-center justify-content-center" style="min-height: 380px;">
+
+                        <div id="iconWrapper" class="p-4 rounded-circle bg-secondary bg-opacity-25 mb-3">
+                            <i id="statusIcon" class="fa-solid fa-user-check text-info display-3"></i>
+                        </div>
+
+                        <img id="studentAvatar" src="" alt="Foto Aluno" class="avatar-img rounded-circle border border-4 border-success shadow mb-3 d-none">
+
+                        <h3 id="statusTitle" class="card-title fw-bold text-white mb-2">Aguardando aluno...</h3>
+                        <p id="statusSubtitle" class="card-text text-secondary mb-3">Posicione seu rosto centralizado na câmera para registrar a presença.</p>
+
+                        <div id="studentInfo" class="d-none w-100">
+                            <span id="studentMatricula" class="badge bg-secondary fs-6 px-3 py-2 mb-3">Matrícula: ---</span>
+                            <div class="alert alert-success d-flex align-items-center justify-content-center gap-2 mb-0 fw-bold fs-5 shadow-sm" role="alert">
+                                <i class="fa-solid fa-circle-check fs-4"></i>
+                                <span>Presença Confirmada!</span>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- HISTÓRICO LATERAL -->
+            <div class="col-lg-3 col-xl-3">
+                <div class="card bg-dark text-white border-secondary shadow-lg h-100">
+                    <div class="card-header border-secondary bg-transparent d-flex align-items-center justify-content-between py-3">
+                        <h5 class="mb-0 fw-bold text-info fs-6">
+                            <i class="fa-solid fa-clock-rotate-left me-2"></i>Últimos Registros
+                        </h5>
+                        <span id="totalCount" class="badge bg-info text-dark rounded-pill fw-bold">0</span>
+                    </div>
+
+                    <div class="card-body p-2 recent-list-container" id="recognizedList">
+                        <div id="emptyListMsg" class="text-center text-muted py-5">
+                            <i class="fa-solid fa-users-slash fs-2 mb-2 d-block opacity-50"></i>
+                            <span class="small">Nenhum registro nesta sessão</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- MODAL DE AUTOCADASTRO DE FACE -->
+    <div class="modal fade" id="cadastrarFaceModal" tabindex="-1" aria-labelledby="cadastrarFaceModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-dark text-white border-secondary shadow-lg">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title fw-bold text-info" id="cadastrarFaceModalLabel">
+                        <i class="fa-solid fa-camera me-2"></i>Cadastro de Face Presencial
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4 text-center">
+                    <p class="text-secondary small mb-3">
+                        Olhe diretamente para a câmera do totem e digite sua matrícula abaixo para cadastrar seu rosto.
+                    </p>
+
+                    <div class="mb-3 text-start">
+                        <label for="inputMatricula" class="form-label fw-bold small text-light">Número da Matrícula:</label>
+                        <input type="text" id="inputMatricula" class="form-control form-control-lg bg-secondary bg-opacity-25 text-white border-secondary" placeholder="Ex: 2026001">
+                    </div>
+
+                    <div id="modalAlert" class="alert d-none py-2 small" role="alert"></div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" id="btnCapturarFoto" class="btn btn-success fw-bold px-4" onclick="salvarFotoTotem()">
+                        <i class="fa-solid fa-circle-dot me-1"></i>Capturar e Cadastrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- RODAPÉ -->
+    <footer class="footer mt-auto py-2 bg-dark text-center border-top border-secondary text-secondary small">
+        <div class="container">
+            <i class="fa-solid fa-shield-halved me-1 text-info"></i> Sistema de Reconhecimento Facial FrequencyON
+        </div>
+    </footer>
+
+    <!-- BOOTSTRAP JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clockTime').innerText = now.toLocaleTimeString('pt-BR');
+            document.getElementById('clockDate').innerText = now.toLocaleDateString('pt-BR', {
+                weekday: 'long', day: '2-digit', month: 'long', year: 'numeric'
+            });
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        let resetTimer = null;
+        let totalRegistros = 0;
+
+        function adicionarAoHistorico(nome, matricula, fotoUrl) {
+            const listContainer = document.getElementById('recognizedList');
+            const emptyMsg = document.getElementById('emptyListMsg');
+            const totalCountBadge = document.getElementById('totalCount');
+
+            if (emptyMsg) emptyMsg.remove();
+
+            const horaAtual = new Date().toLocaleTimeString('pt-BR');
+            const avatarSrc = fotoUrl || 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+
+            const itemHtml = `
+                <div class="recent-item d-flex align-items-center p-2 mb-2 rounded border shadow-sm">
+                    <img src="${avatarSrc}" class="recent-item-img rounded-circle border border-2 border-success me-2" alt="${nome}" onerror="this.src='https://cdn-icons-png.flaticon.com/512/149/149071.png'">
+                    <div class="flex-grow-1 overflow-hidden me-2">
+                        <div class="fw-bold text-white text-truncate small">${nome}</div>
+                        <div class="text-secondary" style="font-size: 0.75rem;">Mat: ${matricula}</div>
+                    </div>
+                    <div class="text-end">
+                        <span class="badge bg-success bg-opacity-25 text-success border border-success px-2 py-1" style="font-size: 0.7rem;">
+                            <i class="fa-regular fa-clock me-1"></i>${horaAtual}
+                        </span>
+                    </div>
+                </div>
+            `;
+
+            listContainer.insertAdjacentHTML('afterbegin', itemHtml);
+            totalRegistros++;
+            totalCountBadge.innerText = totalRegistros;
+
+            if (listContainer.children.length > 15) {
+                listContainer.lastElementChild.remove();
+            }
+        }
+
+        function exibirSucessoAluno(nome, matricula, fotoUrl) {
+            const scannerOverlay = document.getElementById('scannerOverlay');
+            const iconWrapper = document.getElementById('iconWrapper');
+            const studentAvatar = document.getElementById('studentAvatar');
+            const statusTitle = document.getElementById('statusTitle');
+            const statusSubtitle = document.getElementById('statusSubtitle');
+            const studentInfo = document.getElementById('studentInfo');
+            const studentMatricula = document.getElementById('studentMatricula');
+
+            adicionarAoHistorico(nome, matricula, fotoUrl);
+
+            scannerOverlay.classList.add('success');
+            iconWrapper.classList.add('d-none');
+            
+            if (fotoUrl) {
+                studentAvatar.src = fotoUrl;
+                studentAvatar.classList.remove('d-none');
+            }
+
+            statusTitle.innerText = `Bem-vindo(a), ${nome}!`;
+            statusTitle.className = 'card-title fw-bold text-success mb-2';
+            statusSubtitle.innerText = 'Presença registrada no sistema.';
+            
+            studentMatricula.innerText = `Matrícula: ${matricula}`;
+            studentInfo.classList.remove('d-none');
+
+            if (resetTimer) clearTimeout(resetTimer);
+            resetTimer = setTimeout(resetarInterface, 4000);
+        }
+
+        function resetarInterface() {
+            const scannerOverlay = document.getElementById('scannerOverlay');
+            const iconWrapper = document.getElementById('iconWrapper');
+            const studentAvatar = document.getElementById('studentAvatar');
+            const statusTitle = document.getElementById('statusTitle');
+            const statusSubtitle = document.getElementById('statusSubtitle');
+            const studentInfo = document.getElementById('studentInfo');
+
+            scannerOverlay.classList.remove('success');
+            studentAvatar.classList.add('d-none');
+            iconWrapper.classList.remove('d-none');
+
+            statusTitle.innerText = "Aguardando aluno...";
+            statusTitle.className = 'card-title fw-bold text-white mb-2';
+            statusSubtitle.innerText = "Posicione seu rosto centralizado na câmera para registrar a presença.";
+            studentInfo.classList.add('d-none');
+        }
+
+        // FUNÇÃO DE CADASTRO DIRETO NO TOTEM
+        function salvarFotoTotem() {
+            const matricula = document.getElementById('inputMatricula').value.trim();
+            const modalAlert = document.getElementById('modalAlert');
+            const btnCapturar = document.getElementById('btnCapturarFoto');
+
+            if (!matricula) {
+                modalAlert.className = 'alert alert-danger py-2 small';
+                modalAlert.innerText = 'Informe a matrícula antes de capturar!';
+                modalAlert.classList.remove('d-none');
+                return;
+            }
+
+            btnCapturar.disabled = true;
+            btnCapturar.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Salvando...';
+
+            fetch('/api/cadastrar_foto', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json' // Corrigido para application/json
+                },
+                body: JSON.stringify({ matricula: matricula })
+            })
+            .then(async res => {
+                const data = await res.json();
+                btnCapturar.disabled = false;
+                btnCapturar.innerHTML = '<i class="fa-solid fa-circle-dot me-1"></i>Capturar e Cadastrar';
+
+                if (res.ok && data.sucesso) {
+                    modalAlert.className = 'alert alert-success py-2 small';
+                    modalAlert.innerText = data.mensagem;
+                    modalAlert.classList.remove('d-none');
+
+                    setTimeout(() => {
+                        document.getElementById('inputMatricula').value = '';
+                        modalAlert.classList.add('d-none');
+                        const modalElement = document.getElementById('cadastrarFaceModal');
+                        const modalInstance = bootstrap.Modal.getInstance(modalElement);
+                        if (modalInstance) modalInstance.hide();
+                    }, 1500);
+                } else {
+                    modalAlert.className = 'alert alert-danger py-2 small';
+                    modalAlert.innerText = data.mensagem || 'Erro ao cadastrar foto.';
+                    modalAlert.classList.remove('d-none');
+                }
+            })
+            .catch(err => {
+                btnCapturar.disabled = false;
+                btnCapturar.innerHTML = '<i class="fa-solid fa-circle-dot me-1"></i>Capturar e Cadastrar';
+                modalAlert.className = 'alert alert-danger py-2 small';
+                modalAlert.innerText = 'Erro de conexão com o servidor.';
+                modalAlert.classList.remove('d-none');
+            });
+        }
+
+        // POLLING PERIÓDICO DE EVENTOS DE PRESENÇA
+        function verificarReconhecimento() {
+            fetch('/api/reconhecimento')
+            .then(res => res.json())
+            .then(data => {
+                if (data && data.reconhecido) {
+                    const dados = data.dados;
+                    exibirSucessoAluno(dados.nome, dados.matricula, dados.foto);
+                }
+            })
+            .catch(() => {});
+        }
+
+        setInterval(verificarReconhecimento, 1000);
+    </script>
+</body>
+</html>

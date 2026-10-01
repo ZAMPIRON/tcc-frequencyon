@@ -1,0 +1,8 @@
+flask>=3.0
+flask-sqlalchemy>=3.1
+numpy
+opencv-python
+dlib-bin
+face_recognition_models
+setuptools<81
+face_recognition

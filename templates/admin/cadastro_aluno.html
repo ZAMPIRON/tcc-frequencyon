@@ -1,0 +1,56 @@
+{% extends 'admin/base.html' %}
+
+{% block title %}Cadastrar Aluno{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Cadastrar Novo Aluno</h2>
+    
+    <form action="{{ url_for('admin.novo_aluno') }}" method="POST" enctype="multipart/form-data">
+        <div class="mb-3">
+            <label>Nome Completo *</label>
+            <input type="text" name="nome" class="form-control" required placeholder="Ex: Carlos Silva">
+        </div>
+
+        <div class="mb-3">
+            <label>E-mail *</label>
+            <input type="email" name="email" class="form-control" required placeholder="carlos@escola.com">
+        </div>
+
+        <div class="mb-3">
+            <label>Matrícula *</label>
+            <input type="text" name="matricula" class="form-control" required placeholder="Ex: 20261001">
+        </div>
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label small fw-bold">Nº Chamada</label>
+                <input type="number" min="1" name="numero_chamada" class="form-control" placeholder="Ex: 12">
+            </div>
+
+            <div class="col-md-9">
+                <label class="form-label small fw-bold">Foto do Aluno</label>
+                <input type="file" name="foto" class="form-control" accept="image/*">
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label>Senha de Acesso *</label>
+            <input type="password" name="senha" class="form-control" required placeholder="Defina a senha">
+        </div>
+
+        
+
+        <div class="mb-3">
+            <label>Turma</label>
+            <select name="turma_id" class="form-select">
+                <option value="">Selecione uma turma (Opcional)</option>
+                {% for turma in turmas %}
+                    <option value="{{ turma.id }}">{{ turma.nome }} - {{ turma.curso }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-success">Cadastrar Aluno</button>
+    </form>
+</div>
+{% endblock %}

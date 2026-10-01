@@ -1,0 +1,112 @@
+{% extends 'admin/base.html' %}
+
+{% block title %}Professores - FrequencyOn{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h1 class="h4 fw-bold text-dark mb-1">Docentes e Professores</h1>
+        <p class="text-muted mb-0 small">Corpo docente cadastrado no sistema</p>
+    </div>
+    <button class="btn btn-primary fw-semibold btn-sm px-3 py-2 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalProfessor">
+        <i class="fa-solid fa-plus me-1"></i> Cadastrar Professor
+    </button>
+</div>
+
+<div class="card border-0 shadow-sm rounded-3">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light small">
+                    <tr>
+                        <th class="ps-3">Foto</th>
+                        <th>Nome</th>
+                        <th>E-mail</th>
+                        <th>Departamento</th>
+                        <th>Turmas Atribuídas</th>
+                        <th class="text-end pe-3">Ações</th>
+                    </tr>
+                </thead>
+                <tbody class="small">
+                    {% for professor in professores %}
+                    <tr>
+                        <td class="ps-3">
+                            {% if professor.foto %}
+                                <img src="{{ professor.foto }}" 
+                                     alt="{{ professor.nome }}" 
+                                     class="rounded-circle border object-fit-cover" 
+                                     style="width: 36px; height: 36px;">
+                            {% else %}
+                                <div class="avatar-initial rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold" style="width: 36px; height: 36px; font-size: 14px;">
+                                    {{ professor.nome | inicial if professor.nome else 'P' }}
+                                </div>
+                            {% endif %}
+                        </td>
+                        <td class="fw-bold text-dark">{{ professor.nome }}</td>
+                        <td class="text-muted">{{ professor.email or '-' }}</td>
+                        <td><span class="badge bg-secondary bg-opacity-10 text-secondary fw-semibold">{{ professor.departamento or 'Geral' }}</span></td>
+                        <td><span class="badge bg-info bg-opacity-10 text-info fw-semibold">{{ professor.turmas|length if professor.turmas else 0 }} turma(s)</span></td>
+                        <td class="text-end pe-3">
+                            <form method="POST" action="{{ url_for('admin.deletar_professor', id=professor.id) }}" style="display:inline;" onsubmit="return confirm('Tem certeza que deseja excluir este professor?');">
+                                <button type="submit" class="btn btn-outline-danger btn-sm border-0" title="Excluir Professor">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">Nenhum professor cadastrado até o momento.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Adicionar Professor -->
+<div class="modal fade" id="modalProfessor" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form method="POST" action="{{ url_for('admin.professores') }}" enctype="multipart/form-data">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <h5 class="modal-title h6 fw-bold">Novo Professor</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-secondary">Nome Completo</label>
+                        <input type="text" name="nome" class="form-control form-control-sm" placeholder="Ex: Carlos Silva" required>
+                    </div>
+                    
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-secondary">E-mail (Login)</label>
+                            <input type="email" name="email" class="form-control form-control-sm" placeholder="professor@escola.com" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-secondary">Senha de Acesso</label>
+                            <input type="password" name="senha" class="form-control form-control-sm" placeholder="Mínimo 6 caracteres" minlength="6" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-secondary">Departamento / Disciplina</label>
+                        <input type="text" name="departamento" class="form-control form-control-sm" placeholder="Ex: Informática / Programação" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-secondary">Foto do Perfil</label>
+                        <input type="file" name="foto" class="form-control form-control-sm" accept="image/*">
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary btn-sm px-4">Salvar Cadastro</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

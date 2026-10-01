@@ -1,0 +1,47 @@
+{% extends 'admin/base.html' %}
+
+{% block title %}Risco de Evasão - FrequencyOn{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h1 class="h4 fw-bold text-danger mb-1"><i class="fa-solid fa-triangle-exclamation me-1"></i> Alunos em Risco de Evasão</h1>
+    <p class="text-muted mb-0 small">Estudantes com frequência escolar abaixo do limite regulamentar (75%)</p>
+</div>
+
+<div class="card border-0 shadow-sm rounded-3">
+    <div class="card-body p-0">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light small">
+                <tr>
+                    <th>Matrícula</th>
+                    <th>Aluno</th>
+                    <th>Turma</th>
+                    <th>Frequência Atual</th>
+                    <th>Status de Alerta</th>
+                </tr>
+            </thead>
+            <tbody class="small">
+                {% for aluno in alunos %}
+                <tr>
+                    <td class="fw-bold">{{ aluno.matricula }}</td>
+                    <td>{{ aluno.nome }}</td>
+                    <td>{{ aluno.turma.nome if aluno.turma else 'Sem turma' }}</td>
+                    <td class="fw-bold text-danger">{{ aluno.frequencia }}%</td>
+                    <td>
+                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
+                            ALERTA CRÍTICO
+                        </span>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center text-success py-4">
+                        <i class="fa-solid fa-circle-check me-1"></i> Nenhum aluno em risco de evasão detectado no momento.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
