@@ -20,12 +20,12 @@ def popular_banco():
 
         print("Criando Administrador...")
         admin = Admin(nome="Admin Principal", email="admin@senai.com")
-        admin.set_senha("senha_admin123") # Usa o seu UsuarioMixin para gerar o hash
+        admin.set_senha("admin123") # Usa o seu UsuarioMixin para gerar o hash
         db.session.add(admin)
 
         print("Criando Professor...")
         prof = Professor(nome="Carlos Silva", email="carlos@professor.senai.com", departamento="TI")
-        prof.set_senha("senha_prof123")
+        prof.set_senha("prof123")
         db.session.add(prof)
 
         # Precisamos fazer um commit parcial aqui para gerar o ID do professor no banco,
@@ -33,7 +33,7 @@ def popular_banco():
         db.session.commit()
 
         print("Criando Turma...")
-        turma = Turma(nome="Banco de Dados I", curso="Análise de Sistemas", professor_id=prof.id)
+        turma = Turma(nome="C13", curso="Análise de Desenvolvimento de Sistemas", professor_id=prof.id)
         db.session.add(turma)
         
         # Commit parcial para gerar o ID da turma
@@ -41,25 +41,35 @@ def popular_banco():
 
         print("Criando Alunos...")
         aluno1 = Aluno(
-            nome="João Souza", 
-            email="joao@aluno.senai.com", 
-            matricula="2023001", 
-            numero_chamada=1, 
+            nome="Gustavo Lopes Zampiron", 
+            email="gustavo@aluno.senai.com", 
+            matricula="2025001", 
+            numero_chamada=9, 
             turma_id=turma.id
         )
         aluno1.set_senha("123")
         
         aluno2 = Aluno(
-            nome="Maria Oliveira", 
-            email="maria@aluno.senai.com", 
-            matricula="2023002", 
-            numero_chamada=2, 
+            nome="Nicolas Luciani", 
+            email="nicolas@aluno.senai.com", 
+            matricula="2025002", 
+            numero_chamada=25, 
             turma_id=turma.id
         )
         aluno2.set_senha("123")
 
+        aluno3 = Aluno(
+            nome="Samuel Gustavo", 
+            email="samuel@aluno.senai.com", 
+            matricula="2025003", 
+            numero_chamada=30, 
+            turma_id=turma.id
+        )
+        aluno3.set_senha("123")
+
         db.session.add(aluno1)
         db.session.add(aluno2)
+        db.session.add(aluno3)
 
         # Salva tudo no banco definitivamente
         db.session.commit()

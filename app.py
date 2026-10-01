@@ -121,10 +121,10 @@ def dashboard():
         "admin/dashboard.html",
         total_alunos=len(alunos), total_professores=Professor.query.count(),
         total_turmas=len(turmas),
-        frequencia_geral=round(sum(freqs) / len(freqs)) if freqs else 100,
+        frequencia_geral=round(sum(freqs) / len(freqs)) if freqs else 0,
         frequencia_por_curso=[(c, sum(v) / len(v)) for c, v in por_curso.items()],
         turmas_criticas=sorted(turmas, key=lambda t: t.frequencia_media)[:5],
-        alunos_em_risco=sum(1 for f in freqs if f < 75))
+        alunos_em_risco=sum(1 for x in alunos if x.presencas and x.frequencia < 75))
 
 
 @admin.route("/alunos")
@@ -255,7 +255,7 @@ def desvincular_aluno(aluno_id):
 @requer("admin")
 def risco_evasao():
     return render_template("admin/risco_evasao.html",
-                           alunos=sorted([a for a in Aluno.query.all() if a.frequencia < 75],
+                           alunos=sorted([a for a in Aluno.query.all() if a.presencas and a.frequencia < 75],
                                          key=lambda a: a.frequencia))
 
 
@@ -275,9 +275,9 @@ def relatorios():
     n = len(alunos)
     return render_template(
         "admin/relatorios.html", total_alunos=n,
-        media_geral=round(sum(freqs) / n) if n else 100,
-        alunos_criticos=sum(1 for f in freqs if f < 75),
-        taxa_evasao=round(100 * sum(1 for f in freqs if f < 50) / n, 1) if n else 0,
+        media_geral=round(sum(freqs) / n) if n else 0,
+        alunos_criticos=sum(1 for x in alunos if x.presencas and x.frequencia < 75),
+        taxa_evasao=round(100 * sum(1 for x in alunos if x.presencas and x.frequencia < 50) / n, 1) if n else 0,
         cursos_labels=list(por_curso), cursos_valores=[round(sum(v) / len(v)) for v in por_curso.values()],
         meses_labels=[k[5:] + "/" + k[:4] for k in chaves],
         meses_valores=[round(100 * meses[k][0] / meses[k][1]) for k in chaves],

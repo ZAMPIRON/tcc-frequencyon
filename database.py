@@ -17,8 +17,8 @@ def _hora_env(nome, padrao):
 
 
 # Regras de horário do totem (mude aqui ou por variável de ambiente)
-HORARIO_PRESENTE = _hora_env("HORARIO_PRESENTE", "13:26")  # até aqui = presente
-HORARIO_ATRASO = _hora_env("HORARIO_ATRASO", "13:27")      # até aqui = atraso; depois = falta
+HORARIO_PRESENTE = _hora_env("HORARIO_PRESENTE", "07:05")  # até aqui = presente
+HORARIO_ATRASO = _hora_env("HORARIO_ATRASO", "11:00")      # até aqui = atraso; depois = falta
 
 
 class UsuarioMixin:
@@ -51,7 +51,7 @@ class Professor(UsuarioMixin, db.Model):
     @property
     def media(self):
         v = [t.frequencia_media for t in self.turmas]
-        return round(sum(v) / len(v)) if v else 100
+        return round(sum(v) / len(v)) if v else 0
 
 
 class Turma(db.Model):
@@ -66,7 +66,7 @@ class Turma(db.Model):
     @property
     def frequencia_media(self):
         v = [a.frequencia for a in self.alunos]
-        return round(sum(v) / len(v), 1) if v else 100
+        return round(sum(v) / len(v), 1) if v else 0
 
 
 class Aluno(UsuarioMixin, db.Model):
@@ -85,10 +85,10 @@ class Aluno(UsuarioMixin, db.Model):
 
     @property
     def frequencia(self):
-        """% de aulas presentes/atraso nos dias com chamada (sem registro = falta)."""
+        """% de aulas presentes/atraso nos dias com chamada. Sem nenhum registro = 0."""
         dias = db.session.query(func.count(func.distinct(Presenca.data))).scalar()
         if not dias:
-            return 100
+            return 0
         ok = (db.session.query(func.count(Presenca.id))
               .filter(Presenca.aluno_id == self.id, Presenca.status.in_(("presente", "atraso")))
               .scalar())
@@ -113,8 +113,8 @@ def status_por_horario(agora=None):
     if t <= HORARIO_PRESENTE:
         return "presente"
     if t <= HORARIO_ATRASO:
-        return "atraso"
-    return "falta"
+        return "presente"  # Considera presente mesmo que atrasado, para não prejudicar o aluno
+    return "presente"
 
 
 def registrar_presenca_totem(aluno, agora=None):
