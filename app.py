@@ -7,6 +7,9 @@ from datetime import date, timedelta
 from functools import wraps
 
 import cv2
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 from flask import (Flask, Blueprint, render_template, request, redirect, url_for,
                    flash, session, jsonify, Response)
 from sqlalchemy import or_
@@ -306,9 +309,8 @@ def risco_evasao():
                                          key=lambda a: a.frequencia))
 
 
-@admin.route("/relatorios")
-@requer("admin")
-def relatorios():
+def _dados_relatorio():
+    """Indicadores usados na página de relatórios e na planilha exportada."""
     alunos, turmas = Aluno.query.all(), Turma.query.all()
     freqs = [a.frequencia for a in alunos]
     por_curso = {}
@@ -323,15 +325,171 @@ def relatorios():
         meses[p.data.strftime("%Y-%m")] = (ok + (p.status != "falta"), tot + 1)
     chaves = sorted(meses)[-6:]
     n = len(alunos)
-    return render_template(
-        "admin/relatorios.html", total_alunos=n,
+    em_risco = sum(1 for x in alunos if x.presencas and x.frequencia < 75)
+    return dict(
+        alunos=alunos, turmas=turmas, total_alunos=n,
         media_geral=round(sum(freqs) / n) if n else 0,
-        alunos_criticos=sum(1 for x in alunos if x.presencas and x.frequencia < 75),
-        taxa_evasao=round(100 * sum(1 for x in alunos if x.presencas and x.frequencia < 50) / n, 1) if n else 0,
+        alunos_criticos=em_risco,
+        taxa_evasao=round(100 * em_risco / n, 1) if n else 0,
         cursos_labels=list(por_curso), cursos_valores=[round(sum(v) / len(v)) for v in por_curso.values()],
         meses_labels=[k[5:] + "/" + k[:4] for k in chaves],
         meses_valores=[round(100 * meses[k][0] / meses[k][1]) for k in chaves],
         top_professores=sorted(Professor.query.all(), key=lambda p: p.media, reverse=True)[:5])
+
+
+@admin.route("/relatorios")
+@requer("admin")
+def relatorios():
+    return render_template("admin/relatorios.html", **_dados_relatorio())
+
+
+def _situacao(freq):
+    return "Regular" if freq >= 75 else ("Atenção" if freq >= 50 else "Crítico")
+
+
+@admin.route("/relatorios/exportar")
+@requer("admin")
+def exportar_relatorio():
+    """Planilha Excel com resumo, alunos, turmas, professores, alunos em risco e justificativas."""
+    dados = _dados_relatorio()
+    wb = Workbook()
+
+    titulo_fonte = Font(bold=True, size=16, color="3B2FBF")
+    cab_fonte = Font(bold=True, color="FFFFFF")
+    cab_fundo = PatternFill("solid", fgColor="5B4BFF")
+    secao_fonte = Font(bold=True, size=12, color="3B2FBF")
+    cores_situacao = {"Regular": "D1FAE5", "Atenção": "FEF3C7", "Crítico": "FEE2E2"}
+    cores_justificativa = {"aceita": "D1FAE5", "pendente": "FEF3C7", "recusada": "FEE2E2"}
+
+    def tabela(ws, linha, cabecalho, linhas, larguras, formatos=None, coluna_cor=None, cores=None):
+        """Escreve uma tabela a partir de `linha`; formatos = {índice da coluna: formato numérico}."""
+        for c, texto in enumerate(cabecalho, 1):
+            cel = ws.cell(row=linha, column=c, value=texto)
+            cel.font, cel.fill = cab_fonte, cab_fundo
+            cel.alignment = Alignment(vertical="center", wrap_text=True)
+        for i, valores in enumerate(linhas, linha + 1):
+            for c, v in enumerate(valores, 1):
+                cel = ws.cell(row=i, column=c, value=v)
+                if formatos and (c - 1) in formatos:
+                    cel.number_format = formatos[c - 1]
+            if coluna_cor is not None and valores[coluna_cor] in cores:
+                fundo = PatternFill("solid", fgColor=cores[valores[coluna_cor]])
+                for c in range(1, len(valores) + 1):
+                    ws.cell(row=i, column=c).fill = fundo
+        for c, largura in enumerate(larguras, 1):
+            ws.column_dimensions[get_column_letter(c)].width = max(
+                ws.column_dimensions[get_column_letter(c)].width or 0, largura)
+        return linha + len(linhas) + 1
+
+    def contagens(aluno):
+        dias = aluno.turma.dias_aula if aluno.turma else ()
+        st = [p.status for p in aluno.presencas if eh_dia_com_aula(p.data, dias)]
+        return st.count("presente"), st.count("atraso"), st.count("falta")
+
+    alunos = sorted(dados["alunos"], key=lambda a: ((a.turma.nome if a.turma else "~"), a.nome))
+    linhas_alunos = []
+    for a in alunos:
+        pres, atr, fal = contagens(a)
+        linhas_alunos.append([a.matricula, a.nome, a.turma.nome if a.turma else "Sem turma",
+                              a.turma.curso if a.turma else "-", a.turma.dias_aula_nomes if a.turma else "-",
+                              pres, atr, fal, a.frequencia / 100,
+                              _situacao(a.frequencia) if a.presencas else "Sem registros"])
+
+    # ---------- Resumo ----------
+    ws = wb.active
+    ws.title = "Resumo"
+    ws["A1"] = "FrequencyON - Relatório de Frequência"
+    ws["A1"].font = titulo_fonte
+    ws["A2"] = "Gerado em " + agora_local().strftime("%d/%m/%Y %H:%M")
+    ws["A2"].font = Font(italic=True, color="6B7280")
+
+    ws["A4"] = "Indicadores gerais"
+    ws["A4"].font = secao_fonte
+    indicadores = [
+        ["Alunos matriculados", dados["total_alunos"]],
+        ["Turmas", len(dados["turmas"])],
+        ["Professores", Professor.query.count()],
+        ["Frequência média da instituição", dados["media_geral"] / 100],
+        ["Alunos em risco (frequência < 75%)", dados["alunos_criticos"]],
+        ["Taxa de risco", dados["taxa_evasao"] / 100],
+        ["Justificativas pendentes", Justificativa.query.filter_by(status="pendente").count()],
+    ]
+    linha = tabela(ws, 5, ["Indicador", "Valor"], indicadores, [40, 16])
+    ws.cell(row=9, column=2).number_format = "0%"
+    ws.cell(row=11, column=2).number_format = "0.0%"
+
+    linha += 1
+    ws.cell(row=linha, column=1, value="Frequência mensal (últimos 6 meses com aula)").font = secao_fonte
+    linha = tabela(ws, linha + 1, ["Mês", "Frequência"],
+                   [[m, v / 100] for m, v in zip(dados["meses_labels"], dados["meses_valores"])],
+                   [40, 16], {1: "0%"})
+    linha += 1
+    ws.cell(row=linha, column=1, value="Frequência por curso").font = secao_fonte
+    tabela(ws, linha + 1, ["Curso", "Frequência"],
+           [[c, v / 100] for c, v in zip(dados["cursos_labels"], dados["cursos_valores"])],
+           [40, 16], {1: "0%"})
+
+    # ---------- Alunos ----------
+    cab_alunos = ["Matrícula", "Nome", "Turma", "Curso", "Dias de aula",
+                  "Aulas presente", "Aulas com atraso", "Aulas com falta", "Frequência", "Situação"]
+    larg_alunos = [12, 32, 14, 34, 18, 14, 16, 15, 12, 14]
+    ws = wb.create_sheet("Alunos")
+    tabela(ws, 1, cab_alunos, linhas_alunos, larg_alunos, {8: "0%"}, 9, cores_situacao)
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = ws.dimensions
+
+    # ---------- Turmas ----------
+    ws = wb.create_sheet("Turmas")
+    tabela(ws, 1, ["Turma", "Curso", "Professores", "Dias de aula", "Alunos", "Frequência média", "Alunos em risco"],
+           [[t.nome, t.curso, t.nomes_professores, t.dias_aula_nomes, len(t.alunos), t.frequencia_media / 100,
+             sum(1 for a in t.alunos if a.presencas and a.frequencia < 75)]
+            for t in sorted(dados["turmas"], key=lambda t: t.nome)],
+           [14, 34, 30, 18, 9, 17, 15], {5: "0.0%"})
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = ws.dimensions
+
+    # ---------- Professores ----------
+    ws = wb.create_sheet("Professores")
+    tabela(ws, 1, ["Professor", "E-mail", "Departamento", "Turmas (dias de aula)", "Frequência média das turmas"],
+           [[p.nome, p.email, p.departamento or "-",
+             "; ".join(f"{v.turma.nome} ({v.dias_nomes})"
+                       for v in sorted(p.vinculos, key=lambda v: v.turma.nome)) or "-",
+             p.media / 100]
+            for p in sorted(Professor.query.all(), key=lambda p: p.nome)],
+           [28, 30, 18, 40, 16], {4: "0%"})
+    ws.freeze_panes = "A2"
+
+    # ---------- Em risco ----------
+    ws = wb.create_sheet("Em risco")
+    risco = sorted((l for l in linhas_alunos if l[9] in ("Atenção", "Crítico")), key=lambda l: l[8])
+    if risco:
+        tabela(ws, 1, cab_alunos, risco, larg_alunos, {8: "0%"}, 9, cores_situacao)
+        ws.freeze_panes = "A2"
+    else:
+        ws["A1"] = "Nenhum aluno com frequência abaixo de 75%."
+
+    # ---------- Justificativas ----------
+    ws = wb.create_sheet("Justificativas")
+    js = Justificativa.query.order_by(Justificativa.data.desc()).all()
+    if js:
+        tabela(ws, 1, ["Data da falta", "Aluno", "Matrícula", "Turma", "Motivo", "Situação",
+                       "Enviada em", "Respondida em"],
+               [[j.data, j.aluno.nome, j.aluno.matricula, j.aluno.turma.nome if j.aluno.turma else "-",
+                 j.motivo, j.status, j.criada_em, j.respondida_em] for j in js],
+               [13, 28, 12, 12, 50, 12, 17, 17],
+               {0: "DD/MM/YYYY", 6: "DD/MM/YYYY HH:MM", 7: "DD/MM/YYYY HH:MM"},
+               5, cores_justificativa)
+        ws.freeze_panes = "A2"
+        ws.auto_filter.ref = ws.dimensions
+    else:
+        ws["A1"] = "Nenhuma justificativa enviada."
+
+    saida = io.BytesIO()
+    wb.save(saida)
+    nome = f"relatorio_frequencyon_{hoje_local().isoformat()}.xlsx"
+    return Response(saida.getvalue(),
+                    mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f"attachment; filename={nome}"})
 
 
 # ============================ PROFESSOR ============================

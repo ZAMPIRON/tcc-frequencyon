@@ -102,7 +102,7 @@
             document.getElementById('dataHoje').textContent = txt.charAt(0).toUpperCase() + txt.slice(1);
             const h = agora.getHours();
             const s = document.getElementById('saudacao');
-            s.textContent = (h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite') + ', {{ usuario.nome.split()[0] }}! ✨';
+            s.textContent = (h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite') + ', {{ usuario.nome.split()[0] }}!';
         })();
 
         // gaveta do menu no celular

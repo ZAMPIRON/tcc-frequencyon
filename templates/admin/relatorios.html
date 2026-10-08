@@ -14,9 +14,9 @@
             <span class="input-group-text bg-white text-muted border-end-0"><i class="fa-regular fa-calendar"></i></span>
             <input type="text" class="form-control border-start-0 largura-max-150" value="Últimos 6 meses" readonly>
         </div>
-        <button class="btn btn-primary btn-sm px-3 d-flex align-items-center gap-2 text-nowrap" onclick="window.print()">
-            <i class="fa-solid fa-download"></i> Exportar
-        </button>
+        <a href="{{ url_for('admin.exportar_relatorio') }}" class="btn btn-primary btn-sm px-3 d-flex align-items-center gap-2 text-nowrap">
+            <i class="fa-solid fa-file-excel"></i> Exportar Excel
+        </a>
     </div>
 </div>
 

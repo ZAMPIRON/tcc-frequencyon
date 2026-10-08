@@ -141,7 +141,7 @@ On first start the database is created in `instance/frequencyon.db` along with a
 python seed.py
 ```
 
-> ⚠️ `seed.py` **deletes all existing data** (students, classes, attendance, justifications) before creating one admin, one teacher, one class (Tue/Thu) and three students. Use it only on a demo database.
+> WARNING: `seed.py` **deletes all existing data** (students, classes, attendance, justifications) before creating one admin, one teacher, one class (Tue/Thu) and three students. Use it only on a demo database.
 
 ## Configuration
 
@@ -206,6 +206,7 @@ FrequencyON processes **biometric data of students, many of them minors**. Biome
 - [ ] Add liveness detection: HOG + encoding matching alone can be fooled by a printed photo.
 
 ## Roadmap
+
 
 - **Product:** English and Spanish UI, notifications to guardians when attendance drops, ready-made reports for education departments.
 - **Platform:** multi-school (multi-tenant) accounts, PostgreSQL, deployment with Docker.

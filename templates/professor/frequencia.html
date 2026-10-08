@@ -360,7 +360,7 @@
             }
         }
 
-        // turma inteira presente em todas as aulas = festa 🎉
+        // turma inteira presente em todas as aulas = festa
         let jaComemorou = false;
         function verificarTurmaCompleta() {
             const barras = document.querySelectorAll('.bar');
@@ -369,7 +369,7 @@
             if (todasOk && !jaComemorou) {
                 jaComemorou = true;
                 FO.confete();
-                FO.toast('Turma completa! Todos presentes em todas as aulas 🎉', 'success');
+                FO.toast('Turma completa! Todos presentes em todas as aulas', 'success');
             } else if (!todasOk) {
                 jaComemorou = false;
             }
