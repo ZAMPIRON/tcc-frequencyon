@@ -4,142 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chamada do Dia - Professor</title>
-    {% include '_fo_head.html' %}
+    {% include 'componentes/cabecalho.html' %}
+    <link href="{{ url_for('static', filename='css/professor.css') }}" rel="stylesheet">
 
-    <style>
-        .avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 12px;
-            background: var(--fo-grad);
-            color: #ffffff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 0.85rem;
-            box-shadow: 0 6px 16px -6px rgba(162, 107, 255, .8);
-            flex-shrink: 0;
-        }
-
-        .bar-container {
-            display: flex;
-            gap: 5px;
-        }
-
-        .bar {
-            width: 18px;
-            height: 32px;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: transform 0.18s cubic-bezier(.2, .9, .3, 1.5), background-color 0.25s ease, box-shadow .25s;
-            animation: barra-entra .5s cubic-bezier(.2, .9, .3, 1.4) both;
-        }
-        @keyframes barra-entra { from { transform: scaleY(0); opacity: 0; } to { transform: none; opacity: 1; } }
-        .bar-container .bar:nth-child(2) { animation-delay: 30ms; }
-        .bar-container .bar:nth-child(3) { animation-delay: 60ms; }
-        .bar-container .bar:nth-child(4) { animation-delay: 90ms; }
-        .bar-container .bar:nth-child(5) { animation-delay: 120ms; }
-        .bar-container .bar:nth-child(6) { animation-delay: 150ms; }
-        .bar-container .bar:nth-child(7) { animation-delay: 180ms; }
-        .bar-container .bar:nth-child(8) { animation-delay: 210ms; }
-        .bar-container .bar:nth-child(9) { animation-delay: 240ms; }
-        .bar-container .bar:nth-child(10) { animation-delay: 270ms; }
-
-        .bar:hover {
-            transform: scale(1.22) translateY(-2px);
-        }
-        .bar.pulou { animation: barra-pula .45s cubic-bezier(.2, .9, .3, 1.6); }
-        @keyframes barra-pula { 0% { transform: scale(1); } 40% { transform: scale(1.45, .8); } 100% { transform: scale(1); } }
-
-        .bar-bloqueada {
-            cursor: pointer;
-            opacity: 0.6;
-        }
-
-        .bar-bloqueada:hover {
-            transform: none;
-        }
-
-        /* Estados das barras */
-        .bar.on { background: linear-gradient(180deg, #4dffb5, #12c47f); box-shadow: 0 0 12px -2px rgba(34, 225, 154, .7); }
-        .bar.off { background: linear-gradient(180deg, #ff7a93, #e8304f); box-shadow: 0 0 12px -2px rgba(255, 77, 109, .6); }
-        .bar.late { background: linear-gradient(180deg, #ffd66b, #f59e0b); box-shadow: 0 0 12px -2px rgba(255, 194, 61, .7); }
-
-        .navbar-fo {
-            margin: 12px;
-            border-radius: 20px !important;
-            padding: .75rem 1.25rem;
-            position: sticky; top: 12px; z-index: 1020;
-        }
-        .stat-icone {
-            width: 44px; height: 44px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
-            font-size: 1.2rem; color: #fff;
-        }
-
-        /* Calendário */
-        .cal-grid {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 4px;
-            text-align: center;
-        }
-        .cal-head {
-            font-size: 0.7rem;
-            font-weight: 700;
-            color: var(--fo-muted);
-            text-transform: uppercase;
-            padding-bottom: 2px;
-        }
-        .cal-dia {
-            position: relative;
-            aspect-ratio: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            border-radius: 10px;
-            font-size: 0.85rem;
-            color: #adb5bd;
-            text-decoration: none;
-            border: 2px solid transparent;
-            line-height: 1;
-        }
-        .cal-dia.fora { visibility: hidden; }
-        .cal-dia { color: var(--fo-muted); opacity: .55; }
-        .cal-dia.aula { color: var(--fo-text); background: rgba(91, 140, 255, .12); font-weight: 700; opacity: 1; border-color: rgba(91, 140, 255, .18); }
-        .cal-dia.aula.futuro { background: var(--fo-surface-2); color: var(--fo-muted); font-weight: 500; opacity: .8; }
-        a.cal-dia:hover { background: rgba(91, 140, 255, .25); transform: translateY(-2px) scale(1.06); transition: all .2s cubic-bezier(.2,.9,.3,1.5); box-shadow: 0 8px 20px -8px rgba(91, 140, 255, .8); }
-        .cal-dia.hoje { border-color: var(--fo-cyan) !important; box-shadow: 0 0 14px -2px var(--fo-cyan); }
-        .cal-dia.selecionado { background: var(--fo-grad) !important; color: #fff !important; box-shadow: 0 10px 24px -6px rgba(162, 107, 255, .9); transform: scale(1.06); }
-        .cal-dia .ponto {
-            width: 6px; height: 6px; border-radius: 50%; margin-top: 4px;
-        }
-        .ponto.bom { background: var(--fo-green); box-shadow: 0 0 8px var(--fo-green); }
-        .ponto.medio { background: var(--fo-yellow); box-shadow: 0 0 8px var(--fo-yellow); }
-        .ponto.ruim { background: var(--fo-red); box-shadow: 0 0 8px var(--fo-red); }
-        .ponto.vazio { background: var(--fo-muted); opacity: .5; }
-        .cal-dia.selecionado .ponto { box-shadow: 0 0 0 2px #fff; }
-        .cal-nav {
-            width: 32px; height: 32px; border-radius: 50%;
-            display: inline-flex; align-items: center; justify-content: center;
-        }
-
-        /* Legenda */
-        .legend-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 3px;
-            display: inline-block;
-        }
-    </style>
 </head>
 <body>
 
     <!-- Navbar simples -->
     <nav class="navbar-fo fo-glass mb-4">
         <div class="container-xl px-0 d-flex align-items-center justify-content-between gap-2">
-            <a class="d-flex align-items-center gap-2 text-decoration-none fo-display fw-bold fs-5" href="{{ url_for('professor.chamada') }}" style="color: var(--fo-text);">
+            <a class="d-flex align-items-center gap-2 text-decoration-none fo-display fw-bold fs-5 link-marca" href="{{ url_for('professor.chamada') }}">
                 <span class="fo-logo-icone"><i class="bi bi-person-bounding-box"></i></span>
                 <span class="d-none d-sm-inline">Frequency<span class="fo-gradient-text">ON</span></span>
                 <span class="badge bg-primary ms-1 d-none d-md-inline">Professor</span>
@@ -163,7 +37,7 @@
                             <span class="text-muted small fw-semibold">Total Alunos</span>
                             <h3 class="fw-bold mb-0 fs-2 text-primary" data-countup>{{ total_matriculados }}</h3>
                         </div>
-                        <span class="stat-icone" style="background: var(--fo-grad);"><i class="bi bi-people-fill"></i></span>
+                        <span class="stat-icone fundo-azul"><i class="bi bi-people-fill"></i></span>
                     </div>
                 </div>
             </div>
@@ -174,7 +48,7 @@
                             <span class="text-muted small fw-semibold">Presentes no Dia</span>
                             <h3 class="fw-bold mb-0 fs-2 text-success" data-countup>{{ total_presentes }}</h3>
                         </div>
-                        <span class="stat-icone" style="background: var(--fo-grad-green);"><i class="bi bi-check2-circle"></i></span>
+                        <span class="stat-icone fundo-verde"><i class="bi bi-check2-circle"></i></span>
                     </div>
                 </div>
             </div>
@@ -185,7 +59,7 @@
                             <span class="text-muted small fw-semibold">Faltaram no Dia</span>
                             <h3 class="fw-bold mb-0 fs-2 text-danger" data-countup>{{ total_faltas }}</h3>
                         </div>
-                        <span class="stat-icone" style="background: var(--fo-grad-red);"><i class="bi bi-x-circle"></i></span>
+                        <span class="stat-icone fundo-vermelho"><i class="bi bi-x-circle"></i></span>
                     </div>
                 </div>
             </div>
@@ -196,7 +70,7 @@
                             <span class="text-muted small fw-semibold">Média da Turma</span>
                             <h3 class="fw-bold mb-0 fs-2 fo-gradient-text" id="media-frequencia-val" data-countup>{{ media_frequencia }}%</h3>
                         </div>
-                        <span class="stat-icone" style="background: linear-gradient(135deg, var(--fo-violet), var(--fo-pink));"><i class="bi bi-graph-up-arrow"></i></span>
+                        <span class="stat-icone fundo-roxo"><i class="bi bi-graph-up-arrow"></i></span>
                     </div>
                 </div>
             </div>
@@ -268,10 +142,10 @@
                     </div>
 
                     <div class="d-flex flex-wrap gap-2 mt-3 small text-muted justify-content-center">
-                        <span class="d-flex align-items-center gap-1"><span class="ponto bom d-inline-block" style="width:8px;height:8px;border-radius:50%"></span>≥ 75%</span>
-                        <span class="d-flex align-items-center gap-1"><span class="ponto medio d-inline-block" style="width:8px;height:8px;border-radius:50%"></span>50–74%</span>
-                        <span class="d-flex align-items-center gap-1"><span class="ponto ruim d-inline-block" style="width:8px;height:8px;border-radius:50%"></span>&lt; 50%</span>
-                        <span class="d-flex align-items-center gap-1"><span class="ponto vazio d-inline-block" style="width:8px;height:8px;border-radius:50%"></span>sem chamada</span>
+                        <span class="d-flex align-items-center gap-1"><span class="ponto bom d-inline-block ponto-legenda"></span>≥ 75%</span>
+                        <span class="d-flex align-items-center gap-1"><span class="ponto medio d-inline-block ponto-legenda"></span>50–74%</span>
+                        <span class="d-flex align-items-center gap-1"><span class="ponto ruim d-inline-block ponto-legenda"></span>&lt; 50%</span>
+                        <span class="d-flex align-items-center gap-1"><span class="ponto vazio d-inline-block ponto-legenda"></span>sem chamada</span>
                     </div>
                 </div>
             </div>
@@ -288,7 +162,7 @@
             <div class="card-header py-3">
                 <h5 class="fw-bold mb-1 fs-4">{{ dia_nome }}
                     <span class="text-muted fw-normal ms-1">{{ data_exibicao }}</span>
-                    {% if pode_editar %}<span class="badge bg-success ms-2 fs-6"><span class="spinner-grow spinner-grow-sm me-1" style="width:.5rem;height:.5rem"></span>Hoje • ao vivo</span>{% else %}<span class="badge bg-secondary ms-2 fs-6">Somente consulta</span>{% endif %}
+                    {% if pode_editar %}<span class="badge bg-success ms-2 fs-6"><span class="spinner-grow spinner-grow-sm me-1 ponto-ao-vivo"></span>Hoje • ao vivo</span>{% else %}<span class="badge bg-secondary ms-2 fs-6">Somente consulta</span>{% endif %}
                 </h5>
                 <small class="text-muted">{% if pode_editar %}Clique nas barras para alterar falta/presença. Botão direito nas 2 primeiras marca atraso.{% else %}Escolha um dia no calendário. Dias anteriores ficam só para consulta; alterar exige senha de administrador.{% endif %}</small>
             </div>
@@ -350,9 +224,9 @@
             <div class="card-footer py-3 border-top-0">
                 <div class="d-flex align-items-center flex-wrap gap-3 small text-muted">
                     <span class="fw-bold">Legenda:</span>
-                    <span class="d-flex align-items-center gap-1"><span class="legend-dot" style="background: var(--fo-green); box-shadow: 0 0 8px var(--fo-green);"></span> Presente (Clique)</span>
-                    <span class="d-flex align-items-center gap-1"><span class="legend-dot" style="background: var(--fo-red); box-shadow: 0 0 8px var(--fo-red);"></span> Falta (Clique)</span>
-                    <span class="d-flex align-items-center gap-1"><span class="legend-dot" style="background: var(--fo-yellow); box-shadow: 0 0 8px var(--fo-yellow);"></span> Atraso (Botão Direito nas 2 primeiras)</span>
+                    <span class="d-flex align-items-center gap-1"><span class="legend-dot presente"></span> Presente (Clique)</span>
+                    <span class="d-flex align-items-center gap-1"><span class="legend-dot falta"></span> Falta (Clique)</span>
+                    <span class="d-flex align-items-center gap-1"><span class="legend-dot atraso"></span> Atraso (Botão Direito nas 2 primeiras)</span>
                 </div>
             </div>
         </div>
@@ -361,7 +235,7 @@
     </div>
     </div>
 
-    {% include '_fo_scripts.html' %}
+    {% include 'componentes/scripts.html' %}
     <script>
         const DATA_TELA = '{{ data_iso }}';
         const PODE_EDITAR = {{ 'true' if pode_editar else 'false' }};

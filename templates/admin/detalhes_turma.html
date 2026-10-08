@@ -6,7 +6,7 @@
 <!-- Cabeçalho com Navegação e Botões de Ação -->
 <div class="d-flex align-items-center justify-content-between mb-4">
     <div class="d-flex align-items-center gap-3">
-        <a href="{{ url_for('admin.turmas') }}" class="btn btn-outline-secondary btn-sm rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 36px; height: 36px;">
+        <a href="{{ url_for('admin.turmas') }}" class="btn btn-outline-secondary btn-sm rounded-circle p-2 d-flex align-items-center justify-content-center quadrado-36">
             <i class="fa-solid fa-arrow-left"></i>
         </a>
         <div>
@@ -48,7 +48,7 @@
                 <div>
                     <span class="text-muted small d-block">Dias de Aula da Turma</span>
                     <strong class="text-dark small d-block">{{ turma.dias_aula_nomes }}</strong>
-                    <span class="text-muted" style="font-size: 11px;">{{ turma.vinculos|length }} professor(es)</span>
+                    <span class="text-muted texto-mini">{{ turma.vinculos|length }} professor(es)</span>
                 </div>
             </div>
         </div>
@@ -110,7 +110,7 @@
                     <tr>
                         <td>
                             <strong class="d-block">{{ v.professor.nome }}</strong>
-                            <span class="text-muted" style="font-size: 11px;">{{ v.professor.departamento or '-' }}</span>
+                            <span class="text-muted texto-mini">{{ v.professor.departamento or '-' }}</span>
                         </td>
                         <td>
                             <form method="POST" action="{{ url_for('admin.dias_professor_turma', turma_id=turma.id, professor_id=v.professor_id) }}" class="d-flex align-items-center gap-2 flex-wrap">
@@ -124,7 +124,7 @@
                             </form>
                         </td>
                         <td>
-                            <form method="POST" action="{{ url_for('admin.desvincular_professor', turma_id=turma.id, professor_id=v.professor_id) }}" style="display:inline;" onsubmit="return confirm('Remover este professor da turma?');">
+                            <form class="d-inline" method="POST" action="{{ url_for('admin.desvincular_professor', turma_id=turma.id, professor_id=v.professor_id) }}" onsubmit="return confirm('Remover este professor da turma?');">
                                 <button type="submit" class="btn btn-sm btn-link text-danger p-0 border-0 fw-semibold text-decoration-none">
                                     <i class="fa-solid fa-user-minus me-1"></i>Remover
                                 </button>
@@ -166,9 +166,9 @@
                     <tr>
                         <td>
                             {% if aluno.foto %}
-                                <img src="{{ aluno.foto }}" alt="{{ aluno.nome }}" class="rounded-circle border object-fit-cover" style="width: 36px; height: 36px;">
+                                <img src="{{ aluno.foto }}" alt="{{ aluno.nome }}" class="rounded-circle border object-fit-cover quadrado-36">
                             {% else %}
-                                <div class="avatar-initial rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; font-size: 14px;">
+                                <div class="avatar-initial rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center quadrado-36">
                                     {{ aluno.nome[0] if aluno.nome else 'A' }}
                                 </div>
                             {% endif %}
@@ -195,7 +195,7 @@
 
                         <!-- 7. AÇÕES -->
                         <td>
-                            <form method="POST" action="{{ url_for('admin.desvincular_aluno', aluno_id=aluno.id) }}" style="display:inline;">
+                            <form class="d-inline" method="POST" action="{{ url_for('admin.desvincular_aluno', aluno_id=aluno.id) }}">
                                 <button type="submit" class="btn btn-sm btn-link text-warning p-0 border-0 fw-semibold text-decoration-none">
                                     <i class="fa-solid fa-user-minus me-1"></i>Desvincular
                                 </button>

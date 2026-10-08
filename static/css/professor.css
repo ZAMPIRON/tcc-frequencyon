@@ -1,0 +1,140 @@
+/* Chamada do professor: barras de presença e calendário */
+
+.avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: var(--fo-grad);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.85rem;
+    box-shadow: 0 6px 16px -6px rgba(162, 107, 255, .8);
+    flex-shrink: 0;
+}
+
+.bar-container {
+    display: flex;
+    gap: 5px;
+}
+
+.bar {
+    width: 18px;
+    height: 32px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: transform 0.18s cubic-bezier(.2, .9, .3, 1.5), background-color 0.25s ease, box-shadow .25s;
+    animation: barra-entra .5s cubic-bezier(.2, .9, .3, 1.4) both;
+}
+@keyframes barra-entra { from { transform: scaleY(0); opacity: 0; } to { transform: none; opacity: 1; } }
+.bar-container .bar:nth-child(2) { animation-delay: 30ms; }
+.bar-container .bar:nth-child(3) { animation-delay: 60ms; }
+.bar-container .bar:nth-child(4) { animation-delay: 90ms; }
+.bar-container .bar:nth-child(5) { animation-delay: 120ms; }
+.bar-container .bar:nth-child(6) { animation-delay: 150ms; }
+.bar-container .bar:nth-child(7) { animation-delay: 180ms; }
+.bar-container .bar:nth-child(8) { animation-delay: 210ms; }
+.bar-container .bar:nth-child(9) { animation-delay: 240ms; }
+.bar-container .bar:nth-child(10) { animation-delay: 270ms; }
+
+.bar:hover {
+    transform: scale(1.22) translateY(-2px);
+}
+.bar.pulou { animation: barra-pula .45s cubic-bezier(.2, .9, .3, 1.6); }
+@keyframes barra-pula { 0% { transform: scale(1); } 40% { transform: scale(1.45, .8); } 100% { transform: scale(1); } }
+
+.bar-bloqueada {
+    cursor: pointer;
+    opacity: 0.6;
+}
+
+.bar-bloqueada:hover {
+    transform: none;
+}
+
+/* Estados das barras */
+.bar.on { background: linear-gradient(180deg, #4dffb5, #12c47f); box-shadow: 0 0 12px -2px rgba(34, 225, 154, .7); }
+.bar.off { background: linear-gradient(180deg, #ff7a93, #e8304f); box-shadow: 0 0 12px -2px rgba(255, 77, 109, .6); }
+.bar.late { background: linear-gradient(180deg, #ffd66b, #f59e0b); box-shadow: 0 0 12px -2px rgba(255, 194, 61, .7); }
+
+.navbar-fo {
+    margin: 12px;
+    border-radius: 20px !important;
+    padding: .75rem 1.25rem;
+    position: sticky; top: 12px; z-index: 1020;
+}
+.stat-icone {
+    width: 44px; height: 44px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem; color: #fff;
+}
+
+/* Calendário */
+.cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    text-align: center;
+}
+.cal-head {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--fo-muted);
+    text-transform: uppercase;
+    padding-bottom: 2px;
+}
+.cal-dia {
+    position: relative;
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    color: #adb5bd;
+    text-decoration: none;
+    border: 2px solid transparent;
+    line-height: 1;
+}
+.cal-dia.fora { visibility: hidden; }
+.cal-dia { color: var(--fo-muted); opacity: .55; }
+.cal-dia.aula { color: var(--fo-text); background: rgba(91, 140, 255, .12); font-weight: 700; opacity: 1; border-color: rgba(91, 140, 255, .18); }
+.cal-dia.aula.futuro { background: var(--fo-surface-2); color: var(--fo-muted); font-weight: 500; opacity: .8; }
+a.cal-dia:hover { background: rgba(91, 140, 255, .25); transform: translateY(-2px) scale(1.06); transition: all .2s cubic-bezier(.2,.9,.3,1.5); box-shadow: 0 8px 20px -8px rgba(91, 140, 255, .8); }
+.cal-dia.hoje { border-color: var(--fo-cyan) !important; box-shadow: 0 0 14px -2px var(--fo-cyan); }
+.cal-dia.selecionado { background: var(--fo-grad) !important; color: #fff !important; box-shadow: 0 10px 24px -6px rgba(162, 107, 255, .9); transform: scale(1.06); }
+.cal-dia .ponto {
+    width: 6px; height: 6px; border-radius: 50%; margin-top: 4px;
+}
+.ponto.bom { background: var(--fo-green); box-shadow: 0 0 8px var(--fo-green); }
+.ponto.medio { background: var(--fo-yellow); box-shadow: 0 0 8px var(--fo-yellow); }
+.ponto.ruim { background: var(--fo-red); box-shadow: 0 0 8px var(--fo-red); }
+.ponto.vazio { background: var(--fo-muted); opacity: .5; }
+.cal-dia.selecionado .ponto { box-shadow: 0 0 0 2px #fff; }
+.cal-nav {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+}
+
+/* Legenda */
+.legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+/* ---------- peças da tela ---------- */
+.ponto-legenda { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.ponto-ao-vivo { width: .5rem; height: .5rem; }
+
+.stat-icone.fundo-azul { background: var(--fo-grad); }
+.stat-icone.fundo-verde { background: var(--fo-grad-green); }
+.stat-icone.fundo-vermelho { background: var(--fo-grad-red); }
+.stat-icone.fundo-roxo { background: linear-gradient(135deg, var(--fo-violet), var(--fo-pink)); }
+
+.legend-dot.presente { background: var(--fo-green); box-shadow: 0 0 8px var(--fo-green); }
+.legend-dot.falta { background: var(--fo-red); box-shadow: 0 0 8px var(--fo-red); }
+.legend-dot.atraso { background: var(--fo-yellow); box-shadow: 0 0 8px var(--fo-yellow); }

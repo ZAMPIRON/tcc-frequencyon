@@ -32,9 +32,9 @@
                 <div>
                     <span class="text-muted fw-semibold small d-block">Total de Alunos</span>
                     <span class="fs-2 fw-bold text-dark my-1 d-block fo-display" data-countup>{{ total_alunos }}</span>
-                    <small class="text-muted" style="font-size: 11px;">Alunos devidamente matriculados</small>
+                    <small class="text-muted texto-mini">Alunos devidamente matriculados</small>
                 </div>
-                <div class="fo-logo-icone" style="width:44px;height:44px;">
+                <div class="fo-logo-icone tamanho-44">
                     <i class="fa-solid fa-users"></i>
                 </div>
             </div>
@@ -48,9 +48,9 @@
                 <div>
                     <span class="text-muted fw-semibold small d-block">Professores</span>
                     <span class="fs-2 fw-bold text-dark my-1 d-block fo-display" data-countup>{{ total_professores }}</span>
-                    <small class="text-muted" style="font-size: 11px;">Docentes ativos no sistema</small>
+                    <small class="text-muted texto-mini">Docentes ativos no sistema</small>
                 </div>
-                <div class="fo-logo-icone" style="width:44px;height:44px;">
+                <div class="fo-logo-icone tamanho-44">
                     <i class="fa-solid fa-briefcase"></i>
                 </div>
             </div>
@@ -64,9 +64,9 @@
                 <div>
                     <span class="text-muted fw-semibold small d-block">Turmas Ativas</span>
                     <span class="fs-2 fw-bold text-dark my-1 d-block fo-display" data-countup>{{ total_turmas }}</span>
-                    <small class="text-muted" style="font-size: 11px;">Salas e laboratórios mapeados</small>
+                    <small class="text-muted texto-mini">Salas e laboratórios mapeados</small>
                 </div>
-                <div class="fo-logo-icone" style="width:44px;height:44px;">
+                <div class="fo-logo-icone tamanho-44">
                     <i class="fa-solid fa-book-open"></i>
                 </div>
             </div>
@@ -80,9 +80,9 @@
                 <div>
                     <span class="text-muted fw-semibold small d-block">Frequência Geral</span>
                     <span class="fs-2 fw-bold my-1 d-block fo-display fo-gradient-text" data-countup>{{ frequencia_geral }}%</span>
-                    <small class="text-muted" style="font-size: 11px;">Frequência média da instituição</small>
+                    <small class="text-muted texto-mini">Frequência média da instituição</small>
                 </div>
-                <div class="fo-logo-icone" style="width:44px;height:44px;">
+                <div class="fo-logo-icone tamanho-44">
                     <i class="fa-solid fa-circle-check"></i>
                 </div>
             </div>
@@ -98,12 +98,12 @@
             <div class="card-body p-4 d-flex flex-column justify-content-between">
                 <h6 class="fw-bold text-dark mb-3">Frequência por Curso (%)</h6>
                 
-                <div class="d-flex align-items-end justify-content-between px-2 pt-4" style="height: 220px;">
+                <div class="d-flex align-items-end justify-content-between px-2 pt-4 area-grafico">
                     {% for curso, media in frequencia_por_curso %}
                     <div class="d-flex flex-column align-items-center h-100 justify-content-end gap-2">
                         <span class="small fw-bold {% if media < 75 %}text-danger{% else %}text-primary{% endif %}">{{ media|round|int }}%</span>
-                        <div class="{% if media < 75 %}bg-danger{% else %}bg-primary{% endif %} rounded-top fo-bar-grow" style="width: 38px; border-radius: 12px 12px 4px 4px !important; height: calc({{ media|round|int }} * 1%); animation-delay: {{ loop.index0 * 120 }}ms; box-shadow: 0 0 24px -4px {% if media < 75 %}var(--fo-red){% else %}var(--fo-violet){% endif %};"></div>
-                        <span class="text-muted fw-medium" style="font-size: 11px;">{{ curso }}</span>
+                        <div class="{% if media < 75 %}bg-danger{% else %}bg-primary{% endif %} rounded-top fo-bar-grow barra-curso" style="--altura: {{ media|round|int }}%; --atraso: {{ loop.index0 * 120 }}ms"></div>
+                        <span class="text-muted fw-medium texto-mini">{{ curso }}</span>
                     </div>
                     {% else %}
                     <p class="text-muted small">Nenhum dado cadastrado.</p>
@@ -124,14 +124,14 @@
                     <div class="d-flex align-items-center justify-content-between p-2 px-3 rounded-2 {% if turma.frequencia_media < 75 %}bg-light{% endif %}">
                         <div>
                             <h6 class="fw-bold text-dark mb-0 small">{{ turma.nome }}</h6>
-                            <small class="text-muted" style="font-size: 11px;">
+                            <small class="text-muted texto-mini">
                                 Prof. {{ turma.nomes_professores }} • {{ turma.curso }}
                             </small>
                         </div>
                         <div class="d-flex align-items-center gap-2 fw-bold {% if turma.frequencia_media < 75 %}text-danger{% else %}text-dark{% endif %} small">
                             <span>{{ turma.frequencia_media }}%</span>
                             {% if turma.frequencia_media < 75 %}
-                            <span class="bg-danger rounded-circle" style="width: 8px; height: 8px;"></span>
+                            <span class="bg-danger rounded-circle ponto-8"></span>
                             {% endif %}
                         </div>
                     </div>
@@ -149,10 +149,10 @@
     <div class="card-body p-4">
         <div class="d-flex align-items-center justify-content-between mb-3">
             <div class="d-flex align-items-center gap-2">
-                <span class="bg-warning rounded-circle" style="width: 8px; height: 8px;"></span>
+                <span class="bg-warning rounded-circle ponto-8"></span>
                 <h6 class="fw-bold text-dark mb-0">Alertas Críticos e Status do Sistema</h6>
             </div>
-            <small class="text-muted" style="font-size: 11px;">Verificados em tempo real</small>
+            <small class="text-muted texto-mini">Verificados em tempo real</small>
         </div>
 
         <div class="row g-3">
@@ -164,7 +164,7 @@
                     </div>
                     <div>
                         <h6 class="fw-bold text-dark mb-1 small">Sincronização de Totens</h6>
-                        <p class="text-muted mb-0" style="font-size: 11px;">Sistemas de ponto e frequência operando normalmente.</p>
+                        <p class="text-muted mb-0 texto-mini">Sistemas de ponto e frequência operando normalmente.</p>
                     </div>
                 </div>
             </div>
@@ -178,7 +178,7 @@
                         </div>
                         <div>
                             <h6 class="fw-bold text-dark mb-1 small">Alunos com frequência &lt; 75%</h6>
-                            <p class="text-muted mb-0" style="font-size: 11px;">
+                            <p class="text-muted mb-0 texto-mini">
                                 <strong>{{ alunos_em_risco }}</strong> aluno(s) classificado(s) em alto risco de evasão.
                             </p>
                         </div>
@@ -194,7 +194,7 @@
                     </div>
                     <div>
                         <h6 class="fw-bold text-dark mb-1 small">Sistemas e Banco de Dados</h6>
-                        <p class="text-muted mb-0" style="font-size: 11px;">Conexão ativa e integrada ao banco SQLite.</p>
+                        <p class="text-muted mb-0 texto-mini">Conexão ativa e integrada ao banco SQLite.</p>
                     </div>
                 </div>
             </div>

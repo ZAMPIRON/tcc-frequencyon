@@ -176,11 +176,11 @@
     }
 
     /* ---------------- toasts ---------------- */
-    const TIPOS_TOAST = {
-        success: { icone: "bi-check-lg", fundo: "var(--fo-grad-green)" },
-        danger: { icone: "bi-x-lg", fundo: "var(--fo-grad-red)" },
-        warning: { icone: "bi-exclamation-lg", fundo: "var(--fo-grad-yellow)" },
-        info: { icone: "bi-info-lg", fundo: "var(--fo-grad)" },
+    const ICONES_TOAST = {
+        success: "bi-check-lg",
+        danger: "bi-x-lg",
+        warning: "bi-exclamation-lg",
+        info: "bi-info-lg",
     };
 
     FO.toast = function (mensagem, tipo = "info", ms = 4200) {
@@ -191,16 +191,18 @@
             caixa.setAttribute("aria-live", "polite");
             document.body.appendChild(caixa);
         }
-        const t = TIPOS_TOAST[tipo] || TIPOS_TOAST.info;
+        if (!ICONES_TOAST[tipo]) tipo = "info";
         const el = document.createElement("div");
         el.className = "fo-toast";
         el.setAttribute("role", tipo === "danger" ? "alert" : "status");
         el.innerHTML = `
-            <span class="fo-toast-icone" style="background:${t.fundo}"><i class="bi ${t.icone}"></i></span>
-            <div class="flex-grow-1 small fw-semibold" style="padding-top:6px"></div>
+            <span class="fo-toast-icone ${tipo}"><i class="bi ${ICONES_TOAST[tipo]}"></i></span>
+            <div class="fo-toast-texto flex-grow-1 small fw-semibold"></div>
             <button type="button" class="btn-close btn-sm" aria-label="Fechar"></button>
-            <span class="fo-toast-tempo" style="background:${t.fundo};animation-duration:${ms}ms"></span>`;
-        el.querySelector("div").textContent = mensagem;
+            <span class="fo-toast-tempo ${tipo}"></span>`;
+        // a duração da barrinha acompanha o tempo do toast
+        el.querySelector(".fo-toast-tempo").style.animationDuration = ms + "ms";
+        el.querySelector(".fo-toast-texto").textContent = mensagem;
         const fechar = () => {
             el.classList.add("saindo");
             setTimeout(() => el.remove(), 350);
@@ -222,7 +224,7 @@
               <div class="modal-dialog modal-dialog-centered">
                 <form class="modal-content">
                   <div class="modal-body p-4 text-center">
-                    <div class="fo-logo-icone mx-auto mb-3" style="width:56px;height:56px;font-size:1.5rem;animation:fo-float 3s ease-in-out infinite"><i class="bi ${icone}"></i></div>
+                    <div class="fo-logo-icone tamanho-56 flutuando mx-auto mb-3"><i class="bi ${icone}"></i></div>
                     <h5 class="fw-bold mb-1"></h5>
                     <p class="text-muted small mb-3"></p>
                     <input class="form-control form-control-lg text-center" required>

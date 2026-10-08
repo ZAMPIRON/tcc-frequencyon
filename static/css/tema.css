@@ -576,6 +576,7 @@ html.fo-js .fo-reveal.fo-in {
     animation: fo-toast-in .5s cubic-bezier(.2, .9, .3, 1.3) both;
 }
 .fo-toast.saindo { animation: fo-toast-out .35s ease forwards; }
+.fo-toast .fo-toast-texto { padding-top: 6px; }
 .fo-toast .fo-toast-icone {
     width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1rem;
@@ -625,3 +626,30 @@ html.fo-js .fo-reveal.fo-in {
     from { clip-path: circle(0 at var(--fo-vt-x, 50%) var(--fo-vt-y, 50%)); }
     to   { clip-path: circle(150vmax at var(--fo-vt-x, 50%) var(--fo-vt-y, 50%)); }
 }
+
+/* =====================================================================
+   Classes auxiliares usadas em várias telas
+   ===================================================================== */
+.min-w-0 { min-width: 0; }
+.texto-mini { font-size: .72rem; }
+.link-marca { color: var(--fo-text); }
+.link-marca:hover { color: var(--fo-text); }
+.flutuando { animation: fo-float 3s ease-in-out infinite; }
+
+/* tamanhos do ícone da marca */
+.fo-logo-icone.tamanho-44 { width: 44px; height: 44px; }
+.fo-logo-icone.tamanho-52 { width: 52px; height: 52px; font-size: 1.5rem; }
+.fo-logo-icone.tamanho-56 { width: 56px; height: 56px; font-size: 1.5rem; }
+.fo-logo-icone.tamanho-70 { width: 70px; height: 70px; font-size: 2rem; }
+
+/* botão de tema menor (barra do aluno) */
+.fo-theme-btn.pequeno { width: 34px; height: 34px; }
+
+/* largura que vem dos dados (ex.: style="--largura: 80%") */
+.largura-dinamica { width: var(--largura, 0%); }
+
+/* cores do ícone e da barra de tempo dos toasts */
+.fo-toast-icone.success, .fo-toast-tempo.success { background: var(--fo-grad-green); }
+.fo-toast-icone.danger,  .fo-toast-tempo.danger  { background: var(--fo-grad-red); }
+.fo-toast-icone.warning, .fo-toast-tempo.warning { background: var(--fo-grad-yellow); }
+.fo-toast-icone.info,    .fo-toast-tempo.info    { background: var(--fo-grad); }

@@ -4,79 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>{% block title %}FrequencyON - Painel Administrativo{% endblock %}</title>
-    {% include '_fo_head.html' %}
-    <style>
-        :root { --sidebar-w: 270px; }
-        body { height: 100vh; overflow: hidden; }
-
-        /* ---------- sidebar ---------- */
-        .barra-lateral {
-            width: var(--sidebar-w);
-            flex-shrink: 0;
-            margin: 12px 0 12px 12px;
-            padding: 1.25rem 1rem;
-            border-radius: 24px !important;
-            display: flex; flex-direction: column; justify-content: space-between;
-            z-index: 1045;
-        }
-        .barra-lateral .marca { font-family: var(--fo-font-display); font-weight: 700; font-size: 1.15rem; color: var(--fo-text); }
-        .barra-lateral .marca small { display: block; font-family: var(--fo-font); font-size: .62rem; letter-spacing: .14em; text-transform: uppercase; color: var(--fo-muted); font-weight: 600; }
-        .menu-titulo { font-size: .65rem; letter-spacing: .14em; text-transform: uppercase; color: var(--fo-muted); font-weight: 700; padding: 0 .9rem; margin: 1.5rem 0 .5rem; }
-        .nav-lateral { display: flex; flex-direction: column; gap: 4px; }
-        .nav-lateral a {
-            position: relative; display: flex; align-items: center; gap: .85rem;
-            padding: .7rem .9rem; border-radius: 14px; text-decoration: none;
-            color: var(--fo-muted); font-weight: 600; font-size: .9rem;
-            transition: color .25s, background .25s, transform .25s;
-        }
-        .nav-lateral a .ic {
-            width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
-            background: var(--fo-surface-2); border: 1px solid var(--fo-border); transition: all .3s;
-        }
-        .nav-lateral a:hover { color: var(--fo-text); background: var(--fo-surface-2); transform: translateX(4px); }
-        .nav-lateral a.active { color: var(--fo-text); background: linear-gradient(90deg, rgba(91, 140, 255, .22), rgba(162, 107, 255, .08)); }
-        .nav-lateral a.active .ic { background: var(--fo-grad); color: #fff; border-color: transparent; box-shadow: 0 6px 18px -4px rgba(162, 107, 255, .8); }
-        .nav-lateral a.active::before {
-            content: ""; position: absolute; left: -1rem; top: 20%; bottom: 20%; width: 4px; border-radius: 0 4px 4px 0;
-            background: var(--fo-grad); box-shadow: 0 0 14px var(--fo-violet);
-        }
-        .nav-lateral .contador { margin-left: auto; font-size: .7rem; }
-        .perfil-rodape { padding: .75rem; border-radius: 16px; background: var(--fo-surface-2); border: 1px solid var(--fo-border); }
-        .avatar-fo {
-            width: 38px; height: 38px; border-radius: 12px; object-fit: cover; flex-shrink: 0;
-            display: inline-flex; align-items: center; justify-content: center;
-            background: var(--fo-grad); color: #fff; font-weight: 700;
-        }
-
-        /* mobile: sidebar vira gaveta */
-        @media (max-width: 991.98px) {
-            .barra-lateral {
-                position: fixed; top: 0; bottom: 0; left: 0; margin: 10px;
-                transform: translateX(calc(-100% - 20px)); transition: transform .45s cubic-bezier(.2, .9, .3, 1);
-            }
-            body.menu-aberto .barra-lateral { transform: none; }
-            .veu { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); backdrop-filter: blur(3px); z-index: 1040; opacity: 0; pointer-events: none; transition: opacity .3s; }
-            body.menu-aberto .veu { opacity: 1; pointer-events: auto; }
-        }
-
-        /* ---------- topo ---------- */
-        .topbar {
-            margin: 12px 12px 0;
-            padding: .85rem 1.25rem;
-            border-radius: 20px !important;
-            position: sticky; top: 12px; z-index: 1020;
-        }
-        .busca { position: relative; width: min(300px, 32vw); }
-        .busca i { position: absolute; left: .9rem; top: 50%; transform: translateY(-50%); color: var(--fo-muted); }
-        .busca .form-control { padding-left: 2.4rem; border-radius: 12px; font-size: .88rem; }
-        .busca kbd { position: absolute; right: .6rem; top: 50%; transform: translateY(-50%); font-size: .65rem; background: var(--fo-surface-2); color: var(--fo-muted); border: 1px solid var(--fo-border); }
-        .chip-data { font-size: .82rem; color: var(--fo-muted); padding: .5rem .85rem; border-radius: 12px; background: var(--fo-surface-2); border: 1px solid var(--fo-border); }
-
-        main.conteudo { padding: 1.5rem 12px 2rem; }
-        @media (min-width: 992px) { main.conteudo { padding: 1.5rem 1.5rem 2.5rem; } }
-
-        .fo-busca-oculto { display: none !important; }
-    </style>
+    {% include 'componentes/cabecalho.html' %}
+    <link href="{{ url_for('static', filename='css/admin.css') }}" rel="stylesheet">
     {% block extra_css %}{% endblock %}
 </head>
 <body data-fo-sem-tema>
@@ -115,14 +44,14 @@
                 {% endif %}
                 <div class="flex-grow-1 overflow-hidden">
                     <div class="fw-semibold small text-truncate">{{ usuario.nome }}</div>
-                    <small class="text-muted d-block text-truncate" style="font-size: .72rem;">{{ usuario.email }}</small>
+                    <small class="text-muted d-block text-truncate texto-mini">{{ usuario.email }}</small>
                 </div>
                 <a href="{{ url_for('logout') }}" class="btn btn-light btn-sm" title="Sair" aria-label="Sair"><i class="bi bi-box-arrow-right"></i></a>
             </div>
         </aside>
 
         <!-- ================= CONTEÚDO ================= -->
-        <div class="flex-grow-1 d-flex flex-column h-100 overflow-y-auto" id="rolagem" style="min-width: 0;">
+        <div class="flex-grow-1 d-flex flex-column h-100 overflow-y-auto min-w-0" id="rolagem">
             <header class="topbar fo-glass d-flex align-items-center justify-content-between gap-3">
                 <div class="d-flex align-items-center gap-3 min-w-0">
                     <button class="btn btn-light btn-sm d-lg-none" id="abrirMenu" aria-label="Abrir menu"><i class="bi bi-list fs-5"></i></button>
@@ -149,7 +78,7 @@
         </div>
     </div>
 
-    {% include '_fo_scripts.html' %}
+    {% include 'componentes/scripts.html' %}
     <script>
         // item ativo do menu pela URL
         (function () {

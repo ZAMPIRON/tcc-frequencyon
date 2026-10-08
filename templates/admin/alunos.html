@@ -58,9 +58,9 @@
                     <tr>
                         <td>
                             {% if aluno.foto %}
-                                <img src="{{ aluno.foto }}" alt="{{ aluno.nome }}" class="rounded-circle border object-fit-cover" style="width: 36px; height: 36px;">
+                                <img src="{{ aluno.foto }}" alt="{{ aluno.nome }}" class="rounded-circle border object-fit-cover quadrado-36">
                             {% else %}
-                                <div class="avatar-initial rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; font-size: 14px;">
+                                <div class="avatar-initial rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center quadrado-36">
                                     {{ aluno.nome[0] if aluno.nome else 'A' }}
                                 </div>
                             {% endif %}
@@ -79,7 +79,7 @@
                             <a href="{{ url_for('admin.detalhes_aluno', id=aluno.id) }}" class="btn btn-outline-primary btn-sm border-0" title="Ver detalhes">
                                 <i class="fa-solid fa-eye"></i>
                             </a>
-                            <form method="POST" action="{{ url_for('admin.deletar_aluno', id=aluno.id) }}" style="display:inline;" onsubmit="return confirm('Tem certeza que deseja excluir?');">
+                            <form class="d-inline" method="POST" action="{{ url_for('admin.deletar_aluno', id=aluno.id) }}" onsubmit="return confirm('Tem certeza que deseja excluir?');">
                                 <button type="submit" class="btn btn-outline-danger btn-sm border-0">
                                     <i class="fa-solid fa-trash"></i>
                                 </button>

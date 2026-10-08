@@ -12,7 +12,7 @@
     <div class="d-flex align-items-center gap-2">
         <div class="input-group input-group-sm w-auto">
             <span class="input-group-text bg-white text-muted border-end-0"><i class="fa-regular fa-calendar"></i></span>
-            <input type="text" class="form-control border-start-0" value="Últimos 6 meses" readonly style="max-width: 150px;">
+            <input type="text" class="form-control border-start-0 largura-max-150" value="Últimos 6 meses" readonly>
         </div>
         <button class="btn btn-primary btn-sm px-3 d-flex align-items-center gap-2 text-nowrap" onclick="window.print()">
             <i class="fa-solid fa-download"></i> Exportar
@@ -26,12 +26,12 @@
         <div class="card border-0 shadow-sm rounded-3 p-3 h-100">
             <div class="d-flex justify-content-between align-items-start mb-2">
                 <span class="text-muted small fw-semibold">Total Alunos Matriculados</span>
-                <div class="text-primary bg-primary-subtle p-2 rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                <div class="text-primary bg-primary-subtle p-2 rounded-circle d-flex align-items-center justify-content-center quadrado-32">
                     <i class="fa-solid fa-users fs-6"></i>
                 </div>
             </div>
             <div class="fs-2 fw-bold mb-1 fo-display" data-countup>{{ total_alunos }}</div>
-            <small class="text-muted" style="font-size: 11px;">Alunos ativos cadastrados</small>
+            <small class="text-muted texto-mini">Alunos ativos cadastrados</small>
         </div>
     </div>
 
@@ -39,12 +39,12 @@
         <div class="card border-0 shadow-sm rounded-3 p-3 h-100">
             <div class="d-flex justify-content-between align-items-start mb-2">
                 <span class="text-muted small fw-semibold">Frequência Institucional</span>
-                <div class="text-success bg-success-subtle p-2 rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                <div class="text-success bg-success-subtle p-2 rounded-circle d-flex align-items-center justify-content-center quadrado-32">
                     <i class="fa-solid fa-chart-line fs-6"></i>
                 </div>
             </div>
             <div class="fs-2 fw-bold mb-1 fo-display fo-gradient-text" data-countup>{{ media_geral }}%</div>
-            <small class="{% if media_geral >= 75 %}text-success{% else %}text-danger{% endif %} fw-semibold" style="font-size: 11px;">
+            <small class="{% if media_geral >= 75 %}text-success{% else %}text-danger{% endif %} fw-semibold texto-mini">
                 <i class="fa-solid {% if media_geral >= 75 %}fa-circle-check{% else %}fa-triangle-exclamation{% endif %} me-1"></i>
                 {% if media_geral >= 75 %}Dentro da Meta{% else %}Abaixo da Meta{% endif %}
             </small>
@@ -55,12 +55,12 @@
         <div class="card border-0 shadow-sm rounded-3 p-3 h-100">
             <div class="d-flex justify-content-between align-items-start mb-2">
                 <span class="text-muted small fw-semibold">Taxa de Risco (&lt;75%)</span>
-                <div class="text-danger bg-danger-subtle p-2 rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                <div class="text-danger bg-danger-subtle p-2 rounded-circle d-flex align-items-center justify-content-center quadrado-32">
                     <i class="fa-solid fa-arrow-trend-down fs-6"></i>
                 </div>
             </div>
             <div class="fs-2 fw-bold mb-1 fo-display" data-countup>{{ taxa_evasao }}%</div>
-            <small class="text-muted" style="font-size: 11px;">{{ alunos_criticos }} aluno(s) em estado crítico</small>
+            <small class="text-muted texto-mini">{{ alunos_criticos }} aluno(s) em estado crítico</small>
         </div>
     </div>
 
@@ -68,12 +68,12 @@
         <div class="card border-0 shadow-sm rounded-3 p-3 h-100">
             <div class="d-flex justify-content-between align-items-start mb-2">
                 <span class="text-muted small fw-semibold">Alunos em Risco</span>
-                <div class="text-warning bg-warning-subtle p-2 rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                <div class="text-warning bg-warning-subtle p-2 rounded-circle d-flex align-items-center justify-content-center quadrado-32">
                     <i class="fa-solid fa-user-slash fs-6"></i>
                 </div>
             </div>
             <div class="fs-2 fw-bold mb-1 fo-display" data-countup>{{ alunos_criticos }}</div>
-            <small class="text-muted" style="font-size: 11px;">Frequência abaixo de 75%</small>
+            <small class="text-muted texto-mini">Frequência abaixo de 75%</small>
         </div>
     </div>
 </div>
@@ -83,7 +83,7 @@
     <div class="col-lg-6">
         <div class="card border-0 shadow-sm rounded-3 p-4 h-100">
             <h6 class="fw-bold text-dark mb-3">Evolução Mensal da Frequência (2026)</h6>
-            <div style="height: 220px; width: 100%;">
+            <div class="area-grafico">
                 <canvas id="lineChart"></canvas>
             </div>
         </div>
@@ -92,7 +92,7 @@
     <div class="col-lg-6">
         <div class="card border-0 shadow-sm rounded-3 p-4 h-100">
             <h6 class="fw-bold text-dark mb-3">Comparação de Presença por Curso (%)</h6>
-            <div style="height: 220px; width: 100%;">
+            <div class="area-grafico">
                 <canvas id="barChart"></canvas>
             </div>
         </div>
@@ -110,13 +110,13 @@
             <div class="row align-items-center">
                 <div class="col-md-3">
                     <div class="fw-bold text-dark small mb-0">{{ prof.nome }}</div>
-                    <small class="text-muted" style="font-size: 11px;">{{ prof.departamento or 'Geral' }}</small>
+                    <small class="text-muted texto-mini">{{ prof.departamento or 'Geral' }}</small>
                 </div>
                 <div class="col-md-8">
-                    <div class="progress" style="height: 10px;">
-                        <div class="progress-bar {% if prof.media >= 90 %}bg-success{% elif prof.media >= 75 %}bg-primary{% else %}bg-danger{% endif %}" 
+                    <div class="progress progress-fina">
+                        <div class="progress-bar {% if prof.media >= 90 %}bg-success{% elif prof.media >= 75 %}bg-primary{% else %}bg-danger{% endif %} largura-dinamica" 
                              role="progressbar" 
-                             style="width: {{ prof.media }}%;">
+                             style="--largura: {{ prof.media }}%">
                         </div>
                     </div>
                 </div>

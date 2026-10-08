@@ -4,120 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ aluno.nome }} - FrequencyON</title>
-    {% include '_fo_head.html' %}
-    <style>
-        :root {
-            --fo-azul: var(--fo-primary);
-            --fo-verde: var(--fo-green);
-            --fo-vermelho: var(--fo-red);
-            --fo-amarelo: var(--fo-yellow);
-            --fo-cinza: var(--fo-border-strong);
-        }
-
-        /* ---------- topo ---------- */
-        .topo {
-            background: var(--fo-surface); border-bottom: 1px solid var(--fo-border);
-            backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
-        }
-        .marca { font-family: var(--fo-font-display); font-weight: 700; color: var(--fo-text); text-decoration: none; letter-spacing: -.3px; }
-        .marca span {
-            background: var(--fo-grad); -webkit-background-clip: text; background-clip: text; color: transparent;
-        }
-        .marca-chip {
-            display: inline-flex; align-items: center; gap: .5rem;
-            padding: .35rem .65rem; border: 1px solid var(--fo-border-strong) !important; border-radius: 12px; background: var(--fo-surface-2) !important;
-        }
-        .marca-icone {
-            width: 30px; height: 30px; border-radius: 9px; background: var(--fo-grad); color: #fff;
-            display: inline-flex; align-items: center; justify-content: center;
-            box-shadow: 0 4px 14px -4px rgba(162, 107, 255, .8);
-        }
-        .menu-mobile a { display: flex; align-items: center; gap: .6rem; padding: .6rem 0; text-decoration: none; color: var(--fo-text); }
-        .menu-mobile a.destaque { color: var(--fo-azul); font-weight: 600; }
-
-        /* ---------- cards ---------- */
-        .card-fo {
-            border: 1px solid var(--fo-border); border-radius: 22px; box-shadow: var(--fo-shadow);
-            background: var(--fo-surface); backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
-            position: relative;
-        }
-        .foto-aluno {
-            width: 120px; height: 120px; border-radius: 50%; object-fit: cover;
-            border: 4px solid transparent;
-            background: linear-gradient(var(--fo-surface-solid), var(--fo-surface-solid)) padding-box, var(--fo-grad) border-box;
-            box-shadow: 0 16px 40px -12px rgba(162, 107, 255, .7);
-        }
-        .foto-iniciais {
-            width: 120px; height: 120px; border-radius: 50%; background: var(--fo-grad); color: #fff;
-            display: flex; align-items: center; justify-content: center; font-size: 2.6rem; font-weight: 700;
-            font-family: var(--fo-font-display);
-            box-shadow: 0 16px 40px -12px rgba(162, 107, 255, .8);
-            animation: fo-float 5s ease-in-out infinite;
-        }
-        .info-linha { display: flex; justify-content: space-between; gap: 1rem; font-size: .85rem; padding: .2rem 0; }
-        .info-linha .rotulo { color: var(--fo-muted); }
-        .info-linha .valor { font-weight: 600; color: var(--fo-text); text-align: right; word-break: break-word; }
-        @media (min-width: 768px) and (max-width: 991.98px) {
-            .perfil-info { border-left: 1px solid var(--fo-border); }
-        }
-
-        /* barra empilhada da frequência */
-        .barra-geral { display: flex; height: 14px; border-radius: 999px; overflow: hidden; background: var(--fo-surface-2); gap: 3px; }
-        .barra-geral div { height: 100%; border-radius: 999px; transform-origin: left; animation: fo-grow-x 1.3s cubic-bezier(.2, .8, .2, 1) both; }
-        .barra-geral div:nth-child(2) { animation-delay: .2s; }
-        .barra-geral div:nth-child(3) { animation-delay: .4s; }
-        .indicador {
-            display: flex; align-items: center; gap: .75rem;
-            background: var(--fo-surface-2); border: 1px solid var(--fo-border); border-radius: 14px; padding: .75rem .95rem;
-            transition: transform .3s cubic-bezier(.2, .9, .3, 1.4), border-color .3s;
-        }
-        .indicador:hover { transform: translateX(6px); border-color: var(--fo-border-strong); }
-        .indicador .icone {
-            width: 34px; height: 34px; border-radius: 11px; color: #fff;
-            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-        }
-        .indicador .titulo { font-weight: 600; font-size: .9rem; line-height: 1.1; }
-        .indicador small { color: var(--fo-muted); font-size: .72rem; }
-        .indicador .pct { margin-left: auto; font-weight: 700; font-size: 1.35rem; font-family: var(--fo-font-display); }
-        .frequencia-anel {
-            width: 78px; height: 78px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.05rem;
-            font-family: var(--fo-font-display);
-            background: conic-gradient(var(--cor) calc(var(--p) * 1%), var(--fo-surface-2) 0);
-            position: relative;
-            filter: drop-shadow(0 0 14px color-mix(in srgb, var(--cor) 55%, transparent));
-            animation: anel-enche 1.6s cubic-bezier(.2, .8, .2, 1) both;
-        }
-        @keyframes anel-enche { from { --p: 0; } }
-        .frequencia-anel::before { content: ""; position: absolute; inset: 8px; background: var(--fo-surface-solid); border-radius: 50%; }
-        .frequencia-anel span { position: relative; }
-
-        /* ---------- histórico ---------- */
-        .tabela-historico th { font-size: .7rem; text-transform: uppercase; color: var(--fo-muted); font-weight: 700; letter-spacing: .08em; }
-        .tabela-historico td { font-size: .85rem; vertical-align: middle; }
-        .quadros { display: flex; gap: 3px; }
-        .q { width: 15px; height: 15px; border-radius: 5px; animation: q-entra .45s cubic-bezier(.2, .9, .3, 1.6) both; transition: transform .2s; }
-        .q:hover { transform: scale(1.35); }
-        @keyframes q-entra { from { transform: scale(0) rotate(-45deg); opacity: 0; } to { transform: none; opacity: 1; } }
-        .q.presente { background: linear-gradient(135deg, #4dffb5, #12c47f); box-shadow: 0 0 8px -2px var(--fo-green); }
-        .q.falta { background: linear-gradient(135deg, #ff7a93, #e8304f); box-shadow: 0 0 8px -2px var(--fo-red); }
-        .q.atraso { background: linear-gradient(135deg, #ffd66b, #f59e0b); box-shadow: 0 0 8px -2px var(--fo-yellow); }
-        .q.pendente { background: var(--fo-surface-2); border: 1px dashed var(--fo-border-strong); }
-        @media (max-width: 400px) { .q { width: 11px; height: 11px; } .quadros { gap: 2px; } }
-        .filtro .btn { font-size: .78rem; }
-        .legenda-ponto { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
-        .tabela-historico tbody tr { transition: background .2s; }
-        .tabela-historico tbody tr:hover { background: rgba(91, 140, 255, .06); }
-
-        /* botão flutuante (mobile) */
-        .fab {
-            position: fixed; right: 18px; bottom: calc(18px + env(safe-area-inset-bottom, 0px));
-            width: 54px; height: 54px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center; font-size: 1.3rem;
-            box-shadow: 0 10px 30px -6px rgba(162, 107, 255, .8); z-index: 1030;
-            animation: fo-pulse 2.2s infinite;
-        }
-    </style>
+    {% include 'componentes/cabecalho.html' %}
+    <link href="{{ url_for('static', filename='css/aluno.css') }}" rel="stylesheet">
 </head>
 <body>
 {% set url_voltar = url_for('admin.alunos') if visao == 'admin' else url_for('logout') %}
@@ -126,7 +14,7 @@
 {% set url_exportar = url_for('admin.exportar_aluno', id=aluno.id) if visao == 'admin' else url_for('aluno.exportar') %}
 
 <!-- ================= TOPO ================= -->
-<header class="topo sticky-top" style="top: env(safe-area-inset-top, 0px);">
+<header class="topo sticky-top">
     <div class="container-xl py-2">
         <!-- desktop -->
         <div class="d-none d-lg-flex align-items-center justify-content-between">
@@ -152,13 +40,13 @@
                 <a href="{{ url_exportar }}" class="btn btn-primary btn-sm px-3">
                     <i class="bi bi-box-arrow-up me-1"></i> Exportar conteúdo
                 </a>
-                <button type="button" class="fo-theme-btn" style="width:34px;height:34px" data-fo-theme-toggle></button>
+                <button type="button" class="fo-theme-btn pequeno" data-fo-theme-toggle></button>
             </div>
         </div>
 
         <!-- tablet / celular -->
-        <div class="d-flex d-lg-none align-items-center justify-content-between position-relative" style="min-height: 38px;">
-            <span style="width: 38px;"></span>
+        <div class="d-flex d-lg-none align-items-center justify-content-between position-relative altura-min-38">
+            <span class="espaco-38"></span>
             <a class="marca position-absolute start-50 translate-middle-x" href="#">Frequency<span>ON</span></a>
             <button class="btn btn-light btn-sm d-md-none" data-bs-toggle="collapse" data-bs-target="#menuMobile" aria-label="Abrir menu">
                 <i class="bi bi-list fs-5"></i>
@@ -222,7 +110,7 @@
 
             <!-- frequência geral -->
             <div class="card-fo fo-glass p-4" data-fo-reveal>
-                {% set cor_freq = 'var(--fo-verde)' if frequencia >= 75 else ('var(--fo-amarelo)' if frequencia >= 50 else 'var(--fo-vermelho)') %}
+                {% set nivel_freq = 'bom' if frequencia >= 75 else ('medio' if frequencia >= 50 else 'ruim') %}
                 <div class="d-flex align-items-center justify-content-between mb-3">
                     <div>
                         <h2 class="h6 fw-bold mb-1">Frequência geral</h2>
@@ -235,30 +123,30 @@
                             <small class="text-muted">Nenhuma chamada registrada ainda.</small>
                         {% endif %}
                     </div>
-                    <div class="frequencia-anel" style="--p: {{ frequencia }}; --cor: {{ cor_freq }};" title="Presenças + atrasos">
+                    <div class="frequencia-anel {{ nivel_freq }}" style="--p: {{ frequencia }}" title="Presenças + atrasos">
                         <span data-countup>{{ frequencia }}%</span>
                     </div>
                 </div>
 
                 <div class="barra-geral mb-4" role="img" aria-label="Presenças {{ pct_presenca }}%, faltas {{ pct_falta }}%, atrasos {{ pct_atraso }}%">
-                    <div style="width: {{ pct_presenca }}%; background: var(--fo-verde);"></div>
-                    <div style="width: {{ pct_falta }}%; background: var(--fo-vermelho);"></div>
-                    <div style="width: {{ pct_atraso }}%; background: var(--fo-amarelo);"></div>
+                    <div class="parte presente" style="--largura: {{ pct_presenca }}%"></div>
+                    <div class="parte falta" style="--largura: {{ pct_falta }}%"></div>
+                    <div class="parte atraso" style="--largura: {{ pct_atraso }}%"></div>
                 </div>
 
                 <div class="d-flex flex-column gap-2">
                     <div class="indicador">
-                        <span class="icone" style="background: var(--fo-verde);"><i class="bi bi-check-lg"></i></span>
+                        <span class="icone presente"><i class="bi bi-check-lg"></i></span>
                         <div><div class="titulo">Presenças</div><small>Aulas assistidas</small></div>
                         <span class="pct text-success" data-countup>{{ pct_presenca }}%</span>
                     </div>
                     <div class="indicador">
-                        <span class="icone" style="background: var(--fo-vermelho);"><i class="bi bi-x-lg"></i></span>
+                        <span class="icone falta"><i class="bi bi-x-lg"></i></span>
                         <div><div class="titulo">Faltas</div><small>Ausências registradas</small></div>
                         <span class="pct text-danger" data-countup>{{ pct_falta }}%</span>
                     </div>
                     <div class="indicador">
-                        <span class="icone" style="background: var(--fo-amarelo);"><i class="bi bi-clock"></i></span>
+                        <span class="icone atraso"><i class="bi bi-clock"></i></span>
                         <div><div class="titulo">Atrasos</div><small>Entradas com atraso</small></div>
                         <span class="pct text-warning" data-countup>{{ pct_atraso }}%</span>
                     </div>
@@ -342,7 +230,7 @@
                                 <td>
                                     <div class="quadros">
                                         {% for s in l.status %}
-                                        <span class="q {{ s }}" style="animation-delay: {{ loop.index0 * 25 }}ms" title="Aula {{ loop.index }}: {{ 'Chamada não lançada' if s == 'pendente' else s|capitalize }}"></span>
+                                        <span class="q {{ s }}" title="Aula {{ loop.index }}: {{ 'Chamada não lançada' if s == 'pendente' else s|capitalize }}"></span>
                                         {% endfor %}
                                     </div>
                                     {% if l.justificativa %}
@@ -368,10 +256,10 @@
                 </div>
 
                 <div class="p-3 px-4 border-top d-flex flex-wrap gap-3 small text-muted">
-                    <span class="d-flex align-items-center gap-1"><span class="legenda-ponto" style="background: var(--fo-verde);"></span> Presente</span>
-                    <span class="d-flex align-items-center gap-1"><span class="legenda-ponto" style="background: var(--fo-vermelho);"></span> Falta</span>
-                    <span class="d-flex align-items-center gap-1"><span class="legenda-ponto" style="background: var(--fo-amarelo);"></span> Atraso</span>
-                    <span class="d-flex align-items-center gap-1"><span class="legenda-ponto" style="background: var(--fo-cinza);"></span> Chamada não lançada</span>
+                    <span class="d-flex align-items-center gap-1"><span class="legenda-ponto presente"></span> Presente</span>
+                    <span class="d-flex align-items-center gap-1"><span class="legenda-ponto falta"></span> Falta</span>
+                    <span class="d-flex align-items-center gap-1"><span class="legenda-ponto atraso"></span> Atraso</span>
+                    <span class="d-flex align-items-center gap-1"><span class="legenda-ponto pendente"></span> Chamada não lançada</span>
                 </div>
             </div>
         </div>
@@ -422,7 +310,7 @@
 </div>
 {% endif %}
 
-{% include '_fo_scripts.html' %}
+{% include 'componentes/scripts.html' %}
 <script>
     // mensagens flash viram toast (e justificativa enviada ganha confete)
     document.querySelectorAll('main .alert-dismissible').forEach((a) => {

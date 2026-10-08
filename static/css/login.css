@@ -1,0 +1,59 @@
+/* Telas de login (aluno, professor e administrador) */
+
+body { min-height: 100vh; }
+.fundo-particulas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; }
+.papel-aluno { --cor: var(--fo-green); --grad: var(--fo-grad-green); }
+.papel-prof  { --cor: var(--fo-primary); --grad: linear-gradient(135deg, var(--fo-primary), var(--fo-cyan)); }
+.papel-admin { --cor: var(--fo-violet); --grad: linear-gradient(135deg, var(--fo-violet), var(--fo-pink)); }
+
+.auth-wrap { min-height: 100vh; display: grid; grid-template-columns: 1fr; }
+@media (min-width: 992px) { .auth-wrap { grid-template-columns: 1.1fr 1fr; } }
+
+.painel-marca {
+    position: relative; overflow: hidden; padding: 3rem;
+    display: none; flex-direction: column; justify-content: space-between;
+}
+@media (min-width: 992px) { .painel-marca { display: flex; } }
+.painel-marca .bolha {
+    position: absolute; border-radius: 50%; filter: blur(60px); opacity: .55; z-index: -1;
+    animation: fo-float 9s ease-in-out infinite;
+}
+.painel-marca .b1 { width: 380px; height: 380px; background: var(--cor); top: 10%; left: 5%; }
+.painel-marca .b2 { width: 300px; height: 300px; background: var(--fo-pink); bottom: 5%; right: 10%; animation-delay: -4s; opacity: .35; }
+.icone-papel {
+    width: 120px; height: 120px; border-radius: 34px; font-size: 3.4rem; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--grad);
+    box-shadow: 0 30px 60px -15px var(--cor);
+    animation: fo-float 5s ease-in-out infinite;
+}
+.painel-marca h2 { font-size: clamp(2.4rem, 4vw, 3.6rem); font-weight: 700; line-height: 1.02; letter-spacing: -.04em; }
+.painel-marca .digitando { color: var(--fo-muted); font-size: 1.15rem; min-height: 1.6em; }
+
+.lado-form { display: flex; align-items: center; justify-content: center; padding: 2rem 1rem; }
+.cartao-login { width: 100%; max-width: 430px; padding: 2.5rem 2rem; border-radius: 28px !important; }
+@media (max-width: 400px) { .cartao-login { padding: 2rem 1.25rem; } }
+.cartao-login .chip-papel {
+    display: inline-flex; align-items: center; gap: .45rem; padding: .35rem .85rem; border-radius: 999px;
+    background: color-mix(in srgb, var(--cor) 16%, transparent); color: var(--cor);
+    font-weight: 700; font-size: .8rem; letter-spacing: .02em;
+}
+.campo { position: relative; margin-bottom: 1rem; }
+.campo > i.bi {
+    position: absolute; left: 1rem; top: 50%; transform: translateY(-50%);
+    color: var(--fo-muted); font-size: 1.1rem; pointer-events: none; transition: color .2s;
+}
+.campo:focus-within > i.bi { color: var(--cor); }
+.campo .form-control { padding: .95rem 3rem .95rem 2.9rem; font-size: 1rem; }
+.campo .olho {
+    position: absolute; right: .5rem; top: 50%; transform: translateY(-50%);
+    border: 0; background: transparent; color: var(--fo-muted); padding: .4rem .6rem; border-radius: 8px;
+}
+.campo .olho:hover { color: var(--fo-text); background: var(--fo-surface-2); }
+.aviso-caps { font-size: .78rem; color: var(--fo-yellow); margin-top: -.5rem; margin-bottom: .75rem; }
+.btn-entrar {
+    padding: .95rem; font-size: 1.05rem; border-radius: 14px;
+    background: linear-gradient(120deg, var(--cor), var(--fo-violet), var(--fo-pink), var(--cor)) !important;
+    background-size: 300% 100% !important;
+}
+.cartao-login.erro { animation: fo-shake .55s; }

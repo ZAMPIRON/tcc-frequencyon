@@ -1,0 +1,113 @@
+/* Totem de reconhecimento facial */
+
+body { min-height: 100vh; }
+
+/* ---------- topo ---------- */
+.topo-totem { margin: 14px; padding: 1rem 1.5rem; border-radius: 24px !important; }
+.relogio {
+    font-family: var(--fo-font-display); font-weight: 700; font-size: clamp(2rem, 4vw, 3rem); line-height: 1;
+    background: linear-gradient(90deg, var(--fo-cyan), var(--fo-primary), var(--fo-violet));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    font-variant-numeric: tabular-nums;
+    filter: drop-shadow(0 0 18px rgba(34, 211, 238, .45));
+}
+.ao-vivo { display: inline-flex; align-items: center; gap: .4rem; font-size: .75rem; font-weight: 700; letter-spacing: .12em; color: var(--fo-red); }
+.ao-vivo::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--fo-red); box-shadow: 0 0 10px var(--fo-red); animation: fo-pulse 1.4s infinite; }
+
+/* ---------- câmera ---------- */
+.moldura-camera { padding: 14px; border-radius: 28px !important; height: 100%; display: flex; align-items: center; }
+.moldura-camera .video-container { width: 100%; }
+.video-container {
+    position: relative; overflow: hidden; border-radius: 20px; background: #000;
+    box-shadow: inset 0 0 80px rgba(0, 0, 0, .8);
+    aspect-ratio: 4 / 3;
+}
+.video-container img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; color: transparent; }
+.canto { position: absolute; width: 46px; height: 46px; border: 4px solid var(--fo-cyan); filter: drop-shadow(0 0 8px var(--fo-cyan)); transition: border-color .3s, filter .3s; z-index: 2; }
+.canto.tl { top: 16px; left: 16px; border-right: 0; border-bottom: 0; border-radius: 14px 0 0 0; }
+.canto.tr { top: 16px; right: 16px; border-left: 0; border-bottom: 0; border-radius: 0 14px 0 0; }
+.canto.bl { bottom: 16px; left: 16px; border-right: 0; border-top: 0; border-radius: 0 0 0 14px; }
+.canto.br { bottom: 16px; right: 16px; border-left: 0; border-top: 0; border-radius: 0 0 14px 0; }
+.laser {
+    position: absolute; left: 6%; right: 6%; height: 3px; top: 10%; z-index: 2; border-radius: 3px;
+    background: linear-gradient(90deg, transparent, var(--fo-cyan), #fff, var(--fo-cyan), transparent);
+    box-shadow: 0 0 18px 4px rgba(34, 211, 238, .6);
+    animation: varrer 2.6s ease-in-out infinite alternate;
+}
+@keyframes varrer { from { top: 10%; } to { top: 88%; } }
+.scanner-overlay {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 42%; aspect-ratio: 3 / 4; border-radius: 50%;
+    border: 3px dashed rgba(34, 211, 238, .8); pointer-events: none; z-index: 2;
+    animation: girar-oval 14s linear infinite;
+    transition: border-color .3s, box-shadow .3s;
+}
+@keyframes girar-oval { to { transform: translate(-50%, -50%) rotate(360deg); } }
+.scanner-overlay.success {
+    border: 4px solid var(--fo-green); animation: none;
+    box-shadow: 0 0 0 9999px rgba(34, 225, 154, .12), 0 0 50px rgba(34, 225, 154, .9), inset 0 0 40px rgba(34, 225, 154, .6);
+}
+.video-container.ok .canto { border-color: var(--fo-green); filter: drop-shadow(0 0 10px var(--fo-green)); }
+.video-container.ok .laser { display: none; }
+.rotulo-camera {
+    position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 3;
+    padding: .4rem 1rem; border-radius: 999px; font-size: .8rem; font-weight: 700; letter-spacing: .05em;
+    background: rgba(6, 10, 26, .7); border: 1px solid rgba(34, 211, 238, .4); color: var(--fo-cyan);
+    backdrop-filter: blur(8px); white-space: nowrap;
+}
+
+/* ---------- status ---------- */
+#statusCard { border-radius: 28px !important; overflow: hidden; transition: box-shadow .4s, border-color .4s; }
+#statusCard.estado-ok { border-color: rgba(34, 225, 154, .6) !important; box-shadow: 0 0 60px -10px rgba(34, 225, 154, .7) !important; }
+#statusCard.estado-aviso { border-color: rgba(255, 194, 61, .6) !important; box-shadow: 0 0 60px -10px rgba(255, 194, 61, .6) !important; }
+#statusCard.estado-erro { border-color: rgba(255, 77, 109, .6) !important; box-shadow: 0 0 60px -10px rgba(255, 77, 109, .6) !important; animation: fo-shake .5s; }
+.onda-fundo {
+    position: absolute; inset: auto -30% -60% -30%; height: 120%; z-index: -1; opacity: .5;
+    background: radial-gradient(circle at 50% 100%, var(--fo-aurora-1), transparent 60%);
+}
+#iconWrapper {
+    width: 150px; height: 150px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(circle, rgba(91, 140, 255, .25), rgba(91, 140, 255, .05));
+    border: 1px solid var(--fo-border-strong);
+    animation: respirar 3s ease-in-out infinite;
+}
+@keyframes respirar { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(91, 140, 255, .4); } 50% { transform: scale(1.05); box-shadow: 0 0 0 22px rgba(91, 140, 255, 0); } }
+#statusIcon { font-size: 4rem; background: var(--fo-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.avatar-img {
+    width: 150px; height: 150px; object-fit: cover; border-radius: 50%;
+    border: 5px solid var(--fo-green);
+    box-shadow: 0 0 0 8px rgba(34, 225, 154, .15), 0 0 50px rgba(34, 225, 154, .7);
+    animation: avatar-pop .7s cubic-bezier(.2, .9, .3, 1.5) both;
+}
+@keyframes avatar-pop { from { transform: scale(0) rotate(-20deg); opacity: 0; } to { transform: none; opacity: 1; } }
+#statusTitle { font-size: clamp(1.4rem, 2.4vw, 2rem); }
+#statusTitle.anima { animation: fo-pop-in .5s cubic-bezier(.2, .9, .3, 1.4) both; }
+.msg-presenca {
+    display: flex; align-items: center; justify-content: center; gap: .6rem;
+    padding: .9rem 1.2rem; border-radius: 16px; font-weight: 700; font-size: 1.15rem;
+    background: rgba(34, 225, 154, .14); border: 1px solid rgba(34, 225, 154, .5); color: var(--fo-green);
+}
+.msg-presenca.aviso { background: rgba(255, 194, 61, .14); border-color: rgba(255, 194, 61, .5); color: var(--fo-yellow); }
+.msg-presenca.erro { background: rgba(255, 77, 109, .14); border-color: rgba(255, 77, 109, .5); color: var(--fo-red); }
+
+/* ---------- histórico ---------- */
+.recent-list-container { max-height: 470px; overflow-y: auto; }
+.recent-item {
+    background: var(--fo-surface-2); border: 1px solid var(--fo-border); border-radius: 14px;
+    animation: entrar-lista .6s cubic-bezier(.2, .9, .3, 1.3) both;
+    position: relative; overflow: hidden;
+}
+.recent-item::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(34, 225, 154, .25), transparent);
+    transform: translateX(-100%); animation: fo-shimmer 1.2s .2s ease-out 1;
+}
+.recent-item-img { width: 44px; height: 44px; object-fit: cover; border-radius: 12px; border: 2px solid var(--fo-green); }
+@keyframes entrar-lista { from { opacity: 0; transform: translateX(40px) scale(.9); } to { opacity: 1; transform: none; } }
+#totalCount { min-width: 2rem; }
+#totalCount.pulou { animation: fo-pop-in .5s cubic-bezier(.2, .9, .3, 1.6); }
+
+.rodape-totem { color: var(--fo-muted); font-size: .8rem; }
+
+/* ---------- peças da tela ---------- */
+.altura-min-400 { min-height: 400px; }
