@@ -61,6 +61,53 @@
             background-color: #ffc107; /* Amarelo: Atraso */
         }
 
+        /* Calendário */
+        .cal-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+            text-align: center;
+        }
+        .cal-head {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #6c757d;
+            text-transform: uppercase;
+            padding-bottom: 2px;
+        }
+        .cal-dia {
+            position: relative;
+            aspect-ratio: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            color: #adb5bd;
+            text-decoration: none;
+            border: 2px solid transparent;
+            line-height: 1;
+        }
+        .cal-dia.fora { visibility: hidden; }
+        .cal-dia.aula { color: #212529; background: #eef2ff; font-weight: 600; }
+        .cal-dia.aula.futuro { background: #f8f9fa; color: #6c757d; font-weight: 500; }
+        a.cal-dia:hover { background: #dbe4ff; transform: translateY(-1px); transition: all .1s; }
+        .cal-dia.hoje { border-color: #0d6efd; }
+        .cal-dia.selecionado { background: #0d6efd !important; color: #fff !important; }
+        .cal-dia .ponto {
+            width: 6px; height: 6px; border-radius: 50%; margin-top: 4px;
+        }
+        .ponto.bom { background: #198754; }
+        .ponto.medio { background: #ffc107; }
+        .ponto.ruim { background: #dc3545; }
+        .ponto.vazio { background: #ced4da; }
+        .cal-dia.selecionado .ponto { box-shadow: 0 0 0 2px #fff; }
+        .cal-nav {
+            width: 32px; height: 32px; border-radius: 50%;
+            display: inline-flex; align-items: center; justify-content: center;
+        }
+
         /* Legenda */
         .legend-dot {
             width: 12px;
@@ -98,7 +145,7 @@
             <div class="col-md-3">
                 <div class="card border-0 shadow-sm">
                     <div class="card-body">
-                        <span class="text-muted small">Presentes Hoje</span>
+                        <span class="text-muted small">Presentes no Dia</span>
                         <h3 class="fw-bold mb-0 text-success">{{ total_presentes }}</h3>
                     </div>
                 </div>
@@ -106,7 +153,7 @@
             <div class="col-md-3">
                 <div class="card border-0 shadow-sm">
                     <div class="card-body">
-                        <span class="text-muted small">Com Faltas Hoje</span>
+                        <span class="text-muted small">Faltaram no Dia</span>
                         <h3 class="fw-bold mb-0 text-danger">{{ total_faltas }}</h3>
                     </div>
                 </div>
@@ -131,49 +178,13 @@
             <div class="alert alert-info">Você ainda não está vinculado a nenhuma turma. Peça ao administrador para vincular você.</div>
         {% endif %}
 
-        {% if turma_selecionada %}
-        <!-- Dias de aula do professor nesta turma -->
-        <div class="card border-0 shadow-sm mb-4">
-            <div class="card-body">
-                <form method="POST" action="{{ url_for('professor.salvar_dias', turma_id=turma_selecionada.id) }}" class="d-flex align-items-center gap-3 flex-wrap">
-                    <span class="fw-bold small"><i class="bi bi-calendar-week"></i> Seus dias de aula em {{ turma_selecionada.nome }}:</span>
-                    {% for d, nome in dias_opcoes %}
-                    <div class="form-check form-check-inline mb-0">
-                        <input class="form-check-input" type="checkbox" name="dias" value="{{ d }}" id="dia{{ d }}" {% if d in dias_prof %}checked{% endif %}>
-                        <label class="form-check-label small" for="dia{{ d }}">{{ nome }}</label>
-                    </div>
-                    {% endfor %}
-                    <button type="submit" class="btn btn-primary btn-sm">Salvar dias</button>
-                </form>
-                {% if not dias_prof %}
-                    <div class="alert alert-warning small mt-3 mb-0">Defina os dias em que você dá aula nesta turma para liberar a chamada.</div>
-                {% endif %}
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- Seletor de Turma e Tabela de Chamada -->
-        <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white py-3">
-                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-                    <div>
-                        <h5 class="fw-bold mb-0">Chamada do Dia
-                            <span class="text-muted fw-normal ms-1">{{ data_exibicao }}</span>
-                            {% if eh_hoje and not pode_editar %}<span class="badge bg-warning text-dark ms-2 fs-6">Sem aula hoje</span>{% elif eh_hoje %}<span class="badge bg-success ms-2 fs-6">Hoje</span>{% else %}<span class="badge bg-secondary ms-2 fs-6">Somente consulta</span>{% endif %}
-                        </h5>
-                        <small class="text-muted">{% if pode_editar %}Clique nas barras para alterar falta/presença. Botão direito nas 2 primeiras marca atraso.{% elif eh_hoje and dias_prof %}Hoje não é seu dia de aula nesta turma ({{ dias_prof_nomes }}).{% else %}Dias anteriores ficam disponíveis apenas para consulta. O lançamento é permitido somente no dia atual.{% endif %}</small>
-                    </div>
-
-                    <form method="GET" action="{{ url_for('professor.chamada') }}" class="d-flex align-items-center gap-2 flex-wrap">
-                        <label class="form-label mb-0 small fw-bold text-nowrap">Dia:</label>
-                        <select name="data" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
-                            {% for dia in dias_semana %}
-                                <option value="{{ dia.iso }}" {% if dia.selecionado %}selected{% endif %} {% if not dia.disponivel %}disabled{% endif %}>
-                                    {{ dia.nome }} - {{ dia.display }}{% if not dia.disponivel %} (futuro){% endif %}
-                                </option>
-                            {% endfor %}
-                        </select>
-                        <label class="form-label mb-0 small fw-bold text-nowrap">Turma:</label>
+        <div class="row g-4">
+        <!-- Coluna do calendário -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-body">
+                    <form method="GET" action="{{ url_for('professor.chamada') }}">
+                        <label class="form-label small fw-bold mb-1">Turma</label>
                         <select name="turma_id" class="form-select form-select-sm" onchange="this.form.submit()">
                             {% for turma in turmas %}
                                 <option value="{{ turma.id }}" {% if turma_selecionada and turma.id == turma_selecionada.id %}selected{% endif %}>
@@ -182,7 +193,69 @@
                             {% endfor %}
                         </select>
                     </form>
+                    {% if turma_selecionada %}
+                    <div class="small text-muted mt-2">
+                        <i class="bi bi-calendar-week"></i>
+                        Seus dias de aula: <strong class="text-dark">{{ dias_prof_nomes }}</strong>
+                    </div>
+                    {% endif %}
                 </div>
+            </div>
+
+            {% if calendario %}
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <a href="{{ calendario.anterior }}" class="btn btn-light btn-sm cal-nav" title="Mês anterior"><i class="bi bi-chevron-left"></i></a>
+                        <div class="text-center">
+                            <div class="fw-bold">{{ calendario.titulo }}</div>
+                            {% if not eh_hoje %}<a href="{{ calendario.hoje }}" class="small text-decoration-none">voltar para hoje</a>{% endif %}
+                        </div>
+                        {% if calendario.proximo %}
+                            <a href="{{ calendario.proximo }}" class="btn btn-light btn-sm cal-nav" title="Próximo mês"><i class="bi bi-chevron-right"></i></a>
+                        {% else %}
+                            <span class="btn btn-light btn-sm cal-nav disabled"><i class="bi bi-chevron-right"></i></span>
+                        {% endif %}
+                    </div>
+
+                    <div class="cal-grid">
+                        {% for nome in calendario.cabecalho %}<div class="cal-head">{{ nome }}</div>{% endfor %}
+                        {% for semana in calendario.semanas %}{% for c in semana %}
+                            {% set classes = 'cal-dia' ~ (' fora' if not c.no_mes else '') ~ (' aula' if c.aula else '') ~ (' futuro' if c.futuro else '') ~ (' hoje' if c.hoje else '') ~ (' selecionado' if c.selecionado else '') %}
+                            {% if c.url %}
+                                <a href="{{ c.url }}" class="{{ classes }}" title="{% if c.taxa is not none %}{{ c.taxa }}% de presença{% else %}Sem chamada lançada{% endif %}">
+                                    {{ c.dia }}<span class="ponto {{ c.nivel }}"></span>
+                                </a>
+                            {% else %}
+                                <div class="{{ classes }}" {% if c.aula %}title="Aula futura"{% endif %}>{{ c.dia }}</div>
+                            {% endif %}
+                        {% endfor %}{% endfor %}
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2 mt-3 small text-muted justify-content-center">
+                        <span class="d-flex align-items-center gap-1"><span class="ponto bom d-inline-block" style="width:8px;height:8px;border-radius:50%"></span>≥ 75%</span>
+                        <span class="d-flex align-items-center gap-1"><span class="ponto medio d-inline-block" style="width:8px;height:8px;border-radius:50%"></span>50–74%</span>
+                        <span class="d-flex align-items-center gap-1"><span class="ponto ruim d-inline-block" style="width:8px;height:8px;border-radius:50%"></span>&lt; 50%</span>
+                        <span class="d-flex align-items-center gap-1"><span class="ponto vazio d-inline-block" style="width:8px;height:8px;border-radius:50%"></span>sem chamada</span>
+                    </div>
+                </div>
+            </div>
+            {% elif turma_selecionada %}
+            <div class="alert alert-warning small">
+                O administrador ainda não definiu seus dias de aula nesta turma. A chamada fica disponível assim que os dias forem cadastrados.
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Coluna da chamada -->
+        <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3">
+                <h5 class="fw-bold mb-0">{{ dia_nome }}
+                    <span class="text-muted fw-normal ms-1">{{ data_exibicao }}</span>
+                    {% if pode_editar %}<span class="badge bg-success ms-2 fs-6">Hoje</span>{% else %}<span class="badge bg-secondary ms-2 fs-6">Somente consulta</span>{% endif %}
+                </h5>
+                <small class="text-muted">{% if pode_editar %}Clique nas barras para alterar falta/presença. Botão direito nas 2 primeiras marca atraso.{% else %}Escolha um dia no calendário. Dias anteriores ficam só para consulta; alterar exige senha de administrador.{% endif %}</small>
             </div>
 
             <div class="card-body p-0">
@@ -192,8 +265,8 @@
                             <tr>
                                 <th class="ps-4">Nome</th>
                                 <th class="d-none d-sm-table-cell">Matrícula</th>
-                                <th>Data</th>
                                 <th>Status (10 Aulas)</th>
+                                <th class="text-center">{{ mes_nome }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -206,7 +279,6 @@
                                     </div>
                                 </td>
                                 <td class="d-none d-sm-table-cell text-muted small">{{ aluno.matricula }}</td>
-                                <td class="text-muted small">{{ aluno.data }}</td>
                                 <td>
                                     <div class="bar-container">
                                         {% for estado in aluno.status %}
@@ -217,6 +289,13 @@
                                                  onclick="registrarClique(this)" oncontextmenu="registrarAtraso(event, this)"></div>
                                         {% endfor %}
                                     </div>
+                                </td>
+                                <td class="text-center">
+                                    {% if aluno.freq_mes is none %}
+                                        <span class="text-muted small">-</span>
+                                    {% else %}
+                                        <span class="badge rounded-pill {{ 'bg-success' if aluno.freq_mes >= 75 else ('bg-warning text-dark' if aluno.freq_mes >= 50 else 'bg-danger') }}">{{ aluno.freq_mes }}%</span>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% else %}
@@ -243,6 +322,8 @@
             </div>
         </div>
 
+    </div>
+    </div>
     </div>
 
     <script>

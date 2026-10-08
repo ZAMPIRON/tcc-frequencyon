@@ -350,22 +350,59 @@ def _normalizar_data_chamada(valor, dias):
     return ultimo_dia_com_aula(selecionada, dias)
 
 
-def _dias_uteis_semana(data_ref, hoje, dias_aula):
-    """Monta as opções de dias de aula da semana para a tela do professor."""
-    inicio = data_ref - timedelta(days=data_ref.weekday())
-    dias = []
-    for indice in dias_aula:
-        d = inicio + timedelta(days=indice)
-        dias.append({
-            "data": d,
-            "iso": d.isoformat(),
-            "nome": NOMES_DIAS[indice],
-            "display": d.strftime("%d/%m"),
-            "disponivel": d <= hoje,
-            "editavel": d == hoje,
-            "selecionado": d == data_ref,
-        })
-    return dias
+MESES = ("Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho",
+         "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro")
+
+
+def _fim_do_mes(d):
+    return (d.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+
+
+def _link_mes(d, hoje, dias, turma_id):
+    """Link para outro mês: abre no último dia de aula daquele mês (sem passar de hoje)."""
+    alvo = ultimo_dia_com_aula(min(_fim_do_mes(d), hoje), dias)
+    return url_for("professor.chamada", turma_id=turma_id, data=alvo.isoformat())
+
+
+def _calendario_mes(data_ref, hoje, dias_aula, turma, taxa_por_dia):
+    """Monta o calendário do mês de data_ref (semanas começando na segunda)."""
+    primeiro = data_ref.replace(day=1)
+    ultimo = _fim_do_mes(data_ref)
+    d = primeiro - timedelta(days=primeiro.weekday())
+    semanas = []
+    while d <= ultimo:
+        semana = []
+        for _ in range(7):
+            aula = d.month == data_ref.month and eh_dia_com_aula(d, dias_aula)
+            taxa = taxa_por_dia.get(d)
+            nivel = None
+            if aula and d <= hoje:
+                nivel = "vazio" if taxa is None else ("bom" if taxa >= 75 else "medio" if taxa >= 50 else "ruim")
+            semana.append({
+                "dia": d.day,
+                "no_mes": d.month == data_ref.month,
+                "aula": aula,
+                "futuro": d > hoje,
+                "hoje": d == hoje,
+                "selecionado": d == data_ref,
+                "nivel": nivel,
+                "taxa": taxa,
+                "url": url_for("professor.chamada", turma_id=turma.id, data=d.isoformat())
+                       if aula and d <= hoje else None,
+            })
+            d += timedelta(days=1)
+        semanas.append(semana)
+
+    mes_anterior = primeiro - timedelta(days=1)
+    proximo_mes = ultimo + timedelta(days=1)
+    return {
+        "titulo": f"{MESES[data_ref.month - 1]} {data_ref.year}",
+        "semanas": semanas,
+        "cabecalho": [n[:3] for n in NOMES_DIAS],
+        "anterior": _link_mes(mes_anterior, hoje, dias_aula, turma.id),
+        "proximo": _link_mes(proximo_mes, hoje, dias_aula, turma.id) if proximo_mes <= hoje else None,
+        "hoje": url_for("professor.chamada", turma_id=turma.id),
+    }
 
 
 @professor.route("/chamada")
@@ -381,17 +418,33 @@ def chamada():
     dias_prof = vinculo.dias_semana if vinculo else ()
     data_selecionada = _normalizar_data_chamada(request.args.get("data"), dias_prof)
     alunos, presentes, faltas = [], 0, 0
+    calendario = None
 
     if turma and dias_prof:
         ids = [a.id for a in turma.alunos]
-        mapa = {}
-        if ids:
-            registros = Presenca.query.filter(
-                Presenca.aluno_id.in_(ids),
-                Presenca.data == data_selecionada
-            ).all()
-            for r in registros:
+        inicio_mes, fim_mes = data_selecionada.replace(day=1), _fim_do_mes(data_selecionada)
+        registros = Presenca.query.filter(
+            Presenca.aluno_id.in_(ids),
+            Presenca.data.between(inicio_mes, fim_mes)
+        ).all() if ids else []
+
+        # chamada do dia selecionado + totais do mês (só dias de aula do professor)
+        mapa, ok_mes, ok_dia, dias_com_chamada = {}, {}, {}, set()
+        for r in registros:
+            if not eh_dia_com_aula(r.data, dias_prof):
+                continue
+            dias_com_chamada.add(r.data)
+            presente = r.status in ("presente", "atraso")
+            ok_mes[r.aluno_id] = ok_mes.get(r.aluno_id, 0) + presente
+            ok_dia[r.data] = ok_dia.get(r.data, 0) + presente
+            if r.data == data_selecionada:
                 mapa.setdefault(r.aluno_id, {})[r.aula] = r.status
+
+        aulas_por_dia_turma = len(ids) * AULAS_POR_DIA
+        taxa_por_dia = {d: round(100 * ok_dia.get(d, 0) / aulas_por_dia_turma)
+                        for d in dias_com_chamada}
+        calendario = _calendario_mes(data_selecionada, hoje, dias_prof, turma, taxa_por_dia)
+        total_aulas_mes = len(dias_com_chamada) * AULAS_POR_DIA
 
         for a in sorted(turma.alunos, key=lambda x: (x.numero_chamada or 999, x.nome)):
             st = [mapa.get(a.id, {}).get(i, "falta") for i in range(AULAS_POR_DIA)]
@@ -404,8 +457,8 @@ def chamada():
                 "nome": a.nome,
                 "matricula": a.matricula,
                 "iniciais": "".join(p[0] for p in a.nome.split()[:2]).upper(),
-                "data": data_selecionada.strftime("%d/%m/%Y"),
                 "status": st,
+                "freq_mes": round(100 * ok_mes.get(a.id, 0) / total_aulas_mes) if total_aulas_mes else None,
             })
 
     eh_hoje = data_selecionada == hoje
@@ -422,28 +475,14 @@ def chamada():
         media_frequencia=turma.frequencia_media if turma else 0,
         data_iso=data_selecionada.isoformat(),
         data_exibicao=data_selecionada.strftime("%d/%m/%Y"),
-        hoje_iso=hoje.isoformat(),
         eh_hoje=eh_hoje,
         pode_editar=pode_editar,
-        dias_semana=_dias_uteis_semana(data_selecionada, hoje, dias_prof),
         dia_nome=NOMES_DIAS[data_selecionada.weekday()],
+        mes_nome=MESES[data_selecionada.month - 1],
         dias_prof=dias_prof,
         dias_prof_nomes=vinculo.dias_nomes if vinculo else "",
-        dias_opcoes=[(d, NOMES_DIAS[d]) for d in DIAS_SELECIONAVEIS],
+        calendario=calendario,
     )
-
-
-@professor.route("/turmas/<int:turma_id>/dias", methods=["POST"])
-@requer("professor")
-def salvar_dias(turma_id):
-    v = db.session.get(ProfessorTurma, (session["uid"], turma_id))
-    if not v:
-        flash("Você não leciona nessa turma.", "danger")
-        return redirect(url_for("professor.chamada"))
-    v.dias_semana = dias_de_formulario(request.form.getlist("dias"))
-    db.session.commit()
-    flash(f"Dias de aula salvos: {v.dias_nomes}.", "success")
-    return redirect(url_for("professor.chamada", turma_id=turma_id))
 
 
 def _dados_postagem():
