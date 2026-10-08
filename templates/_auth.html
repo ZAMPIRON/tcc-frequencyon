@@ -1,0 +1,147 @@
+{# Base das telas de login. Variáveis definidas pelo template filho:
+   papel_nome, papel_icone, papel_classe, papel_action, papel_rotulo, papel_placeholder, papel_frases #}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Login {{ papel_nome }} - FrequencyON</title>
+    {% include '_fo_head.html' %}
+    <style>
+        body { min-height: 100vh; }
+        .fundo-particulas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; }
+        .papel-aluno { --cor: var(--fo-green); --grad: var(--fo-grad-green); }
+        .papel-prof  { --cor: var(--fo-primary); --grad: linear-gradient(135deg, var(--fo-primary), var(--fo-cyan)); }
+        .papel-admin { --cor: var(--fo-violet); --grad: linear-gradient(135deg, var(--fo-violet), var(--fo-pink)); }
+
+        .auth-wrap { min-height: 100vh; display: grid; grid-template-columns: 1fr; }
+        @media (min-width: 992px) { .auth-wrap { grid-template-columns: 1.1fr 1fr; } }
+
+        .painel-marca {
+            position: relative; overflow: hidden; padding: 3rem;
+            display: none; flex-direction: column; justify-content: space-between;
+        }
+        @media (min-width: 992px) { .painel-marca { display: flex; } }
+        .painel-marca .bolha {
+            position: absolute; border-radius: 50%; filter: blur(60px); opacity: .55; z-index: -1;
+            animation: fo-float 9s ease-in-out infinite;
+        }
+        .painel-marca .b1 { width: 380px; height: 380px; background: var(--cor); top: 10%; left: 5%; }
+        .painel-marca .b2 { width: 300px; height: 300px; background: var(--fo-pink); bottom: 5%; right: 10%; animation-delay: -4s; opacity: .35; }
+        .icone-papel {
+            width: 120px; height: 120px; border-radius: 34px; font-size: 3.4rem; color: #fff;
+            display: flex; align-items: center; justify-content: center;
+            background: var(--grad);
+            box-shadow: 0 30px 60px -15px var(--cor);
+            animation: fo-float 5s ease-in-out infinite;
+        }
+        .painel-marca h2 { font-size: clamp(2.4rem, 4vw, 3.6rem); font-weight: 700; line-height: 1.02; letter-spacing: -.04em; }
+        .painel-marca .digitando { color: var(--fo-muted); font-size: 1.15rem; min-height: 1.6em; }
+
+        .lado-form { display: flex; align-items: center; justify-content: center; padding: 2rem 1rem; }
+        .cartao-login { width: 100%; max-width: 430px; padding: 2.5rem 2rem; border-radius: 28px !important; }
+        @media (max-width: 400px) { .cartao-login { padding: 2rem 1.25rem; } }
+        .cartao-login .chip-papel {
+            display: inline-flex; align-items: center; gap: .45rem; padding: .35rem .85rem; border-radius: 999px;
+            background: color-mix(in srgb, var(--cor) 16%, transparent); color: var(--cor);
+            font-weight: 700; font-size: .8rem; letter-spacing: .02em;
+        }
+        .campo { position: relative; margin-bottom: 1rem; }
+        .campo > i.bi {
+            position: absolute; left: 1rem; top: 50%; transform: translateY(-50%);
+            color: var(--fo-muted); font-size: 1.1rem; pointer-events: none; transition: color .2s;
+        }
+        .campo:focus-within > i.bi { color: var(--cor); }
+        .campo .form-control { padding: .95rem 3rem .95rem 2.9rem; font-size: 1rem; }
+        .campo .olho {
+            position: absolute; right: .5rem; top: 50%; transform: translateY(-50%);
+            border: 0; background: transparent; color: var(--fo-muted); padding: .4rem .6rem; border-radius: 8px;
+        }
+        .campo .olho:hover { color: var(--fo-text); background: var(--fo-surface-2); }
+        .aviso-caps { font-size: .78rem; color: var(--fo-yellow); margin-top: -.5rem; margin-bottom: .75rem; }
+        .btn-entrar {
+            padding: .95rem; font-size: 1.05rem; border-radius: 14px;
+            background: linear-gradient(120deg, var(--cor), var(--fo-violet), var(--fo-pink), var(--cor)) !important;
+            background-size: 300% 100% !important;
+        }
+        .cartao-login.erro { animation: fo-shake .55s; }
+    </style>
+</head>
+<body class="{{ papel_classe }}">
+    <canvas class="fundo-particulas" data-fo-particulas aria-hidden="true"></canvas>
+
+    <div class="auth-wrap">
+        <!-- painel lateral (desktop) -->
+        <aside class="painel-marca">
+            <span class="bolha b1"></span><span class="bolha b2"></span>
+            <a href="{{ url_for('index') }}" class="d-flex align-items-center gap-2 text-decoration-none fo-display fw-bold fs-5" style="color: var(--fo-text);">
+                <span class="fo-logo-icone"><i class="bi bi-person-bounding-box"></i></span>
+                <span>Frequency<span class="fo-gradient-text">ON</span></span>
+            </a>
+            <div>
+                <div class="icone-papel mb-4"><i class="bi {{ papel_icone }}"></i></div>
+                <h2 class="mb-3">Área do<br><span class="fo-gradient-text">{{ papel_nome }}</span></h2>
+                <p class="digitando"><span data-typewriter="{{ papel_frases }}"></span></p>
+            </div>
+            <small class="text-muted"><i class="bi bi-shield-check me-1"></i> Conexão protegida • FrequencyON</small>
+        </aside>
+
+        <!-- formulário -->
+        <main class="lado-form">
+            <div class="cartao-login fo-glass fo-border-anim {% if get_flashed_messages() %}erro{% endif %}" data-fo-reveal>
+                <div class="d-flex align-items-center justify-content-between mb-4">
+                    <a href="{{ url_for('index') }}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left"></i> Perfis</a>
+                    <button type="button" class="fo-theme-btn" data-fo-theme-toggle></button>
+                </div>
+
+                <span class="chip-papel mb-3"><i class="bi {{ papel_icone }}"></i> {{ papel_nome }}</span>
+                <h1 class="h2 fw-bold mb-1">Bem-vindo de volta 👋</h1>
+                <p class="text-muted mb-4">Entre para acessar o FrequencyON.</p>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} small py-2" role="alert"><i class="bi bi-exclamation-triangle me-1"></i> {{ message }}</div>
+                    {% endfor %}
+                {% endwith %}
+
+                <form action="{{ papel_action }}" method="POST">
+                    <label for="email" class="form-label small fw-semibold">{{ papel_rotulo }}</label>
+                    <div class="campo">
+                        <i class="bi bi-person"></i>
+                        <input type="text" id="email" name="email" class="form-control" placeholder="{{ papel_placeholder }}" autocomplete="username" required autofocus>
+                    </div>
+
+                    <label for="senhaInput" class="form-label small fw-semibold">Senha</label>
+                    <div class="campo">
+                        <i class="bi bi-lock"></i>
+                        <input type="password" id="senhaInput" name="senha" class="form-control" placeholder="••••••••" autocomplete="current-password" required>
+                        <button type="button" class="olho" id="toggleSenha" aria-label="Mostrar senha"><i class="bi bi-eye"></i></button>
+                    </div>
+                    <div class="aviso-caps" id="avisoCaps" hidden><i class="bi bi-capslock-fill"></i> Caps Lock ativado</div>
+
+                    <button type="submit" class="btn btn-primary btn-entrar w-100 mt-2" data-magnetic>
+                        Entrar <i class="bi bi-arrow-right-short fs-5 align-middle"></i>
+                    </button>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    {% include '_fo_scripts.html' %}
+    <script>
+        const senha = document.getElementById('senhaInput');
+        const olho = document.getElementById('toggleSenha');
+        olho.addEventListener('click', () => {
+            const mostrar = senha.type === 'password';
+            senha.type = mostrar ? 'text' : 'password';
+            olho.innerHTML = mostrar ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
+            olho.setAttribute('aria-label', mostrar ? 'Esconder senha' : 'Mostrar senha');
+            senha.focus();
+        });
+        const avisoCaps = document.getElementById('avisoCaps');
+        senha.addEventListener('keyup', (e) => {
+            avisoCaps.hidden = !(e.getModifierState && e.getModifierState('CapsLock'));
+        });
+    </script>
+</body>
+</html>

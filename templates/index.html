@@ -2,111 +2,164 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Escolher Perfil - FrequencyON</title>
-
-    <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Bootstrap Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>FrequencyON - Escolha seu perfil</title>
+    {% include '_fo_head.html' %}
     <style>
-        /* Fundo com degradê suave e fluído */
-        body.login-bg {
-            background-color: #e2e8f0;
-            background-image: 
-                radial-gradient(circle at 90% 10%, rgba(147, 197, 253, 0.7) 0%, transparent 45%),
-                radial-gradient(circle at 10% 80%, rgba(196, 181, 253, 0.7) 0%, transparent 45%);
-            background-repeat: no-repeat;
-            background-attachment: fixed;
-            min-height: 100vh;
+        body { min-height: 100vh; overflow-x: hidden; }
+        .fundo-particulas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; }
+        .cursor-glow {
+            position: fixed; top: 0; left: 0; width: 520px; height: 520px; border-radius: 50%;
+            background: radial-gradient(circle, rgba(162, 107, 255, .22), transparent 65%);
+            pointer-events: none; z-index: -1; filter: blur(10px);
         }
 
-        /* Cartão Central */
-        .login-card {
-            max-width: 400px;
-            background-color: #f8fafc;
+        .topo-landing { padding: 1.25rem 0; }
+        .marca-txt { font-family: var(--fo-font-display); font-weight: 700; font-size: 1.25rem; color: var(--fo-text); text-decoration: none; }
+
+        .hero { padding: clamp(2rem, 7vh, 5rem) 0 2.5rem; text-align: center; }
+        .selo {
+            display: inline-flex; align-items: center; gap: .5rem;
+            padding: .45rem 1rem; border-radius: 999px;
+            background: var(--fo-surface); border: 1px solid var(--fo-border-strong);
+            font-size: .85rem; font-weight: 600; backdrop-filter: blur(10px);
+        }
+        .selo .ponto { width: 8px; height: 8px; border-radius: 50%; background: var(--fo-green); box-shadow: 0 0 12px var(--fo-green); animation: fo-pulse 1.8s infinite; }
+        .titulo-hero {
+            font-size: clamp(3rem, 10vw, 7.5rem);
+            font-weight: 700;
+            line-height: .95;
+            letter-spacing: -.05em;
+            margin: 1.5rem 0 1rem;
+        }
+        .titulo-hero .on {
+            display: inline-block;
+            background: var(--fo-grad); background-size: 200% 200%;
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+            animation: fo-grad-move 5s ease infinite;
+            filter: drop-shadow(0 8px 40px rgba(162, 107, 255, .55));
+        }
+        .sub-hero { font-size: clamp(1.05rem, 2.4vw, 1.4rem); color: var(--fo-muted); min-height: 2em; }
+        .sub-hero .cursor { display: inline-block; width: 2px; height: 1.1em; background: var(--fo-primary); vertical-align: -0.15em; margin-left: 3px; animation: piscar 1s steps(1) infinite; }
+        @keyframes piscar { 50% { opacity: 0; } }
+
+        /* cards de perfil */
+        .perfil {
+            display: block; text-decoration: none; color: var(--fo-text);
+            padding: 1.75rem; height: 100%;
             border-radius: 24px !important;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04) !important;
+            overflow: hidden;
         }
+        .perfil:hover { color: var(--fo-text); }
+        .perfil .icone {
+            width: 64px; height: 64px; border-radius: 18px; font-size: 1.8rem; color: #fff;
+            display: flex; align-items: center; justify-content: center; margin-bottom: 1.25rem;
+            transform: translateZ(40px);
+            box-shadow: 0 12px 30px -8px var(--cor-sombra);
+        }
+        .perfil h3 { font-size: 1.4rem; font-weight: 700; margin-bottom: .35rem; transform: translateZ(30px); }
+        .perfil p { color: var(--fo-muted); font-size: .92rem; margin-bottom: 1.25rem; transform: translateZ(20px); }
+        .perfil .ir {
+            display: inline-flex; align-items: center; gap: .5rem; font-weight: 700; font-size: .9rem;
+            color: var(--cor); transform: translateZ(25px);
+        }
+        .perfil .ir i { transition: transform .3s; }
+        .perfil:hover .ir i { transform: translateX(6px); }
+        .perfil .brilho {
+            position: absolute; width: 220px; height: 220px; border-radius: 50%; right: -70px; top: -70px;
+            background: var(--cor); opacity: .16; filter: blur(40px); transition: opacity .4s, transform .6s;
+        }
+        .perfil:hover .brilho { opacity: .35; transform: scale(1.3); }
+        .perfil-aluno { --cor: var(--fo-green); --cor-sombra: rgba(34, 225, 154, .6); }
+        .perfil-prof  { --cor: var(--fo-primary); --cor-sombra: rgba(91, 140, 255, .6); }
+        .perfil-admin { --cor: var(--fo-violet); --cor-sombra: rgba(162, 107, 255, .6); }
+        .perfil-aluno .icone { background: var(--fo-grad-green); }
+        .perfil-prof .icone  { background: linear-gradient(135deg, var(--fo-primary), var(--fo-cyan)); }
+        .perfil-admin .icone { background: linear-gradient(135deg, var(--fo-violet), var(--fo-pink)); }
 
-        /* Ícone Biométrico */
-        .bio-icon {
-            font-size: 3.5rem;
-            color: #3b82f6;
-            line-height: 1;
+        .recursos { display: flex; flex-wrap: wrap; justify-content: center; gap: .75rem; margin-top: 3rem; }
+        .recurso {
+            display: inline-flex; align-items: center; gap: .5rem; padding: .55rem 1rem; border-radius: 999px;
+            background: var(--fo-surface-2); border: 1px solid var(--fo-border); color: var(--fo-muted); font-size: .85rem; font-weight: 500;
         }
+        .recurso i { color: var(--fo-primary); }
 
-        /* Estilização dos Botões */
-        .btn-aluno {
-            background-color: #22c55e;
-            color: #ffffff;
-            border: none;
-        }
-        .btn-aluno:hover {
-            background-color: #16a34a;
-            color: #ffffff;
-        }
-
-        .btn-professor {
-            background-color: #3b82f6;
-            color: #ffffff;
-            border: none;
-        }
-        .btn-professor:hover {
-            background-color: #2563eb;
-            color: #ffffff;
-        }
-
-        .btn-admin {
-            background-color: #475569;
-            color: #ffffff;
-            border: none;
-        }
-        .btn-admin:hover {
-            background-color: #334155;
-            color: #ffffff;
-        }
-
-        /* Transição suave ao passar o mouse */
-        .btn {
-            transition: all 0.2s ease-in-out;
-        }
+        .orbita { position: absolute; border-radius: 50%; border: 1px dashed var(--fo-border-strong); pointer-events: none; z-index: -1; }
+        .orbita.o1 { width: 760px; height: 760px; left: 50%; top: 120px; transform: translateX(-50%); animation: girar 60s linear infinite; }
+        .orbita.o2 { width: 1100px; height: 1100px; left: 50%; top: -60px; transform: translateX(-50%); animation: girar 90s linear infinite reverse; opacity: .6; }
+        .orbita::after { content: ""; position: absolute; top: -5px; left: 50%; width: 10px; height: 10px; border-radius: 50%; background: var(--fo-cyan); box-shadow: 0 0 18px var(--fo-cyan); }
+        @keyframes girar { to { transform: translateX(-50%) rotate(360deg); } }
     </style>
 </head>
+<body>
+    <canvas class="fundo-particulas" data-fo-particulas aria-hidden="true"></canvas>
+    <div class="cursor-glow" data-fo-cursor-glow aria-hidden="true"></div>
+    <div class="orbita o1 d-none d-md-block" aria-hidden="true"></div>
+    <div class="orbita o2 d-none d-lg-block" aria-hidden="true"></div>
 
-<body class="login-bg d-flex align-items-center justify-content-center p-3">
-
-    <div class="card login-card border-0 p-4 p-sm-5 w-100">
-        
-        <!-- Cabeçalho -->
-        <div class="text-center mb-4">
-            <!-- Ícone de Reconhecimento Facial -->
-            <div class="mb-3">
-                <i class="bi bi-person-bounding-box bio-icon"></i>
+    <div class="container" style="max-width: 1140px;">
+        <header class="topo-landing d-flex align-items-center justify-content-between">
+            <a href="{{ url_for('index') }}" class="d-flex align-items-center gap-2 marca-txt">
+                <span class="fo-logo-icone"><i class="bi bi-person-bounding-box"></i></span>
+                <span>Frequency<span class="fo-gradient-text">ON</span></span>
+            </a>
+            <div class="d-flex align-items-center gap-2">
+                <a href="{{ url_for('reconhecimento.pagina_totem') }}" class="btn btn-light btn-sm px-3 d-none d-sm-inline-flex align-items-center gap-2">
+                    <i class="bi bi-camera-video"></i> Abrir totem
+                </a>
+                <button type="button" class="fo-theme-btn" data-fo-theme-toggle></button>
             </div>
-            
-            <!-- Título e Subtítulo -->
-            <h1 class="h3 fw-bold text-dark m-0">Frequency<span class="text-primary">ON</span></h1>
-            <p class="text-secondary small mb-0 mt-1 fs-7">Controle de frequência inteligente</p>
-        </div>
+        </header>
 
-        <!-- Opções de Perfil -->
-        <div class="d-grid gap-3">
-            <a href="/login/aluno" class="btn btn-aluno py-2-5 py-2 fw-bold rounded-3">
-                Entrar como Aluno
-            </a>
-            
-            <a href="/login/professor" class="btn btn-professor py-2-5 py-2 fw-bold rounded-3">
-                Entrar como Professor
-            </a>
-            
-            <a href="/login/admin" class="btn btn-admin py-2-5 py-2 fw-bold rounded-3">
-                Entrar como Administrador
-            </a>
-        </div>
+        <section class="hero">
+            <span class="selo" data-fo-reveal><span class="ponto"></span> Reconhecimento facial + chamada inteligente</span>
+            <h1 class="titulo-hero" data-fo-reveal>Frequency<span class="on">ON</span></h1>
+            <p class="sub-hero" data-fo-reveal>
+                <span data-typewriter="Chamada em menos de 1 segundo.|Adeus lista de papel.|Frequência em tempo real.|Evasão escolar sob controle."></span><span class="cursor"></span>
+            </p>
+        </section>
 
+        <section class="row g-4 justify-content-center pb-5">
+            <div class="col-md-4" data-fo-reveal>
+                <a href="{{ url_for('login_aluno') }}" class="perfil perfil-aluno fo-glass fo-border-anim" data-tilt="12">
+                    <span class="brilho"></span>
+                    <div class="icone"><i class="bi bi-mortarboard-fill"></i></div>
+                    <h3>Sou Aluno</h3>
+                    <p>Veja sua frequência, histórico de aulas e justifique faltas.</p>
+                    <span class="ir">Entrar <i class="bi bi-arrow-right"></i></span>
+                </a>
+            </div>
+            <div class="col-md-4" data-fo-reveal>
+                <a href="{{ url_for('login_professor') }}" class="perfil perfil-prof fo-glass fo-border-anim" data-tilt="12">
+                    <span class="brilho"></span>
+                    <div class="icone"><i class="bi bi-easel2-fill"></i></div>
+                    <h3>Sou Professor</h3>
+                    <p>Faça a chamada com um clique e acompanhe o mês da turma.</p>
+                    <span class="ir">Entrar <i class="bi bi-arrow-right"></i></span>
+                </a>
+            </div>
+            <div class="col-md-4" data-fo-reveal>
+                <a href="{{ url_for('login_admin') }}" class="perfil perfil-admin fo-glass fo-border-anim" data-tilt="12">
+                    <span class="brilho"></span>
+                    <div class="icone"><i class="bi bi-shield-lock-fill"></i></div>
+                    <h3>Administração</h3>
+                    <p>Turmas, professores, relatórios e alunos em risco de evasão.</p>
+                    <span class="ir">Entrar <i class="bi bi-arrow-right"></i></span>
+                </a>
+            </div>
+
+            <div class="col-12">
+                <div class="recursos" data-fo-reveal>
+                    <span class="recurso"><i class="bi bi-camera"></i> Totem com IA facial</span>
+                    <span class="recurso"><i class="bi bi-lightning-charge"></i> 10 aulas por dia</span>
+                    <span class="recurso"><i class="bi bi-calendar-week"></i> Dias por turma</span>
+                    <span class="recurso"><i class="bi bi-graph-up-arrow"></i> Relatórios ao vivo</span>
+                    <span class="recurso"><i class="bi bi-file-earmark-check"></i> Justificativas online</span>
+                </div>
+            </div>
+        </section>
     </div>
 
+    {% include '_fo_scripts.html' %}
 </body>
 </html>

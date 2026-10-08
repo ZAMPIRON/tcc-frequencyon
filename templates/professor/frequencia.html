@@ -4,61 +4,77 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chamada do Dia - Professor</title>
-    <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    {% include '_fo_head.html' %}
 
     <style>
         .avatar {
-            width: 38px;
-            height: 38px;
-            border-radius: 50%;
-            background-color: #0d6efd;
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: var(--fo-grad);
             color: #ffffff;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: 600;
+            font-weight: 700;
             font-size: 0.85rem;
+            box-shadow: 0 6px 16px -6px rgba(162, 107, 255, .8);
+            flex-shrink: 0;
         }
 
         .bar-container {
             display: flex;
-            gap: 4px;
+            gap: 5px;
         }
 
         .bar {
-            width: 16px;
-            height: 30px;
-            border-radius: 4px;
+            width: 18px;
+            height: 32px;
+            border-radius: 6px;
             cursor: pointer;
-            transition: transform 0.1s ease, background-color 0.2s ease;
+            transition: transform 0.18s cubic-bezier(.2, .9, .3, 1.5), background-color 0.25s ease, box-shadow .25s;
+            animation: barra-entra .5s cubic-bezier(.2, .9, .3, 1.4) both;
         }
+        @keyframes barra-entra { from { transform: scaleY(0); opacity: 0; } to { transform: none; opacity: 1; } }
+        .bar-container .bar:nth-child(2) { animation-delay: 30ms; }
+        .bar-container .bar:nth-child(3) { animation-delay: 60ms; }
+        .bar-container .bar:nth-child(4) { animation-delay: 90ms; }
+        .bar-container .bar:nth-child(5) { animation-delay: 120ms; }
+        .bar-container .bar:nth-child(6) { animation-delay: 150ms; }
+        .bar-container .bar:nth-child(7) { animation-delay: 180ms; }
+        .bar-container .bar:nth-child(8) { animation-delay: 210ms; }
+        .bar-container .bar:nth-child(9) { animation-delay: 240ms; }
+        .bar-container .bar:nth-child(10) { animation-delay: 270ms; }
 
         .bar:hover {
-            transform: scale(1.18);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            transform: scale(1.22) translateY(-2px);
         }
+        .bar.pulou { animation: barra-pula .45s cubic-bezier(.2, .9, .3, 1.6); }
+        @keyframes barra-pula { 0% { transform: scale(1); } 40% { transform: scale(1.45, .8); } 100% { transform: scale(1); } }
 
         .bar-bloqueada {
             cursor: pointer;
-            opacity: 0.72;
+            opacity: 0.6;
         }
 
         .bar-bloqueada:hover {
             transform: none;
-            box-shadow: none;
         }
 
         /* Estados das barras */
-        .bar.on {
-            background-color: #198754; /* Verde: Presente */
+        .bar.on { background: linear-gradient(180deg, #4dffb5, #12c47f); box-shadow: 0 0 12px -2px rgba(34, 225, 154, .7); }
+        .bar.off { background: linear-gradient(180deg, #ff7a93, #e8304f); box-shadow: 0 0 12px -2px rgba(255, 77, 109, .6); }
+        .bar.late { background: linear-gradient(180deg, #ffd66b, #f59e0b); box-shadow: 0 0 12px -2px rgba(255, 194, 61, .7); }
+
+        .navbar-fo {
+            margin: 12px;
+            border-radius: 20px !important;
+            padding: .75rem 1.25rem;
+            position: sticky; top: 12px; z-index: 1020;
         }
-        .bar.off {
-            background-color: #dc3545; /* Vermelho: Falta */
-        }
-        .bar.late {
-            background-color: #ffc107; /* Amarelo: Atraso */
+        .stat-icone {
+            width: 44px; height: 44px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; color: #fff;
         }
 
         /* Calendário */
@@ -70,8 +86,8 @@
         }
         .cal-head {
             font-size: 0.7rem;
-            font-weight: 600;
-            color: #6c757d;
+            font-weight: 700;
+            color: var(--fo-muted);
             text-transform: uppercase;
             padding-bottom: 2px;
         }
@@ -90,18 +106,19 @@
             line-height: 1;
         }
         .cal-dia.fora { visibility: hidden; }
-        .cal-dia.aula { color: #212529; background: #eef2ff; font-weight: 600; }
-        .cal-dia.aula.futuro { background: #f8f9fa; color: #6c757d; font-weight: 500; }
-        a.cal-dia:hover { background: #dbe4ff; transform: translateY(-1px); transition: all .1s; }
-        .cal-dia.hoje { border-color: #0d6efd; }
-        .cal-dia.selecionado { background: #0d6efd !important; color: #fff !important; }
+        .cal-dia { color: var(--fo-muted); opacity: .55; }
+        .cal-dia.aula { color: var(--fo-text); background: rgba(91, 140, 255, .12); font-weight: 700; opacity: 1; border-color: rgba(91, 140, 255, .18); }
+        .cal-dia.aula.futuro { background: var(--fo-surface-2); color: var(--fo-muted); font-weight: 500; opacity: .8; }
+        a.cal-dia:hover { background: rgba(91, 140, 255, .25); transform: translateY(-2px) scale(1.06); transition: all .2s cubic-bezier(.2,.9,.3,1.5); box-shadow: 0 8px 20px -8px rgba(91, 140, 255, .8); }
+        .cal-dia.hoje { border-color: var(--fo-cyan) !important; box-shadow: 0 0 14px -2px var(--fo-cyan); }
+        .cal-dia.selecionado { background: var(--fo-grad) !important; color: #fff !important; box-shadow: 0 10px 24px -6px rgba(162, 107, 255, .9); transform: scale(1.06); }
         .cal-dia .ponto {
             width: 6px; height: 6px; border-radius: 50%; margin-top: 4px;
         }
-        .ponto.bom { background: #198754; }
-        .ponto.medio { background: #ffc107; }
-        .ponto.ruim { background: #dc3545; }
-        .ponto.vazio { background: #ced4da; }
+        .ponto.bom { background: var(--fo-green); box-shadow: 0 0 8px var(--fo-green); }
+        .ponto.medio { background: var(--fo-yellow); box-shadow: 0 0 8px var(--fo-yellow); }
+        .ponto.ruim { background: var(--fo-red); box-shadow: 0 0 8px var(--fo-red); }
+        .ponto.vazio { background: var(--fo-muted); opacity: .5; }
         .cal-dia.selecionado .ponto { box-shadow: 0 0 0 2px #fff; }
         .cal-nav {
             width: 32px; height: 32px; border-radius: 50%;
@@ -117,15 +134,20 @@
         }
     </style>
 </head>
-<body class="bg-light">
+<body>
 
     <!-- Navbar simples -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow-sm">
-        <div class="container">
-            <a class="navbar-brand fw-bold" href="#">FrequencyON - Professor</a>
-            <div class="d-flex align-items-center gap-3 text-white">
-                <span class="small"><i class="bi bi-person-circle"></i> {{ usuario.nome if usuario else 'Professor' }}</span>
-                <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">Sair</a>
+    <nav class="navbar-fo fo-glass mb-4">
+        <div class="container-xl px-0 d-flex align-items-center justify-content-between gap-2">
+            <a class="d-flex align-items-center gap-2 text-decoration-none fo-display fw-bold fs-5" href="{{ url_for('professor.chamada') }}" style="color: var(--fo-text);">
+                <span class="fo-logo-icone"><i class="bi bi-person-bounding-box"></i></span>
+                <span class="d-none d-sm-inline">Frequency<span class="fo-gradient-text">ON</span></span>
+                <span class="badge bg-primary ms-1 d-none d-md-inline">Professor</span>
+            </a>
+            <div class="d-flex align-items-center gap-2">
+                <span class="small d-none d-md-inline me-1 text-muted">Olá, <strong class="text-dark">{{ usuario.nome.split()[0] if usuario else 'Professor' }}</strong> 👋</span>
+                <button type="button" class="fo-theme-btn" data-fo-theme-toggle></button>
+                <a href="{{ url_for('logout') }}" class="btn btn-light btn-sm px-3"><i class="bi bi-box-arrow-right me-1"></i>Sair</a>
             </div>
         </div>
     </nav>
@@ -134,35 +156,47 @@
 
         <!-- Cards de Resumo / Estatísticas -->
         <div class="row g-3 mb-4">
-            <div class="col-md-3">
+            <div class="col-6 col-md-3">
                 <div class="card border-0 shadow-sm">
-                    <div class="card-body">
-                        <span class="text-muted small">Total Alunos</span>
-                        <h3 class="fw-bold mb-0 text-primary">{{ total_matriculados }}</h3>
+                    <div class="card-body d-flex align-items-center justify-content-between">
+                        <div>
+                            <span class="text-muted small fw-semibold">Total Alunos</span>
+                            <h3 class="fw-bold mb-0 fs-2 text-primary" data-countup>{{ total_matriculados }}</h3>
+                        </div>
+                        <span class="stat-icone" style="background: var(--fo-grad);"><i class="bi bi-people-fill"></i></span>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-6 col-md-3">
                 <div class="card border-0 shadow-sm">
-                    <div class="card-body">
-                        <span class="text-muted small">Presentes no Dia</span>
-                        <h3 class="fw-bold mb-0 text-success">{{ total_presentes }}</h3>
+                    <div class="card-body d-flex align-items-center justify-content-between">
+                        <div>
+                            <span class="text-muted small fw-semibold">Presentes no Dia</span>
+                            <h3 class="fw-bold mb-0 fs-2 text-success" data-countup>{{ total_presentes }}</h3>
+                        </div>
+                        <span class="stat-icone" style="background: var(--fo-grad-green);"><i class="bi bi-check2-circle"></i></span>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-6 col-md-3">
                 <div class="card border-0 shadow-sm">
-                    <div class="card-body">
-                        <span class="text-muted small">Faltaram no Dia</span>
-                        <h3 class="fw-bold mb-0 text-danger">{{ total_faltas }}</h3>
+                    <div class="card-body d-flex align-items-center justify-content-between">
+                        <div>
+                            <span class="text-muted small fw-semibold">Faltaram no Dia</span>
+                            <h3 class="fw-bold mb-0 fs-2 text-danger" data-countup>{{ total_faltas }}</h3>
+                        </div>
+                        <span class="stat-icone" style="background: var(--fo-grad-red);"><i class="bi bi-x-circle"></i></span>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-6 col-md-3">
                 <div class="card border-0 shadow-sm">
-                    <div class="card-body">
-                        <span class="text-muted small">Média da Turma</span>
-                        <h3 class="fw-bold mb-0 text-dark" id="media-frequencia-val">{{ media_frequencia }}%</h3>
+                    <div class="card-body d-flex align-items-center justify-content-between">
+                        <div>
+                            <span class="text-muted small fw-semibold">Média da Turma</span>
+                            <h3 class="fw-bold mb-0 fs-2 fo-gradient-text" id="media-frequencia-val" data-countup>{{ media_frequencia }}%</h3>
+                        </div>
+                        <span class="stat-icone" style="background: linear-gradient(135deg, var(--fo-violet), var(--fo-pink));"><i class="bi bi-graph-up-arrow"></i></span>
                     </div>
                 </div>
             </div>
@@ -173,6 +207,7 @@
             <div class="alert alert-{{ category }} small">{{ message }}</div>
           {% endfor %}
         {% endwith %}
+
 
         {% if not turmas %}
             <div class="alert alert-info">Você ainda não está vinculado a nenhuma turma. Peça ao administrador para vincular você.</div>
@@ -250,10 +285,10 @@
         <!-- Coluna da chamada -->
         <div class="col-lg-8">
         <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white py-3">
-                <h5 class="fw-bold mb-0">{{ dia_nome }}
+            <div class="card-header py-3">
+                <h5 class="fw-bold mb-1 fs-4">{{ dia_nome }}
                     <span class="text-muted fw-normal ms-1">{{ data_exibicao }}</span>
-                    {% if pode_editar %}<span class="badge bg-success ms-2 fs-6">Hoje</span>{% else %}<span class="badge bg-secondary ms-2 fs-6">Somente consulta</span>{% endif %}
+                    {% if pode_editar %}<span class="badge bg-success ms-2 fs-6"><span class="spinner-grow spinner-grow-sm me-1" style="width:.5rem;height:.5rem"></span>Hoje • ao vivo</span>{% else %}<span class="badge bg-secondary ms-2 fs-6">Somente consulta</span>{% endif %}
                 </h5>
                 <small class="text-muted">{% if pode_editar %}Clique nas barras para alterar falta/presença. Botão direito nas 2 primeiras marca atraso.{% else %}Escolha um dia no calendário. Dias anteriores ficam só para consulta; alterar exige senha de administrador.{% endif %}</small>
             </div>
@@ -312,12 +347,12 @@
             </div>
 
             <!-- Footer do Card com Legenda -->
-            <div class="card-footer bg-white py-3 border-top-0">
-                <div class="d-flex align-items-center gap-4 small text-muted">
+            <div class="card-footer py-3 border-top-0">
+                <div class="d-flex align-items-center flex-wrap gap-3 small text-muted">
                     <span class="fw-bold">Legenda:</span>
-                    <span class="d-flex align-items-center gap-1"><span class="legend-dot bg-success"></span> Presente (Clique)</span>
-                    <span class="d-flex align-items-center gap-1"><span class="legend-dot bg-danger"></span> Falta (Clique)</span>
-                    <span class="d-flex align-items-center gap-1"><span class="legend-dot bg-warning"></span> Atraso (Botão Direito nas 2 primeiras)</span>
+                    <span class="d-flex align-items-center gap-1"><span class="legend-dot" style="background: var(--fo-green); box-shadow: 0 0 8px var(--fo-green);"></span> Presente (Clique)</span>
+                    <span class="d-flex align-items-center gap-1"><span class="legend-dot" style="background: var(--fo-red); box-shadow: 0 0 8px var(--fo-red);"></span> Falta (Clique)</span>
+                    <span class="d-flex align-items-center gap-1"><span class="legend-dot" style="background: var(--fo-yellow); box-shadow: 0 0 8px var(--fo-yellow);"></span> Atraso (Botão Direito nas 2 primeiras)</span>
                 </div>
             </div>
         </div>
@@ -326,30 +361,37 @@
     </div>
     </div>
 
+    {% include '_fo_scripts.html' %}
     <script>
         const DATA_TELA = '{{ data_iso }}';
         const PODE_EDITAR = {{ 'true' if pode_editar else 'false' }};
         let SENHA_ADMIN_HISTORICO = '';
 
-        function pedirSenhaAdmin() {
+        async function pedirSenhaAdmin() {
             if (SENHA_ADMIN_HISTORICO) {
                 return SENHA_ADMIN_HISTORICO;
             }
 
-            const senha = prompt('Digite a senha de um administrador para alterar esta chamada anterior:');
-            if (senha === null || senha.trim() === '') {
+            const senha = await FO.pedir({
+                titulo: 'Alterar chamada anterior',
+                texto: 'Digite a senha de um administrador para liberar a edição deste dia.',
+                tipo: 'password',
+                placeholder: 'Senha do administrador',
+                confirmar: 'Liberar edição',
+            });
+            if (!senha) {
                 return null;
             }
 
-            SENHA_ADMIN_HISTORICO = senha.trim();
+            SENHA_ADMIN_HISTORICO = senha;
             return SENHA_ADMIN_HISTORICO;
         }
 
-        function dadosPostagem() {
+        async function dadosPostagem() {
             const dados = { data: DATA_TELA };
 
             if (!PODE_EDITAR) {
-                const senha = pedirSenhaAdmin();
+                const senha = await pedirSenhaAdmin();
                 if (!senha) {
                     return null;
                 }
@@ -360,7 +402,7 @@
         }
 
         async function enviarAlteracao(url, elemento) {
-            const dados = dadosPostagem();
+            const dados = await dadosPostagem();
             if (!dados) {
                 return;
             }
@@ -377,16 +419,23 @@
                     if (res.status === 403 && data.erro && data.erro.includes('senha')) {
                         SENHA_ADMIN_HISTORICO = '';
                     }
-                    alert(data.erro || 'Não foi possível alterar a presença.');
+                    FO.toast(data.erro || 'Não foi possível alterar a presença.', 'danger');
+                    elemento.animate([{ transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'none' }], { duration: 250, iterations: 2 });
                     return;
                 }
 
                 atualizarBarra(elemento, data.estado);
+                elemento.classList.remove('pulou');
+                void elemento.offsetWidth;
+                elemento.classList.add('pulou');
+                FO.explosao(elemento, data.estado === 'presente' ? '#22e19a' : data.estado === 'atraso' ? '#ffc23d' : '#ff4d6d');
+                verificarTurmaCompleta();
                 if (data.media_frequencia !== undefined) {
                     atualizarMediaTurma(data.media_frequencia);
                 }
             } catch (err) {
                 console.error('Erro ao alterar presença:', err);
+                FO.toast('Sem conexão com o servidor.', 'danger');
             }
         }
 
@@ -404,7 +453,7 @@
 
             const barraIndice = parseInt(elemento.getAttribute('data-barra'));
             if (barraIndice > 1) {
-                alert('Atraso só pode ser marcado nas aulas 1 e 2.');
+                FO.toast('Atraso só pode ser marcado nas aulas 1 e 2.', 'warning');
                 return;
             }
 
@@ -433,6 +482,22 @@
             const mediaEl = document.getElementById('media-frequencia-val');
             if (mediaEl) {
                 mediaEl.innerText = media + '%';
+                mediaEl.animate([{ transform: 'scale(1.25)' }, { transform: 'scale(1)' }], { duration: 400, easing: 'cubic-bezier(.2,.9,.3,1.5)' });
+            }
+        }
+
+        // turma inteira presente em todas as aulas = festa 🎉
+        let jaComemorou = false;
+        function verificarTurmaCompleta() {
+            const barras = document.querySelectorAll('.bar');
+            if (!barras.length) return;
+            const todasOk = [...barras].every((b) => b.classList.contains('on'));
+            if (todasOk && !jaComemorou) {
+                jaComemorou = true;
+                FO.confete();
+                FO.toast('Turma completa! Todos presentes em todas as aulas 🎉', 'success');
+            } else if (!todasOk) {
+                jaComemorou = false;
             }
         }
     </script>

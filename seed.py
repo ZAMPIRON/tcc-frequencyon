@@ -36,7 +36,7 @@ def popular_banco():
         db.session.commit()
 
         print("Criando Turma...")
-        turma = Turma(nome="C13", curso="Análise de Desenvolvimento de Sistemas")
+        turma = Turma(nome="Dev 2", curso="Análise de Desenvolvimento de Sistemas")
         db.session.add(turma)
         # Vincula o professor à turma com os dias de aula dele (1 = terça, 3 = quinta)
         turma.vinculos.append(ProfessorTurma(professor=prof, dias="1,3"))

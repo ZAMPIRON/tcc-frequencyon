@@ -1,133 +1,183 @@
 <!DOCTYPE html>
-<html lang="pt-BR" class="h-100">
+<html lang="pt-BR" class="h-100" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>FrequencyON - Totem de Presença</title>
-
-    <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Font Awesome Icons -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
-
+    {% include '_fo_head.html' %}
+    <script>document.documentElement.setAttribute('data-bs-theme', 'dark');</script>
     <style>
-        body {
-            background-color: #0f172a;
+        body { min-height: 100vh; }
+
+        /* ---------- topo ---------- */
+        .topo-totem { margin: 14px; padding: 1rem 1.5rem; border-radius: 24px !important; }
+        .relogio {
+            font-family: var(--fo-font-display); font-weight: 700; font-size: clamp(2rem, 4vw, 3rem); line-height: 1;
+            background: linear-gradient(90deg, var(--fo-cyan), var(--fo-primary), var(--fo-violet));
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+            font-variant-numeric: tabular-nums;
+            filter: drop-shadow(0 0 18px rgba(34, 211, 238, .45));
         }
+        .ao-vivo { display: inline-flex; align-items: center; gap: .4rem; font-size: .75rem; font-weight: 700; letter-spacing: .12em; color: var(--fo-red); }
+        .ao-vivo::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--fo-red); box-shadow: 0 0 10px var(--fo-red); animation: fo-pulse 1.4s infinite; }
+
+        /* ---------- câmera ---------- */
+        .moldura-camera { padding: 14px; border-radius: 28px !important; height: 100%; display: flex; align-items: center; }
+        .moldura-camera .video-container { width: 100%; }
         .video-container {
-            position: relative;
-            overflow: hidden;
-            background-color: #000;
+            position: relative; overflow: hidden; border-radius: 20px; background: #000;
+            box-shadow: inset 0 0 80px rgba(0, 0, 0, .8);
+            aspect-ratio: 4 / 3;
         }
+        .video-container img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; color: transparent; }
+        .canto { position: absolute; width: 46px; height: 46px; border: 4px solid var(--fo-cyan); filter: drop-shadow(0 0 8px var(--fo-cyan)); transition: border-color .3s, filter .3s; z-index: 2; }
+        .canto.tl { top: 16px; left: 16px; border-right: 0; border-bottom: 0; border-radius: 14px 0 0 0; }
+        .canto.tr { top: 16px; right: 16px; border-left: 0; border-bottom: 0; border-radius: 0 14px 0 0; }
+        .canto.bl { bottom: 16px; left: 16px; border-right: 0; border-top: 0; border-radius: 0 0 0 14px; }
+        .canto.br { bottom: 16px; right: 16px; border-left: 0; border-top: 0; border-radius: 0 0 14px 0; }
+        .laser {
+            position: absolute; left: 6%; right: 6%; height: 3px; top: 10%; z-index: 2; border-radius: 3px;
+            background: linear-gradient(90deg, transparent, var(--fo-cyan), #fff, var(--fo-cyan), transparent);
+            box-shadow: 0 0 18px 4px rgba(34, 211, 238, .6);
+            animation: varrer 2.6s ease-in-out infinite alternate;
+        }
+        @keyframes varrer { from { top: 10%; } to { top: 88%; } }
         .scanner-overlay {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 220px;
-            height: 280px;
-            border: 3px dashed #0dcaf0;
-            border-radius: 50%;
-            pointer-events: none;
-            transition: all 0.3s ease;
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 42%; aspect-ratio: 3 / 4; border-radius: 50%;
+            border: 3px dashed rgba(34, 211, 238, .8); pointer-events: none; z-index: 2;
+            animation: girar-oval 14s linear infinite;
+            transition: border-color .3s, box-shadow .3s;
         }
+        @keyframes girar-oval { to { transform: translate(-50%, -50%) rotate(360deg); } }
         .scanner-overlay.success {
-            border: 4px solid #198754;
-            box-shadow: 0 0 30px rgba(25, 135, 84, 0.7);
+            border: 4px solid var(--fo-green); animation: none;
+            box-shadow: 0 0 0 9999px rgba(34, 225, 154, .12), 0 0 50px rgba(34, 225, 154, .9), inset 0 0 40px rgba(34, 225, 154, .6);
         }
+        .video-container.ok .canto { border-color: var(--fo-green); filter: drop-shadow(0 0 10px var(--fo-green)); }
+        .video-container.ok .laser { display: none; }
+        .rotulo-camera {
+            position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 3;
+            padding: .4rem 1rem; border-radius: 999px; font-size: .8rem; font-weight: 700; letter-spacing: .05em;
+            background: rgba(6, 10, 26, .7); border: 1px solid rgba(34, 211, 238, .4); color: var(--fo-cyan);
+            backdrop-filter: blur(8px); white-space: nowrap;
+        }
+
+        /* ---------- status ---------- */
+        #statusCard { border-radius: 28px !important; overflow: hidden; transition: box-shadow .4s, border-color .4s; }
+        #statusCard.estado-ok { border-color: rgba(34, 225, 154, .6) !important; box-shadow: 0 0 60px -10px rgba(34, 225, 154, .7) !important; }
+        #statusCard.estado-aviso { border-color: rgba(255, 194, 61, .6) !important; box-shadow: 0 0 60px -10px rgba(255, 194, 61, .6) !important; }
+        #statusCard.estado-erro { border-color: rgba(255, 77, 109, .6) !important; box-shadow: 0 0 60px -10px rgba(255, 77, 109, .6) !important; animation: fo-shake .5s; }
+        .onda-fundo {
+            position: absolute; inset: auto -30% -60% -30%; height: 120%; z-index: -1; opacity: .5;
+            background: radial-gradient(circle at 50% 100%, var(--fo-aurora-1), transparent 60%);
+        }
+        #iconWrapper {
+            width: 150px; height: 150px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            background: radial-gradient(circle, rgba(91, 140, 255, .25), rgba(91, 140, 255, .05));
+            border: 1px solid var(--fo-border-strong);
+            animation: respirar 3s ease-in-out infinite;
+        }
+        @keyframes respirar { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(91, 140, 255, .4); } 50% { transform: scale(1.05); box-shadow: 0 0 0 22px rgba(91, 140, 255, 0); } }
+        #statusIcon { font-size: 4rem; background: var(--fo-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
         .avatar-img {
-            width: 120px;
-            height: 120px;
-            object-fit: cover;
+            width: 150px; height: 150px; object-fit: cover; border-radius: 50%;
+            border: 5px solid var(--fo-green);
+            box-shadow: 0 0 0 8px rgba(34, 225, 154, .15), 0 0 50px rgba(34, 225, 154, .7);
+            animation: avatar-pop .7s cubic-bezier(.2, .9, .3, 1.5) both;
         }
-        .recent-list-container {
-            max-height: 440px;
-            overflow-y: auto;
+        @keyframes avatar-pop { from { transform: scale(0) rotate(-20deg); opacity: 0; } to { transform: none; opacity: 1; } }
+        #statusTitle { font-size: clamp(1.4rem, 2.4vw, 2rem); }
+        #statusTitle.anima { animation: fo-pop-in .5s cubic-bezier(.2, .9, .3, 1.4) both; }
+        .msg-presenca {
+            display: flex; align-items: center; justify-content: center; gap: .6rem;
+            padding: .9rem 1.2rem; border-radius: 16px; font-weight: 700; font-size: 1.15rem;
+            background: rgba(34, 225, 154, .14); border: 1px solid rgba(34, 225, 154, .5); color: var(--fo-green);
         }
-        .recent-list-container::-webkit-scrollbar {
-            width: 6px;
-        }
-        .recent-list-container::-webkit-scrollbar-thumb {
-            background-color: #334155;
-            border-radius: 4px;
-        }
+        .msg-presenca.aviso { background: rgba(255, 194, 61, .14); border-color: rgba(255, 194, 61, .5); color: var(--fo-yellow); }
+        .msg-presenca.erro { background: rgba(255, 77, 109, .14); border-color: rgba(255, 77, 109, .5); color: var(--fo-red); }
+
+        /* ---------- histórico ---------- */
+        .recent-list-container { max-height: 470px; overflow-y: auto; }
         .recent-item {
-            background-color: #1e293b;
-            border-color: #334155;
-            animation: fadeIn 0.4s ease-in-out;
+            background: var(--fo-surface-2); border: 1px solid var(--fo-border); border-radius: 14px;
+            animation: entrar-lista .6s cubic-bezier(.2, .9, .3, 1.3) both;
+            position: relative; overflow: hidden;
         }
-        .recent-item-img {
-            width: 45px;
-            height: 45px;
-            object-fit: cover;
+        .recent-item::after {
+            content: ""; position: absolute; inset: 0; pointer-events: none;
+            background: linear-gradient(90deg, transparent, rgba(34, 225, 154, .25), transparent);
+            transform: translateX(-100%); animation: fo-shimmer 1.2s .2s ease-out 1;
         }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        .recent-item-img { width: 44px; height: 44px; object-fit: cover; border-radius: 12px; border: 2px solid var(--fo-green); }
+        @keyframes entrar-lista { from { opacity: 0; transform: translateX(40px) scale(.9); } to { opacity: 1; transform: none; } }
+        #totalCount { min-width: 2rem; }
+        #totalCount.pulou { animation: fo-pop-in .5s cubic-bezier(.2, .9, .3, 1.6); }
+
+        .rodape-totem { color: var(--fo-muted); font-size: .8rem; }
     </style>
 </head>
-<body class="d-flex flex-column h-100 text-light">
+<body class="d-flex flex-column h-100" data-fo-sem-tema>
 
     <!-- CABEÇALHO -->
-    <header class="navbar navbar-dark bg-dark bg-gradient border-bottom border-secondary px-4 py-3 shadow-sm">
-        <div class="container-fluid d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center gap-3">
-                <i class="fa-solid fa-id-card-clip text-info fs-1"></i>
-                <div>
-                    <h3 class="mb-0 fw-bold text-white">FrequencyON</h3>
-                    <span class="badge bg-secondary text-light">Totem de Presença Facial</span>
-                </div>
+    <header class="topo-totem fo-glass d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <span class="fo-logo-icone" style="width:52px;height:52px;font-size:1.5rem;"><i class="bi bi-person-bounding-box"></i></span>
+            <div>
+                <h3 class="mb-0 fw-bold">Frequency<span class="fo-gradient-text">ON</span></h3>
+                <span class="ao-vivo">TOTEM AO VIVO</span>
             </div>
-            
-            <div class="d-flex align-items-center gap-4">
-                <button type="button" class="btn btn-outline-info btn-lg fw-bold d-flex align-items-center gap-2 shadow-sm" data-bs-toggle="modal" data-bs-target="#cadastrarFaceModal">
-                    <i class="fa-solid fa-user-plus"></i>
-                    <span>Primeiro Acesso / Cadastrar Face</span>
-                </button>
+        </div>
 
-                <div class="text-end">
-                    <div id="clockTime" class="fs-2 fw-bold text-info">00:00:00</div>
-                    <div id="clockDate" class="small text-secondary">Carregando data...</div>
-                </div>
+        <div class="d-flex align-items-center gap-4">
+            <button type="button" class="btn btn-outline-info btn-lg fw-bold d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#cadastrarFaceModal">
+                <i class="fa-solid fa-user-plus"></i>
+                <span class="d-none d-md-inline">Primeiro acesso / Cadastrar face</span>
+            </button>
+            <div class="text-end">
+                <div id="clockTime" class="relogio">00:00:00</div>
+                <div id="clockDate" class="small text-muted">Carregando data...</div>
             </div>
         </div>
     </header>
 
     <!-- CONTEÚDO PRINCIPAL -->
-    <main class="container-fluid my-auto py-3">
+    <main class="container-fluid my-auto pb-3 px-3">
         <div class="row g-3 align-items-stretch justify-content-center">
 
             <!-- CÂMERA -->
-            <div class="col-lg-5 col-xl-5">
-                <div class="card bg-dark text-white border-secondary shadow-lg h-100">
-                    <div class="card-body p-2 d-flex align-items-center justify-content-center">
-                        <div class="video-container ratio ratio-4x3 border border-2 border-secondary rounded w-100">
-                            <img id="videoStream" src="{{ url_for('reconhecimento.video_feed') }}" class="img-fluid rounded" alt="Câmera do Totem">
-                            <div id="scannerOverlay" class="scanner-overlay"></div>
-                        </div>
+            <div class="col-lg-5">
+                <div class="moldura-camera fo-glass fo-border-anim">
+                    <div class="video-container" id="videoBox">
+                        <img id="videoStream" src="{{ url_for('reconhecimento.video_feed') }}" alt="Câmera do Totem">
+                        <span class="canto tl"></span><span class="canto tr"></span>
+                        <span class="canto bl"></span><span class="canto br"></span>
+                        <div class="laser"></div>
+                        <div id="scannerOverlay" class="scanner-overlay"></div>
+                        <span class="rotulo-camera" id="rotuloCamera"><i class="bi bi-broadcast me-1"></i> Procurando rostos...</span>
                     </div>
                 </div>
             </div>
 
             <!-- CARD DE FEEDBACK -->
-            <div class="col-lg-4 col-xl-4">
-                <div id="statusCard" class="card bg-dark bg-gradient text-white border-secondary shadow-lg text-center p-3 h-100">
-                    <div class="card-body d-flex flex-column align-items-center justify-content-center" style="min-height: 380px;">
+            <div class="col-lg-4">
+                <div id="statusCard" class="card text-center p-3 h-100">
+                    <span class="onda-fundo"></span>
+                    <div class="card-body d-flex flex-column align-items-center justify-content-center" style="min-height: 400px;">
 
-                        <div id="iconWrapper" class="p-4 rounded-circle bg-secondary bg-opacity-25 mb-3">
-                            <i id="statusIcon" class="fa-solid fa-user-check text-info display-3"></i>
+                        <div id="iconWrapper" class="mb-4">
+                            <i id="statusIcon" class="fa-solid fa-face-smile"></i>
                         </div>
 
-                        <img id="studentAvatar" src="" alt="Foto Aluno" class="avatar-img rounded-circle border border-4 border-success shadow mb-3 d-none">
+                        <img id="studentAvatar" src="" alt="Foto Aluno" class="avatar-img mb-4 d-none">
 
-                        <h3 id="statusTitle" class="card-title fw-bold text-white mb-2">Aguardando aluno...</h3>
-                        <p id="statusSubtitle" class="card-text text-secondary mb-3">Posicione seu rosto centralizado na câmera para registrar a presença.</p>
+                        <h3 id="statusTitle" class="card-title fw-bold mb-2">Aguardando aluno...</h3>
+                        <p id="statusSubtitle" class="card-text text-muted mb-4">Posicione seu rosto no centro da câmera para registrar a presença.</p>
 
                         <div id="studentInfo" class="d-none w-100">
                             <span id="studentMatricula" class="badge bg-secondary fs-6 px-3 py-2 mb-3">Matrícula: ---</span>
-                            <div class="alert alert-success d-flex align-items-center justify-content-center gap-2 mb-0 fw-bold fs-5 shadow-sm" role="alert">
-                                <i class="fa-solid fa-circle-check fs-4"></i>
+                            <div class="msg-presenca" id="caixaPresenca" role="status">
+                                <i class="fa-solid fa-circle-check fs-4" id="iconePresenca"></i>
                                 <span id="presenceMessage">Presença Confirmada!</span>
                             </div>
                         </div>
@@ -137,18 +187,16 @@
             </div>
 
             <!-- HISTÓRICO LATERAL -->
-            <div class="col-lg-3 col-xl-3">
-                <div class="card bg-dark text-white border-secondary shadow-lg h-100">
-                    <div class="card-header border-secondary bg-transparent d-flex align-items-center justify-content-between py-3">
-                        <h5 class="mb-0 fw-bold text-info fs-6">
-                            <i class="fa-solid fa-clock-rotate-left me-2"></i>Últimos Registros
-                        </h5>
-                        <span id="totalCount" class="badge bg-info text-dark rounded-pill fw-bold">0</span>
+            <div class="col-lg-3">
+                <div class="card h-100">
+                    <div class="card-header d-flex align-items-center justify-content-between py-3">
+                        <h5 class="mb-0 fw-bold fs-6"><i class="fa-solid fa-clock-rotate-left me-2 text-info"></i>Últimos registros</h5>
+                        <span id="totalCount" class="badge bg-info rounded-pill fw-bold">0</span>
                     </div>
 
                     <div class="card-body p-2 recent-list-container" id="recognizedList">
                         <div id="emptyListMsg" class="text-center text-muted py-5">
-                            <i class="fa-solid fa-users-slash fs-2 mb-2 d-block opacity-50"></i>
+                            <i class="fa-solid fa-users-viewfinder fs-1 mb-3 d-block opacity-50"></i>
                             <span class="small">Nenhum registro nesta sessão</span>
                         </div>
                     </div>
@@ -161,173 +209,184 @@
     <!-- MODAL DE AUTOCADASTRO DE FACE -->
     <div class="modal fade" id="cadastrarFaceModal" tabindex="-1" aria-labelledby="cadastrarFaceModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content bg-dark text-white border-secondary shadow-lg">
-                <div class="modal-header border-secondary">
-                    <h5 class="modal-title fw-bold text-info" id="cadastrarFaceModalLabel">
-                        <i class="fa-solid fa-camera me-2"></i>Cadastro de Face Presencial
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="cadastrarFaceModalLabel">
+                        <i class="fa-solid fa-camera me-2 text-info"></i>Cadastro de face
                     </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
                 </div>
                 <div class="modal-body p-4 text-center">
-                    <p class="text-secondary small mb-3">
+                    <div class="fo-logo-icone mx-auto mb-3" style="width:70px;height:70px;font-size:2rem;animation:fo-float 3s ease-in-out infinite"><i class="bi bi-person-bounding-box"></i></div>
+                    <p class="text-muted small mb-3">
                         Olhe diretamente para a câmera do totem e digite sua matrícula abaixo para cadastrar seu rosto.
                     </p>
-
                     <div class="mb-3 text-start">
-                        <label for="inputMatricula" class="form-label fw-bold small text-light">Número da Matrícula:</label>
-                        <input type="text" id="inputMatricula" class="form-control form-control-lg bg-secondary bg-opacity-25 text-white border-secondary" placeholder="Ex: 2026001">
+                        <label for="inputMatricula" class="form-label fw-bold small">Número da matrícula</label>
+                        <input type="text" id="inputMatricula" class="form-control form-control-lg text-center fw-bold" placeholder="Ex.: 2026001" inputmode="numeric">
                     </div>
-
                     <div id="modalAlert" class="alert d-none py-2 small" role="alert"></div>
                 </div>
-                <div class="modal-footer border-secondary">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
                     <button type="button" id="btnCapturarFoto" class="btn btn-success fw-bold px-4" onclick="salvarFotoTotem()">
-                        <i class="fa-solid fa-circle-dot me-1"></i>Capturar e Cadastrar
+                        <i class="fa-solid fa-circle-dot me-1"></i>Capturar e cadastrar
                     </button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- RODAPÉ -->
-    <footer class="footer mt-auto py-2 bg-dark text-center border-top border-secondary text-secondary small">
-        <div class="container">
-            <i class="fa-solid fa-shield-halved me-1 text-info"></i> Sistema de Reconhecimento Facial FrequencyON
-        </div>
+    <footer class="rodape-totem text-center py-2">
+        <i class="fa-solid fa-shield-halved me-1 text-info"></i> Reconhecimento facial FrequencyON
     </footer>
 
-    <!-- BOOTSTRAP JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
+    {% include '_fo_scripts.html' %}
     <script>
         function updateClock() {
             const now = new Date();
             document.getElementById('clockTime').innerText = now.toLocaleTimeString('pt-BR');
-            document.getElementById('clockDate').innerText = now.toLocaleDateString('pt-BR', {
+            const data = now.toLocaleDateString('pt-BR', {
                 weekday: 'long', day: '2-digit', month: 'long', year: 'numeric'
             });
+            document.getElementById('clockDate').innerText = data.charAt(0).toUpperCase() + data.slice(1);
         }
         setInterval(updateClock, 1000);
         updateClock();
 
         let resetTimer = null;
         let totalRegistros = 0;
+        const AVATAR_PADRAO = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#5b8cff"/><circle cx="32" cy="25" r="11" fill="#fff"/><path d="M12 56c3-11 11-16 20-16s17 5 20 16" fill="#fff"/></svg>');
 
-        function adicionarAoHistorico(nome, matricula, fotoUrl) {
+        function escaparHtml(t) {
+            const d = document.createElement('div');
+            d.textContent = t == null ? '' : String(t);
+            return d.innerHTML;
+        }
+
+        function adicionarAoHistorico(nome, matricula, fotoUrl, status) {
             const listContainer = document.getElementById('recognizedList');
             const emptyMsg = document.getElementById('emptyListMsg');
             const totalCountBadge = document.getElementById('totalCount');
 
             if (emptyMsg) emptyMsg.remove();
 
-            const horaAtual = new Date().toLocaleTimeString('pt-BR');
-            const avatarSrc = fotoUrl || 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+            const horaAtual = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            const avatarSrc = fotoUrl || AVATAR_PADRAO;
+            const cor = status === 'atraso' ? 'warning' : 'success';
 
             const itemHtml = `
-                <div class="recent-item d-flex align-items-center p-2 mb-2 rounded border shadow-sm">
-                    <img src="${avatarSrc}" class="recent-item-img rounded-circle border border-2 border-success me-2" alt="${nome}" onerror="this.src='https://cdn-icons-png.flaticon.com/512/149/149071.png'">
+                <div class="recent-item d-flex align-items-center p-2 mb-2">
+                    <img src="${escaparHtml(avatarSrc)}" class="recent-item-img me-2" alt="" onerror="this.src=AVATAR_PADRAO">
                     <div class="flex-grow-1 overflow-hidden me-2">
-                        <div class="fw-bold text-white text-truncate small">${nome}</div>
-                        <div class="text-secondary" style="font-size: 0.75rem;">Mat: ${matricula}</div>
+                        <div class="fw-bold text-truncate small">${escaparHtml(nome)}</div>
+                        <div class="text-muted" style="font-size: 0.75rem;">Mat: ${escaparHtml(matricula)}</div>
                     </div>
-                    <div class="text-end">
-                        <span class="badge bg-success bg-opacity-25 text-success border border-success px-2 py-1" style="font-size: 0.7rem;">
-                            <i class="fa-regular fa-clock me-1"></i>${horaAtual}
-                        </span>
-                    </div>
+                    <span class="badge bg-${cor}" style="font-size: 0.7rem;">
+                        <i class="fa-regular fa-clock me-1"></i>${horaAtual}
+                    </span>
                 </div>
             `;
 
             listContainer.insertAdjacentHTML('afterbegin', itemHtml);
             totalRegistros++;
             totalCountBadge.innerText = totalRegistros;
+            totalCountBadge.classList.remove('pulou');
+            void totalCountBadge.offsetWidth;
+            totalCountBadge.classList.add('pulou');
 
             if (listContainer.children.length > 15) {
                 listContainer.lastElementChild.remove();
             }
         }
 
+        function definirEstado(estado, titulo, subtitulo, mensagem, icone) {
+            const card = document.getElementById('statusCard');
+            const caixa = document.getElementById('caixaPresenca');
+            const tituloEl = document.getElementById('statusTitle');
+            card.classList.remove('estado-ok', 'estado-aviso', 'estado-erro');
+            void card.offsetWidth;
+            card.classList.add('estado-' + estado);
+            caixa.className = 'msg-presenca' + (estado === 'ok' ? '' : ' ' + estado);
+            document.getElementById('iconePresenca').className = 'fa-solid ' + icone + ' fs-4';
+            tituloEl.innerText = titulo;
+            tituloEl.className = 'card-title fw-bold mb-2 anima ' + (estado === 'ok' ? 'text-success' : estado === 'aviso' ? 'text-warning' : 'text-danger');
+            document.getElementById('statusSubtitle').innerText = subtitulo;
+            document.getElementById('presenceMessage').innerText = mensagem;
+        }
+
         function exibirSucessoAluno(nome, matricula, fotoUrl, jaRegistrado, status) {
             const scannerOverlay = document.getElementById('scannerOverlay');
+            const videoBox = document.getElementById('videoBox');
             const iconWrapper = document.getElementById('iconWrapper');
             const studentAvatar = document.getElementById('studentAvatar');
-            const statusTitle = document.getElementById('statusTitle');
-            const statusSubtitle = document.getElementById('statusSubtitle');
             const studentInfo = document.getElementById('studentInfo');
             const studentMatricula = document.getElementById('studentMatricula');
+            const rotulo = document.getElementById('rotuloCamera');
+            const primeiroNome = (nome || '').split(' ')[0];
 
+            const registrou = status !== 'sem_aula' && !jaRegistrado && status !== 'falta';
             if (status !== 'sem_aula' && !jaRegistrado) {
-                adicionarAoHistorico(nome, matricula, fotoUrl);
+                adicionarAoHistorico(nome, matricula, fotoUrl, status);
             }
 
-            const presenceMessage = document.getElementById('presenceMessage');
-            scannerOverlay.classList.add('success');
             iconWrapper.classList.add('d-none');
-            
+            studentAvatar.classList.add('d-none');
             if (fotoUrl) {
                 studentAvatar.src = fotoUrl;
+                void studentAvatar.offsetWidth;
                 studentAvatar.classList.remove('d-none');
             }
 
             if (status === 'sem_aula') {
-                statusTitle.innerText = 'Hoje não há aula';
-                statusTitle.className = 'card-title fw-bold text-warning mb-2';
-                statusSubtitle.innerText = 'O reconhecimento foi realizado, mas hoje não é dia de aula da turma deste aluno.';
-                presenceMessage.innerText = 'Nenhuma presença foi registrada.';
-                scannerOverlay.classList.remove('success');
+                definirEstado('aviso', 'Hoje não há aula', 'O reconhecimento foi feito, mas hoje não é dia de aula da turma deste aluno.', 'Nenhuma presença registrada.', 'fa-calendar-xmark');
+                FO.som('aviso');
             } else if (jaRegistrado) {
-                statusTitle.innerText = `${nome}, presença já registrada!`;
-                statusTitle.className = 'card-title fw-bold text-warning mb-2';
-                statusSubtitle.innerText = 'A presença deste aluno já está salva no dia atual.';
-                presenceMessage.innerText = 'Presença já confirmada hoje.';
-                scannerOverlay.classList.remove('success');
+                definirEstado('aviso', `${primeiroNome}, você já está aqui!`, 'A presença deste aluno já está salva no dia de hoje.', 'Presença já confirmada hoje.', 'fa-circle-info');
+                FO.som('aviso');
             } else if (status === 'atraso') {
-                statusTitle.innerText = `Bem-vindo(a), ${nome}!`;
-                statusTitle.className = 'card-title fw-bold text-warning mb-2';
-                statusSubtitle.innerText = 'Presença registrada no dia atual com atraso.';
-                presenceMessage.innerText = 'Presença Confirmada com Atraso!';
+                definirEstado('aviso', `Bem-vindo(a), ${primeiroNome}!`, 'Presença registrada hoje com atraso.', 'Presença confirmada com atraso!', 'fa-clock');
+                FO.som('ok');
+                FO.confete({ quantidade: 70, cores: ['#ffc23d', '#ff8a3d', '#ffd66b'] });
             } else if (status === 'falta') {
-                statusTitle.innerText = `${nome}, registro fora do horário`;
-                statusTitle.className = 'card-title fw-bold text-danger mb-2';
-                statusSubtitle.innerText = 'O reconhecimento ocorreu, mas o horário ultrapassou o limite configurado para presença.';
-                presenceMessage.innerText = 'Registro salvo como Falta.';
-                scannerOverlay.classList.remove('success');
+                definirEstado('erro', `${primeiroNome}, registro fora do horário`, 'O reconhecimento ocorreu, mas passou do horário limite para presença.', 'Registro salvo como falta.', 'fa-circle-xmark');
+                FO.som('erro');
             } else {
-                statusTitle.innerText = `Bem-vindo(a), ${nome}!`;
-                statusTitle.className = 'card-title fw-bold text-success mb-2';
-                statusSubtitle.innerText = 'Presença registrada no dia atual.';
-                presenceMessage.innerText = 'Presença Confirmada!';
+                definirEstado('ok', `Bem-vindo(a), ${primeiroNome}! 🎉`, 'Presença registrada no dia de hoje.', 'Presença confirmada!', 'fa-circle-check');
+                FO.som('ok');
+                const r = videoBox.getBoundingClientRect();
+                FO.confete({ x: r.left + r.width / 2, y: r.top + r.height / 2, quantidade: 160 });
             }
-            
+
+            scannerOverlay.classList.toggle('success', registrou);
+            videoBox.classList.toggle('ok', registrou);
+            rotulo.innerHTML = registrou
+                ? '<i class="bi bi-check-circle-fill me-1"></i> Rosto reconhecido'
+                : '<i class="bi bi-person-check me-1"></i> ' + escaparHtml(primeiroNome);
+
             studentMatricula.innerText = `Matrícula: ${matricula}`;
             studentInfo.classList.remove('d-none');
 
             if (resetTimer) clearTimeout(resetTimer);
-            resetTimer = setTimeout(resetarInterface, 4000);
+            resetTimer = setTimeout(resetarInterface, 4500);
         }
 
         function resetarInterface() {
-            const scannerOverlay = document.getElementById('scannerOverlay');
-            const iconWrapper = document.getElementById('iconWrapper');
-            const studentAvatar = document.getElementById('studentAvatar');
-            const statusTitle = document.getElementById('statusTitle');
-            const statusSubtitle = document.getElementById('statusSubtitle');
-            const studentInfo = document.getElementById('studentInfo');
-
-            scannerOverlay.classList.remove('success');
-            studentAvatar.classList.add('d-none');
-            iconWrapper.classList.remove('d-none');
-
-            statusTitle.innerText = "Aguardando aluno...";
-            statusTitle.className = 'card-title fw-bold text-white mb-2';
-            statusSubtitle.innerText = "Posicione seu rosto centralizado na câmera para registrar a presença.";
-            studentInfo.classList.add('d-none');
-            const presenceMessage = document.getElementById('presenceMessage');
-            if (presenceMessage) presenceMessage.innerText = 'Presença Confirmada!';
+            document.getElementById('scannerOverlay').classList.remove('success');
+            document.getElementById('videoBox').classList.remove('ok');
+            document.getElementById('studentAvatar').classList.add('d-none');
+            document.getElementById('iconWrapper').classList.remove('d-none');
+            document.getElementById('statusCard').classList.remove('estado-ok', 'estado-aviso', 'estado-erro');
+            const tituloEl = document.getElementById('statusTitle');
+            tituloEl.innerText = 'Aguardando aluno...';
+            tituloEl.className = 'card-title fw-bold mb-2';
+            document.getElementById('statusSubtitle').innerText = 'Posicione seu rosto no centro da câmera para registrar a presença.';
+            document.getElementById('studentInfo').classList.add('d-none');
+            document.getElementById('rotuloCamera').innerHTML = '<i class="bi bi-broadcast me-1"></i> Procurando rostos...';
         }
 
-        // FUNÇÃO DE CADASTRO DIRETO NO TOTEM
+        // CADASTRO DE FACE DIRETO NO TOTEM
         function salvarFotoTotem() {
             const matricula = document.getElementById('inputMatricula').value.trim();
             const modalAlert = document.getElementById('modalAlert');
@@ -345,37 +404,37 @@
 
             fetch('/api/cadastrar_foto', {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json' // Corrigido para application/json
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ matricula: matricula })
             })
             .then(async res => {
                 const data = await res.json();
                 btnCapturar.disabled = false;
-                btnCapturar.innerHTML = '<i class="fa-solid fa-circle-dot me-1"></i>Capturar e Cadastrar';
+                btnCapturar.innerHTML = '<i class="fa-solid fa-circle-dot me-1"></i>Capturar e cadastrar';
 
                 if (res.ok && data.sucesso) {
                     modalAlert.className = 'alert alert-success py-2 small';
                     modalAlert.innerText = data.mensagem;
                     modalAlert.classList.remove('d-none');
+                    FO.som('ok');
+                    FO.confete({ quantidade: 120 });
 
                     setTimeout(() => {
                         document.getElementById('inputMatricula').value = '';
                         modalAlert.classList.add('d-none');
-                        const modalElement = document.getElementById('cadastrarFaceModal');
-                        const modalInstance = bootstrap.Modal.getInstance(modalElement);
+                        const modalInstance = bootstrap.Modal.getInstance(document.getElementById('cadastrarFaceModal'));
                         if (modalInstance) modalInstance.hide();
                     }, 1500);
                 } else {
                     modalAlert.className = 'alert alert-danger py-2 small';
                     modalAlert.innerText = data.mensagem || 'Erro ao cadastrar foto.';
                     modalAlert.classList.remove('d-none');
+                    FO.som('erro');
                 }
             })
-            .catch(err => {
+            .catch(() => {
                 btnCapturar.disabled = false;
-                btnCapturar.innerHTML = '<i class="fa-solid fa-circle-dot me-1"></i>Capturar e Cadastrar';
+                btnCapturar.innerHTML = '<i class="fa-solid fa-circle-dot me-1"></i>Capturar e cadastrar';
                 modalAlert.className = 'alert alert-danger py-2 small';
                 modalAlert.innerText = 'Erro de conexão com o servidor.';
                 modalAlert.classList.remove('d-none');
@@ -396,6 +455,11 @@
         }
 
         setInterval(verificarReconhecimento, 1000);
+
+        // Enter no modal também cadastra
+        document.getElementById('inputMatricula').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') salvarFotoTotem();
+        });
     </script>
 </body>
 </html>

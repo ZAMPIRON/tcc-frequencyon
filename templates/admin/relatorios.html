@@ -6,15 +6,15 @@
 <!-- Cabeçalho e Filtros -->
 <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-4 gap-3">
     <div>
-        <h1 class="h4 fw-bold text-dark mb-1">Relatórios Administrativos (BI)</h1>
+        <h1 class="h3 fw-bold mb-1">Relatórios <span class="fo-gradient-text">Administrativos</span></h1>
         <p class="text-muted mb-0 small">Dados unificados de frequência do campus</p>
     </div>
     <div class="d-flex align-items-center gap-2">
-        <div class="input-group input-group-sm">
+        <div class="input-group input-group-sm w-auto">
             <span class="input-group-text bg-white text-muted border-end-0"><i class="fa-regular fa-calendar"></i></span>
-            <input type="text" class="form-control border-start-0 bg-white" value="Jan 2026 - Jun 2026" readonly style="max-width: 150px;">
+            <input type="text" class="form-control border-start-0" value="Últimos 6 meses" readonly style="max-width: 150px;">
         </div>
-        <button class="btn btn-primary btn-sm px-3 d-flex align-items-center gap-2" onclick="window.print()">
+        <button class="btn btn-primary btn-sm px-3 d-flex align-items-center gap-2 text-nowrap" onclick="window.print()">
             <i class="fa-solid fa-download"></i> Exportar
         </button>
     </div>
@@ -30,7 +30,7 @@
                     <i class="fa-solid fa-users fs-6"></i>
                 </div>
             </div>
-            <div class="fs-3 fw-bold text-dark mb-1">{{ total_alunos }}</div>
+            <div class="fs-2 fw-bold mb-1 fo-display" data-countup>{{ total_alunos }}</div>
             <small class="text-muted" style="font-size: 11px;">Alunos ativos cadastrados</small>
         </div>
     </div>
@@ -43,7 +43,7 @@
                     <i class="fa-solid fa-chart-line fs-6"></i>
                 </div>
             </div>
-            <div class="fs-3 fw-bold text-dark mb-1">{{ media_geral }}%</div>
+            <div class="fs-2 fw-bold mb-1 fo-display fo-gradient-text" data-countup>{{ media_geral }}%</div>
             <small class="{% if media_geral >= 75 %}text-success{% else %}text-danger{% endif %} fw-semibold" style="font-size: 11px;">
                 <i class="fa-solid {% if media_geral >= 75 %}fa-circle-check{% else %}fa-triangle-exclamation{% endif %} me-1"></i>
                 {% if media_geral >= 75 %}Dentro da Meta{% else %}Abaixo da Meta{% endif %}
@@ -59,7 +59,7 @@
                     <i class="fa-solid fa-arrow-trend-down fs-6"></i>
                 </div>
             </div>
-            <div class="fs-3 fw-bold text-dark mb-1">{{ taxa_evasao }}%</div>
+            <div class="fs-2 fw-bold mb-1 fo-display" data-countup>{{ taxa_evasao }}%</div>
             <small class="text-muted" style="font-size: 11px;">{{ alunos_criticos }} aluno(s) em estado crítico</small>
         </div>
     </div>
@@ -72,7 +72,7 @@
                     <i class="fa-solid fa-user-slash fs-6"></i>
                 </div>
             </div>
-            <div class="fs-3 fw-bold text-dark mb-1">{{ alunos_criticos }}</div>
+            <div class="fs-2 fw-bold mb-1 fo-display" data-countup>{{ alunos_criticos }}</div>
             <small class="text-muted" style="font-size: 11px;">Frequência abaixo de 75%</small>
         </div>
     </div>
@@ -113,7 +113,7 @@
                     <small class="text-muted" style="font-size: 11px;">{{ prof.departamento or 'Geral' }}</small>
                 </div>
                 <div class="col-md-8">
-                    <div class="progress" style="height: 10px; background-color: #e9ecef;">
+                    <div class="progress" style="height: 10px;">
                         <div class="progress-bar {% if prof.media >= 90 %}bg-success{% elif prof.media >= 75 %}bg-primary{% else %}bg-danger{% endif %}" 
                              role="progressbar" 
                              style="width: {{ prof.media }}%;">
@@ -133,71 +133,122 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function () {
-        // Dados vindos do Flask
         const mesesLabels = {{ meses_labels | tojson }};
         const mesesValores = {{ meses_valores | tojson }};
         const cursosLabels = {{ cursos_labels | tojson }};
         const cursosValores = {{ cursos_valores | tojson }};
+        const graficos = [];
 
-        // Gráfico de Linha (Evolução Mensal)
+        const cor = (nome) => getComputedStyle(document.documentElement).getPropertyValue(nome).trim();
+
+        function aplicarTema() {
+            Chart.defaults.color = cor('--fo-muted');
+            Chart.defaults.font.family = 'Inter, system-ui, sans-serif';
+            Chart.defaults.borderColor = cor('--fo-border');
+        }
+        aplicarTema();
+
+        const tooltip = {
+            backgroundColor: 'rgba(10, 14, 35, .92)',
+            borderColor: 'rgba(148, 163, 255, .3)',
+            borderWidth: 1,
+            padding: 12,
+            cornerRadius: 12,
+            titleFont: { weight: '700' },
+            callbacks: { label: (ctx) => ' ' + ctx.raw + '% de presença' },
+        };
+
+        // ---------- linha: evolução mensal ----------
         const ctxLine = document.getElementById('lineChart').getContext('2d');
-        new Chart(ctxLine, {
+        const gradLinha = () => {
+            const g = ctxLine.createLinearGradient(0, 0, 0, 220);
+            g.addColorStop(0, 'rgba(162, 107, 255, .45)');
+            g.addColorStop(1, 'rgba(91, 140, 255, 0)');
+            return g;
+        };
+        const traco = () => {
+            const g = ctxLine.createLinearGradient(0, 0, ctxLine.canvas.width, 0);
+            g.addColorStop(0, cor('--fo-primary'));
+            g.addColorStop(.5, cor('--fo-violet'));
+            g.addColorStop(1, cor('--fo-pink'));
+            return g;
+        };
+        graficos.push(new Chart(ctxLine, {
             type: 'line',
             data: {
-                labels: mesesLabels,
+                labels: mesesLabels.length ? mesesLabels : ['Sem dados'],
                 datasets: [{
-                    data: mesesValores,
-                    borderColor: '#0d6efd',
-                    backgroundColor: 'rgba(13, 110, 253, 0.05)',
-                    borderWidth: 2,
-                    tension: 0.3,
+                    data: mesesValores.length ? mesesValores : [0],
+                    borderColor: traco(),
+                    backgroundColor: gradLinha(),
+                    borderWidth: 3,
+                    tension: 0.42,
                     fill: true,
-                    pointRadius: 4,
-                    pointBackgroundColor: '#0d6efd'
+                    pointRadius: 5,
+                    pointHoverRadius: 9,
+                    pointBackgroundColor: cor('--fo-surface-solid'),
+                    pointBorderColor: cor('--fo-violet'),
+                    pointBorderWidth: 3,
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
+                animation: { duration: 1600, easing: 'easeOutQuart' },
+                interaction: { intersect: false, mode: 'index' },
+                plugins: { legend: { display: false }, tooltip },
                 scales: {
-                    y: { display: false, min: 0, max: 100 },
+                    y: { min: 0, max: 100, ticks: { callback: (v) => v + '%', stepSize: 25 }, grid: { color: cor('--fo-border') } },
                     x: { grid: { display: false } }
                 }
             }
-        });
+        }));
 
-        // Gráfico de Barras (Presença por Curso)
+        // ---------- barras: presença por curso ----------
         const ctxBar = document.getElementById('barChart').getContext('2d');
-        new Chart(ctxBar, {
+        const gradBarra = (ruim) => {
+            const g = ctxBar.createLinearGradient(0, 0, 0, 220);
+            if (ruim) { g.addColorStop(0, '#ff4d6d'); g.addColorStop(1, '#ff7a3d'); }
+            else { g.addColorStop(0, '#a26bff'); g.addColorStop(1, '#5b8cff'); }
+            return g;
+        };
+        graficos.push(new Chart(ctxBar, {
             type: 'bar',
             data: {
-                labels: cursosLabels.length ? cursosLabels : ['Sem Dados'],
+                labels: cursosLabels.length ? cursosLabels : ['Sem dados'],
                 datasets: [{
                     data: cursosValores.length ? cursosValores : [0],
-                    backgroundColor: cursosValores.map(v => v < 75 ? '#dc3545' : '#0d6efd'),
-                    borderRadius: 4
+                    backgroundColor: (cursosValores.length ? cursosValores : [0]).map(v => gradBarra(v < 75)),
+                    borderRadius: 12,
+                    borderSkipped: false,
+                    maxBarThickness: 56,
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: (ctx) => ctx.raw + '%'
-                        }
-                    }
-                },
+                animation: { duration: 1400, easing: 'easeOutBack', delay: (c) => c.dataIndex * 140 },
+                plugins: { legend: { display: false }, tooltip },
                 scales: {
-                    y: { display: false, min: 0, max: 100 },
+                    y: { min: 0, max: 100, ticks: { callback: (v) => v + '%', stepSize: 25 }, grid: { color: cor('--fo-border') } },
                     x: { grid: { display: false } }
                 }
             }
+        }));
+
+        // troca de tema: recolore eixos e grades
+        document.addEventListener('fo:tema', () => {
+            aplicarTema();
+            graficos.forEach((g) => {
+                ['x', 'y'].forEach((eixo) => {
+                    g.options.scales[eixo].ticks.color = cor('--fo-muted');
+                    if (g.options.scales[eixo].grid.color) g.options.scales[eixo].grid.color = cor('--fo-border');
+                });
+                g.update();
+            });
         });
     });
 </script>
