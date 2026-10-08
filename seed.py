@@ -1,6 +1,6 @@
 # seed.py
 from app import create_app  # Importe a instância do seu app Flask (ajuste o nome se necessário)
-from database import db, Admin, Professor, Turma, Aluno
+from database import db, Admin, Professor, Turma, Aluno, Presenca, ProfessorTurma
 
 
 
@@ -13,6 +13,8 @@ def popular_banco():
 
         print("Limpando dados antigos (opcional)...")
         # Se quiser apagar tudo antes de recriar, descomente as linhas abaixo com cuidado:
+        Presenca.query.delete()
+        ProfessorTurma.query.delete()
         Aluno.query.delete()
         Turma.query.delete()
         Professor.query.delete()
@@ -33,8 +35,10 @@ def popular_banco():
         db.session.commit()
 
         print("Criando Turma...")
-        turma = Turma(nome="C13", curso="Análise de Desenvolvimento de Sistemas", professor_id=prof.id)
+        turma = Turma(nome="C13", curso="Análise de Desenvolvimento de Sistemas")
         db.session.add(turma)
+        # Vincula o professor à turma com os dias de aula dele (1 = terça, 3 = quinta)
+        turma.vinculos.append(ProfessorTurma(professor=prof, dias="1,3"))
         
         # Commit parcial para gerar o ID da turma
         db.session.commit()

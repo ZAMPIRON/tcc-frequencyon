@@ -10,7 +10,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 db = SQLAlchemy()
 
 AULAS_POR_DIA = 10
-DIAS_AULA = (0, 1, 2, 3, 4)  # segunda a sexta
+DIAS_SELECIONAVEIS = (0, 1, 2, 3, 4, 5)  # segunda a sábado (date.weekday())
 NOMES_DIAS = ("Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo")
 
 try:
@@ -43,9 +43,38 @@ def hoje_local():
     return agora_local().date()
 
 
-def eh_dia_com_aula(data):
-    """Considera aulas apenas de segunda a sexta."""
-    return data.weekday() in DIAS_AULA
+def eh_dia_com_aula(data, dias):
+    """True se o dia da semana de `data` está em `dias` (valores de date.weekday())."""
+    return data.weekday() in dias
+
+
+def ultimo_dia_com_aula(data, dias):
+    """Retorna o próprio dia, se tiver aula, ou o dia de aula anterior mais próximo.
+    Sem dias definidos, devolve a própria data."""
+    if not dias:
+        return data
+    while not eh_dia_com_aula(data, dias):
+        data -= timedelta(days=1)
+    return data
+
+
+def filtro_dias_aula(coluna, dias):
+    """Filtro SQL (SQLite) que mantém só registros em dias de aula.
+    strftime('%w') usa domingo=0, então converte de date.weekday()."""
+    return func.strftime("%w", coluna).in_([str((d + 1) % 7) for d in dias])
+
+
+def dias_de_formulario(valores):
+    """Converte a lista de checkboxes ("1", "3"...) em tupla ordenada de dias válidos."""
+    dias = set()
+    for v in valores:
+        try:
+            d = int(v)
+        except (TypeError, ValueError):
+            continue
+        if d in DIAS_SELECIONAVEIS:
+            dias.add(d)
+    return tuple(sorted(dias))
 
 
 def _hora_env(nome, padrao):
@@ -96,7 +125,15 @@ class Professor(UsuarioMixin, db.Model):
     senha_hash = db.Column(db.String(255), nullable=False)
     departamento = db.Column(db.String(120))
     foto = db.Column(db.String(255))
-    turmas = db.relationship("Turma", back_populates="professor")
+    vinculos = db.relationship("ProfessorTurma", back_populates="professor",
+                               cascade="all, delete-orphan")
+
+    @property
+    def turmas(self):
+        return sorted((v.turma for v in self.vinculos), key=lambda t: t.nome)
+
+    def vinculo(self, turma_id):
+        return next((v for v in self.vinculos if v.turma_id == turma_id), None)
 
     @property
     def media(self):
@@ -109,14 +146,53 @@ class Turma(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(120), nullable=False)
     curso = db.Column(db.String(120), nullable=False)
-    professor_id = db.Column(db.Integer, db.ForeignKey("professores.id"))
-    professor = db.relationship("Professor", back_populates="turmas")
     alunos = db.relationship("Aluno", back_populates="turma")
+    vinculos = db.relationship("ProfessorTurma", back_populates="turma",
+                               cascade="all, delete-orphan")
+
+    @property
+    def professores(self):
+        return sorted((v.professor for v in self.vinculos), key=lambda p: p.nome)
+
+    @property
+    def nomes_professores(self):
+        return ", ".join(p.nome for p in self.professores) or "Sem professor"
+
+    @property
+    def dias_aula(self):
+        """Dias com aula na turma: união dos dias de todos os professores."""
+        return tuple(sorted({d for v in self.vinculos for d in v.dias_semana}))
+
+    @property
+    def dias_aula_nomes(self):
+        return ", ".join(NOMES_DIAS[d] for d in self.dias_aula) or "Nenhum dia definido"
 
     @property
     def frequencia_media(self):
         v = [a.frequencia for a in self.alunos]
         return round(sum(v) / len(v), 1) if v else 0
+
+
+class ProfessorTurma(db.Model):
+    """Vínculo professor <-> turma com os dias da semana em que esse professor dá aula nela."""
+    __tablename__ = "professor_turma"
+    professor_id = db.Column(db.Integer, db.ForeignKey("professores.id"), primary_key=True)
+    turma_id = db.Column(db.Integer, db.ForeignKey("turmas.id"), primary_key=True)
+    dias = db.Column(db.String(20), nullable=False, default="")   # ex: "1,3" = terça e quinta
+    professor = db.relationship("Professor", back_populates="vinculos")
+    turma = db.relationship("Turma", back_populates="vinculos")
+
+    @property
+    def dias_semana(self):
+        return tuple(int(d) for d in self.dias.split(",") if d.strip().isdigit())
+
+    @dias_semana.setter
+    def dias_semana(self, valores):
+        self.dias = ",".join(str(d) for d in sorted(set(valores)))
+
+    @property
+    def dias_nomes(self):
+        return ", ".join(NOMES_DIAS[d] for d in self.dias_semana) or "Nenhum dia definido"
 
 
 class Aluno(UsuarioMixin, db.Model):
@@ -139,11 +215,16 @@ class Aluno(UsuarioMixin, db.Model):
         if not self.turma_id:
             return 0
 
+        dias_aula = self.turma.dias_aula
+        if not dias_aula:
+            return 0
+
         # Um dia entra no cálculo quando existe pelo menos um lançamento
         # de presença/falta para algum aluno da mesma turma.
         dias = (db.session.query(func.count(func.distinct(Presenca.data)))
                 .join(Aluno, Presenca.aluno_id == Aluno.id)
-                .filter(Aluno.turma_id == self.turma_id)
+                .filter(Aluno.turma_id == self.turma_id,
+                        filtro_dias_aula(Presenca.data, dias_aula))
                 .scalar())
 
         if not dias:
@@ -152,7 +233,8 @@ class Aluno(UsuarioMixin, db.Model):
         ok = (db.session.query(func.count(Presenca.id))
               .filter(
                   Presenca.aluno_id == self.id,
-                  Presenca.status.in_(("presente", "atraso"))
+                  Presenca.status.in_(("presente", "atraso")),
+                  filtro_dias_aula(Presenca.data, dias_aula)
               )
               .scalar())
 
@@ -205,7 +287,7 @@ def registrar_presenca_totem(aluno, agora=None):
     agora = agora or agora_local()
     hoje = agora.date()
 
-    if not eh_dia_com_aula(hoje):
+    if not aluno.turma or not eh_dia_com_aula(hoje, aluno.turma.dias_aula):
         return "sem_aula", False
 
     primeira = Presenca.query.filter_by(
@@ -255,3 +337,20 @@ def registrar_presenca_totem(aluno, agora=None):
     if aula_atual > 0:
         return "presente", False
     return status_entrada, False
+
+
+def migrar_professor_turma():
+    """Bancos antigos tinham turmas.professor_id (1 professor por turma).
+    Copia esses vínculos para professor_turma com os dias antigos (terça e quinta)."""
+    from sqlalchemy import inspect, text
+    colunas = [c["name"] for c in inspect(db.engine).get_columns("turmas")]
+    if "professor_id" not in colunas:
+        return
+    linhas = db.session.execute(
+        text("SELECT id, professor_id FROM turmas WHERE professor_id IS NOT NULL")).all()
+    for turma_id, professor_id in linhas:
+        if db.session.get(Professor, professor_id) and not db.session.get(
+                ProfessorTurma, (professor_id, turma_id)):
+            db.session.add(ProfessorTurma(professor_id=professor_id, turma_id=turma_id, dias="1,3"))
+    db.session.execute(text("UPDATE turmas SET professor_id = NULL"))
+    db.session.commit()

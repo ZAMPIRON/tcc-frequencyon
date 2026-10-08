@@ -121,6 +121,37 @@
             </div>
         </div>
 
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }} small">{{ message }}</div>
+          {% endfor %}
+        {% endwith %}
+
+        {% if not turmas %}
+            <div class="alert alert-info">Você ainda não está vinculado a nenhuma turma. Peça ao administrador para vincular você.</div>
+        {% endif %}
+
+        {% if turma_selecionada %}
+        <!-- Dias de aula do professor nesta turma -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('professor.salvar_dias', turma_id=turma_selecionada.id) }}" class="d-flex align-items-center gap-3 flex-wrap">
+                    <span class="fw-bold small"><i class="bi bi-calendar-week"></i> Seus dias de aula em {{ turma_selecionada.nome }}:</span>
+                    {% for d, nome in dias_opcoes %}
+                    <div class="form-check form-check-inline mb-0">
+                        <input class="form-check-input" type="checkbox" name="dias" value="{{ d }}" id="dia{{ d }}" {% if d in dias_prof %}checked{% endif %}>
+                        <label class="form-check-label small" for="dia{{ d }}">{{ nome }}</label>
+                    </div>
+                    {% endfor %}
+                    <button type="submit" class="btn btn-primary btn-sm">Salvar dias</button>
+                </form>
+                {% if not dias_prof %}
+                    <div class="alert alert-warning small mt-3 mb-0">Defina os dias em que você dá aula nesta turma para liberar a chamada.</div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Seletor de Turma e Tabela de Chamada -->
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white py-3">
@@ -128,9 +159,9 @@
                     <div>
                         <h5 class="fw-bold mb-0">Chamada do Dia
                             <span class="text-muted fw-normal ms-1">{{ data_exibicao }}</span>
-                            {% if eh_hoje %}<span class="badge bg-success ms-2 fs-6">Hoje</span>{% else %}<span class="badge bg-secondary ms-2 fs-6">Somente consulta</span>{% endif %}
+                            {% if eh_hoje and not pode_editar %}<span class="badge bg-warning text-dark ms-2 fs-6">Sem aula hoje</span>{% elif eh_hoje %}<span class="badge bg-success ms-2 fs-6">Hoje</span>{% else %}<span class="badge bg-secondary ms-2 fs-6">Somente consulta</span>{% endif %}
                         </h5>
-                        <small class="text-muted">{% if pode_editar %}Clique nas barras para alterar falta/presença. Botão direito nas 2 primeiras marca atraso.{% else %}Dias anteriores ficam disponíveis apenas para consulta. O lançamento é permitido somente no dia atual.{% endif %}</small>
+                        <small class="text-muted">{% if pode_editar %}Clique nas barras para alterar falta/presença. Botão direito nas 2 primeiras marca atraso.{% elif eh_hoje and dias_prof %}Hoje não é seu dia de aula nesta turma ({{ dias_prof_nomes }}).{% else %}Dias anteriores ficam disponíveis apenas para consulta. O lançamento é permitido somente no dia atual.{% endif %}</small>
                     </div>
 
                     <form method="GET" action="{{ url_for('professor.chamada') }}" class="d-flex align-items-center gap-2 flex-wrap">

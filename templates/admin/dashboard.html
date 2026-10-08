@@ -124,7 +124,7 @@
                         <div>
                             <h6 class="fw-bold text-dark mb-0 small">{{ turma.nome }}</h6>
                             <small class="text-muted" style="font-size: 11px;">
-                                Prof. {{ turma.professor.nome if turma.professor else 'Sem prof.' }} • {{ turma.curso }}
+                                Prof. {{ turma.nomes_professores }} • {{ turma.curso }}
                             </small>
                         </div>
                         <div class="d-flex align-items-center gap-2 fw-bold {% if turma.frequencia_media < 75 %}text-danger{% else %}text-dark{% endif %} small">

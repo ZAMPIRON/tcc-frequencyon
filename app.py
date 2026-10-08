@@ -9,8 +9,10 @@ from flask import (Flask, Blueprint, render_template, request, redirect, url_for
                    flash, session, jsonify, Response)
 from sqlalchemy import or_
 
-from database import (db, Admin, Professor, Turma, Aluno, Presenca, AULAS_POR_DIA,
-                      hoje_local, eh_dia_com_aula, NOMES_DIAS)
+from database import (db, Admin, Professor, Turma, Aluno, Presenca, ProfessorTurma,
+                      AULAS_POR_DIA, DIAS_SELECIONAVEIS, NOMES_DIAS,
+                      hoje_local, eh_dia_com_aula, ultimo_dia_com_aula,
+                      dias_de_formulario, migrar_professor_turma)
 from face_service import Totem, encoding_de_arquivo
 
 admin = Blueprint("admin", __name__, url_prefix="/admin")
@@ -196,9 +198,7 @@ def professores():
 @requer("admin")
 def deletar_professor(id):
     p = db.get_or_404(Professor, id)
-    for t in p.turmas:
-        t.professor_id = None
-    db.session.delete(p)
+    db.session.delete(p)   # os vínculos com turmas são apagados junto
     db.session.commit()
     return redirect(url_for("admin.professores"))
 
@@ -208,19 +208,61 @@ def deletar_professor(id):
 def turmas():
     if request.method == "POST":
         f = request.form
-        db.session.add(Turma(nome=f["nome"], curso=f["curso"],
-                             professor_id=int(f["professor_id"]) if f.get("professor_id") else None))
+        turma = Turma(nome=f["nome"], curso=f["curso"])
+        for pid in set(f.getlist("professor_ids", type=int)):
+            if db.session.get(Professor, pid):
+                turma.vinculos.append(ProfessorTurma(professor_id=pid, dias=""))
+        db.session.add(turma)
         db.session.commit()
-        flash("Turma criada!", "success")
+        flash("Turma criada! Defina os dias de aula de cada professor nos detalhes da turma.", "success")
         return redirect(url_for("admin.turmas"))
-    return render_template("admin/turmas.html", turmas=Turma.query.all(), professores=Professor.query.all())
+    return render_template("admin/turmas.html", turmas=Turma.query.all(),
+                           professores=Professor.query.order_by(Professor.nome).all())
 
 
 @admin.route("/turmas/<int:id>")
 @requer("admin")
 def detalhes_turma(id):
-    return render_template("admin/detalhes_turma.html", turma=db.get_or_404(Turma, id),
-                           alunos_sem_turma=Aluno.query.filter_by(turma_id=None).all())
+    turma = db.get_or_404(Turma, id)
+    vinculados = {v.professor_id for v in turma.vinculos}
+    return render_template("admin/detalhes_turma.html", turma=turma,
+                           alunos_sem_turma=Aluno.query.filter_by(turma_id=None).all(),
+                           professores_disponiveis=[p for p in Professor.query.order_by(Professor.nome)
+                                                    if p.id not in vinculados],
+                           dias_opcoes=[(d, NOMES_DIAS[d]) for d in DIAS_SELECIONAVEIS])
+
+
+@admin.route("/turmas/<int:turma_id>/professores", methods=["POST"])
+@requer("admin")
+def vincular_professor(turma_id):
+    turma = db.get_or_404(Turma, turma_id)
+    prof = db.get_or_404(Professor, request.form.get("professor_id", type=int))
+    if not db.session.get(ProfessorTurma, (prof.id, turma.id)):
+        v = ProfessorTurma(professor_id=prof.id, turma_id=turma.id)
+        v.dias_semana = dias_de_formulario(request.form.getlist("dias"))
+        db.session.add(v)
+        db.session.commit()
+        flash(f"{prof.nome} vinculado à turma.", "success")
+    return redirect(url_for("admin.detalhes_turma", id=turma_id))
+
+
+@admin.route("/turmas/<int:turma_id>/professores/<int:professor_id>/dias", methods=["POST"])
+@requer("admin")
+def dias_professor_turma(turma_id, professor_id):
+    v = db.get_or_404(ProfessorTurma, (professor_id, turma_id))
+    v.dias_semana = dias_de_formulario(request.form.getlist("dias"))
+    db.session.commit()
+    flash("Dias de aula atualizados.", "success")
+    return redirect(url_for("admin.detalhes_turma", id=turma_id))
+
+
+@admin.route("/turmas/<int:turma_id>/professores/<int:professor_id>/remover", methods=["POST"])
+@requer("admin")
+def desvincular_professor(turma_id, professor_id):
+    db.session.delete(db.get_or_404(ProfessorTurma, (professor_id, turma_id)))
+    db.session.commit()
+    flash("Professor removido da turma.", "success")
+    return redirect(url_for("admin.detalhes_turma", id=turma_id))
 
 
 @admin.route("/turmas/<int:id>/deletar", methods=["POST"])
@@ -268,8 +310,11 @@ def relatorios():
     por_curso = {}
     for t in turmas:
         por_curso.setdefault(t.curso, []).append(t.frequencia_media)
+    dias_por_turma = {t.id: t.dias_aula for t in turmas}
     meses = {}
     for p in Presenca.query.all():
+        if not eh_dia_com_aula(p.data, dias_por_turma.get(p.aluno.turma_id, ())):
+            continue
         ok, tot = meses.get(p.data.strftime("%Y-%m"), (0, 0))
         meses[p.data.strftime("%Y-%m")] = (ok + (p.status != "falta"), tot + 1)
     chaves = sorted(meses)[-6:]
@@ -286,8 +331,8 @@ def relatorios():
 
 
 # ============================ PROFESSOR ============================
-def _normalizar_data_chamada(valor=None):
-    """Retorna uma data válida de aula: nunca futura e nunca no fim de semana."""
+def _normalizar_data_chamada(valor, dias):
+    """Retorna uma data válida de aula: nunca futura e sempre em dia de aula."""
     hoje = hoje_local()
 
     if not valor:
@@ -301,18 +346,15 @@ def _normalizar_data_chamada(valor=None):
     if selecionada > hoje:
         selecionada = hoje
 
-    if not eh_dia_com_aula(selecionada):
-        # sábado/domingo apontam para a sexta-feira anterior
-        selecionada -= timedelta(days=selecionada.weekday() - 4)
-
-    return selecionada
+    # dias sem aula apontam para o dia de aula anterior mais próximo
+    return ultimo_dia_com_aula(selecionada, dias)
 
 
-def _dias_uteis_semana(data_ref, hoje):
-    """Monta as cinco opções da semana atual para a tela do professor."""
+def _dias_uteis_semana(data_ref, hoje, dias_aula):
+    """Monta as opções de dias de aula da semana para a tela do professor."""
     inicio = data_ref - timedelta(days=data_ref.weekday())
     dias = []
-    for indice in range(5):
+    for indice in dias_aula:
         d = inicio + timedelta(days=indice)
         dias.append({
             "data": d,
@@ -320,7 +362,7 @@ def _dias_uteis_semana(data_ref, hoje):
             "nome": NOMES_DIAS[indice],
             "display": d.strftime("%d/%m"),
             "disponivel": d <= hoje,
-            "editavel": d == hoje and eh_dia_com_aula(hoje),
+            "editavel": d == hoje,
             "selecionado": d == data_ref,
         })
     return dias
@@ -331,13 +373,16 @@ def _dias_uteis_semana(data_ref, hoje):
 def chamada():
     prof = usuario_atual()
     turma_id = request.args.get("turma_id", type=int)
-    data_selecionada = _normalizar_data_chamada(request.args.get("data"))
     hoje = hoje_local()
 
-    turma = next((t for t in prof.turmas if t.id == turma_id), prof.turmas[0] if prof.turmas else None)
+    turmas = prof.turmas
+    turma = next((t for t in turmas if t.id == turma_id), turmas[0] if turmas else None)
+    vinculo = prof.vinculo(turma.id) if turma else None
+    dias_prof = vinculo.dias_semana if vinculo else ()
+    data_selecionada = _normalizar_data_chamada(request.args.get("data"), dias_prof)
     alunos, presentes, faltas = [], 0, 0
 
-    if turma:
+    if turma and dias_prof:
         ids = [a.id for a in turma.alunos]
         mapa = {}
         if ids:
@@ -364,11 +409,11 @@ def chamada():
             })
 
     eh_hoje = data_selecionada == hoje
-    pode_editar = eh_hoje and eh_dia_com_aula(hoje)
+    pode_editar = eh_hoje and eh_dia_com_aula(hoje, dias_prof)
 
     return render_template(
         "professor/frequencia.html",
-        turmas=prof.turmas,
+        turmas=turmas,
         turma_selecionada=turma,
         alunos=alunos,
         total_matriculados=len(alunos),
@@ -380,9 +425,25 @@ def chamada():
         hoje_iso=hoje.isoformat(),
         eh_hoje=eh_hoje,
         pode_editar=pode_editar,
-        dias_semana=_dias_uteis_semana(data_selecionada, hoje),
+        dias_semana=_dias_uteis_semana(data_selecionada, hoje, dias_prof),
         dia_nome=NOMES_DIAS[data_selecionada.weekday()],
+        dias_prof=dias_prof,
+        dias_prof_nomes=vinculo.dias_nomes if vinculo else "",
+        dias_opcoes=[(d, NOMES_DIAS[d]) for d in DIAS_SELECIONAVEIS],
     )
+
+
+@professor.route("/turmas/<int:turma_id>/dias", methods=["POST"])
+@requer("professor")
+def salvar_dias(turma_id):
+    v = db.session.get(ProfessorTurma, (session["uid"], turma_id))
+    if not v:
+        flash("Você não leciona nessa turma.", "danger")
+        return redirect(url_for("professor.chamada"))
+    v.dias_semana = dias_de_formulario(request.form.getlist("dias"))
+    db.session.commit()
+    flash(f"Dias de aula salvos: {v.dias_nomes}.", "success")
+    return redirect(url_for("professor.chamada", turma_id=turma_id))
 
 
 def _dados_postagem():
@@ -404,7 +465,7 @@ def _senha_admin_valida(senha):
     return any(admin.check_senha(senha) for admin in Admin.query.all())
 
 
-def _pode_alterar_data(data_requisitada, senha_admin):
+def _pode_alterar_data(data_requisitada, senha_admin, dias):
     hoje = hoje_local()
 
     if data_requisitada is None:
@@ -413,8 +474,8 @@ def _pode_alterar_data(data_requisitada, senha_admin):
     if data_requisitada > hoje:
         return False, "Não é possível alterar uma chamada futura."
 
-    if not eh_dia_com_aula(data_requisitada):
-        return False, "Não há chamada em finais de semana."
+    if not eh_dia_com_aula(data_requisitada, dias):
+        return False, "Você não tem aula nesta turma neste dia da semana."
 
     if data_requisitada == hoje:
         return True, None
@@ -426,17 +487,18 @@ def _pode_alterar_data(data_requisitada, senha_admin):
 
 
 def _alterar(aluno_id, barra, regra):
-    data_requisitada, senha_admin = _dados_postagem()
-    permitido, erro = _pode_alterar_data(data_requisitada, senha_admin)
-    if not permitido:
-        return jsonify(erro=erro), 403
-
     if barra < 0 or barra >= AULAS_POR_DIA:
         return jsonify(erro="Aula inválida."), 400
 
     aluno = db.get_or_404(Aluno, aluno_id)
-    if not aluno.turma or aluno.turma.professor_id != session["uid"]:
+    vinculo = db.session.get(ProfessorTurma, (session["uid"], aluno.turma_id)) if aluno.turma_id else None
+    if not vinculo:
         return jsonify(erro="Aluno não pertence às suas turmas."), 403
+
+    data_requisitada, senha_admin = _dados_postagem()
+    permitido, erro = _pode_alterar_data(data_requisitada, senha_admin, vinculo.dias_semana)
+    if not permitido:
+        return jsonify(erro=erro), 403
 
     p = Presenca.query.filter_by(
         aluno_id=aluno_id, data=data_requisitada, aula=barra
@@ -525,6 +587,7 @@ def create_app():
 
     with app.app_context():
         db.create_all()
+        migrar_professor_turma()
         if not Admin.query.first():   # admin padrão para o primeiro acesso
             a = Admin(nome="Administrador", email="admin@frequencyon.com")
             a.set_senha("admin123")

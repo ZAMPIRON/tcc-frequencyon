@@ -273,7 +273,7 @@
             if (status === 'sem_aula') {
                 statusTitle.innerText = 'Hoje não há aula';
                 statusTitle.className = 'card-title fw-bold text-warning mb-2';
-                statusSubtitle.innerText = 'O reconhecimento foi realizado, mas o sistema não registra presença aos fins de semana.';
+                statusSubtitle.innerText = 'O reconhecimento foi realizado, mas hoje não é dia de aula da turma deste aluno.';
                 presenceMessage.innerText = 'Nenhuma presença foi registrada.';
                 scannerOverlay.classList.remove('success');
             } else if (jaRegistrado) {
