@@ -40,6 +40,16 @@
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
 
+        .bar-bloqueada {
+            cursor: pointer;
+            opacity: 0.72;
+        }
+
+        .bar-bloqueada:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
         /* Estados das barras */
         .bar.on {
             background-color: #198754; /* Verde: Presente */
@@ -117,16 +127,21 @@
                 <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                     <div>
                         <h5 class="fw-bold mb-0">Chamada do Dia
-                            {% if not eh_hoje %}<span class="badge bg-secondary ms-2 fs-6">Dia anterior</span>{% endif %}
+                            <span class="text-muted fw-normal ms-1">{{ data_exibicao }}</span>
+                            {% if eh_hoje %}<span class="badge bg-success ms-2 fs-6">Hoje</span>{% else %}<span class="badge bg-secondary ms-2 fs-6">Somente consulta</span>{% endif %}
                         </h5>
-                        <small class="text-muted">Clique nas barras para alterar falta/presença. Botão direito nas 2 primeiras marca atraso.</small>
+                        <small class="text-muted">{% if pode_editar %}Clique nas barras para alterar falta/presença. Botão direito nas 2 primeiras marca atraso.{% else %}Dias anteriores ficam disponíveis apenas para consulta. O lançamento é permitido somente no dia atual.{% endif %}</small>
                     </div>
 
                     <form method="GET" action="{{ url_for('professor.chamada') }}" class="d-flex align-items-center gap-2 flex-wrap">
-                        <label class="form-label mb-0 small fw-bold text-nowrap">Data:</label>
-                        <input type="date" name="data" value="{{ data_iso }}" max="{{ hoje_iso }}"
-                               class="form-control form-control-sm" style="width:auto"
-                               onchange="this.form.submit()">
+                        <label class="form-label mb-0 small fw-bold text-nowrap">Dia:</label>
+                        <select name="data" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+                            {% for dia in dias_semana %}
+                                <option value="{{ dia.iso }}" {% if dia.selecionado %}selected{% endif %} {% if not dia.disponivel %}disabled{% endif %}>
+                                    {{ dia.nome }} - {{ dia.display }}{% if not dia.disponivel %} (futuro){% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
                         <label class="form-label mb-0 small fw-bold text-nowrap">Turma:</label>
                         <select name="turma_id" class="form-select form-select-sm" onchange="this.form.submit()">
                             {% for turma in turmas %}
@@ -164,12 +179,11 @@
                                 <td>
                                     <div class="bar-container">
                                         {% for estado in aluno.status %}
-                                            <div class="bar {{ 'on' if estado == 'presente' else ('late' if estado == 'atraso' else 'off') }}"
+                                            <div class="bar {{ 'on' if estado == 'presente' else ('late' if estado == 'atraso' else 'off') }} {{ 'bar-bloqueada' if not pode_editar else '' }}"
                                                  data-aluno="{{ aluno.id }}"
                                                  data-barra="{{ loop.index0 }}"
-                                                 title="Aula {{ loop.index }}: {{ estado|capitalize }}"
-                                                 onclick="registrarClique(this)"
-                                                 oncontextmenu="registrarAtraso(event, this)"></div>
+                                                 title="Aula {{ loop.index }}: {{ estado|capitalize }}{% if pode_editar %} (alterável){% else %} (senha de administrador para alterar){% endif %}"
+                                                 onclick="registrarClique(this)" oncontextmenu="registrarAtraso(event, this)"></div>
                                         {% endfor %}
                                     </div>
                                 </td>
@@ -201,55 +215,94 @@
     </div>
 
     <script>
-        // Alterna entre Presente e Falta (Clique Esquerdo)
-        function registrarClique(elemento) {
-            const alunoId = elemento.getAttribute('data-aluno');
-            const barraIndice = elemento.getAttribute('data-barra');
+        const DATA_TELA = '{{ data_iso }}';
+        const PODE_EDITAR = {{ 'true' if pode_editar else 'false' }};
+        let SENHA_ADMIN_HISTORICO = '';
 
-            fetch(`/professor/toggle/${alunoId}/${barraIndice}?data={{ data_iso }}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.erro) { alert(data.erro); return; }
+        function pedirSenhaAdmin() {
+            if (SENHA_ADMIN_HISTORICO) {
+                return SENHA_ADMIN_HISTORICO;
+            }
+
+            const senha = prompt('Digite a senha de um administrador para alterar esta chamada anterior:');
+            if (senha === null || senha.trim() === '') {
+                return null;
+            }
+
+            SENHA_ADMIN_HISTORICO = senha.trim();
+            return SENHA_ADMIN_HISTORICO;
+        }
+
+        function dadosPostagem() {
+            const dados = { data: DATA_TELA };
+
+            if (!PODE_EDITAR) {
+                const senha = pedirSenhaAdmin();
+                if (!senha) {
+                    return null;
+                }
+                dados.admin_senha = senha;
+            }
+
+            return dados;
+        }
+
+        async function enviarAlteracao(url, elemento) {
+            const dados = dadosPostagem();
+            if (!dados) {
+                return;
+            }
+
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dados)
+                });
+                const data = await res.json();
+
+                if (!res.ok || data.erro) {
+                    if (res.status === 403 && data.erro && data.erro.includes('senha')) {
+                        SENHA_ADMIN_HISTORICO = '';
+                    }
+                    alert(data.erro || 'Não foi possível alterar a presença.');
+                    return;
+                }
+
                 atualizarBarra(elemento, data.estado);
                 if (data.media_frequencia !== undefined) {
                     atualizarMediaTurma(data.media_frequencia);
                 }
-            })
-            .catch(err => console.error('Erro ao alternar presença:', err));
+            } catch (err) {
+                console.error('Erro ao alterar presença:', err);
+            }
         }
 
-        // Alterna Atraso nas duas primeiras barras (Clique Botão Direito)
-        function registrarAtraso(event, elemento) {
-            event.preventDefault(); // Impede o menu do botão direito de abrir
+        function registrarClique(elemento) {
             const alunoId = elemento.getAttribute('data-aluno');
-            const barraIndice = parseInt(elemento.getAttribute('data-barra'));
+            const barraIndice = elemento.getAttribute('data-barra');
+            enviarAlteracao(
+                `/professor/toggle/${alunoId}/${barraIndice}?data=${encodeURIComponent(DATA_TELA)}`,
+                elemento
+            );
+        }
 
+        function registrarAtraso(event, elemento) {
+            event.preventDefault();
+
+            const barraIndice = parseInt(elemento.getAttribute('data-barra'));
             if (barraIndice > 1) {
-                return; // Atrasos são permitidos apenas nas aulas 1 e 2
+                alert('Atraso só pode ser marcado nas aulas 1 e 2.');
+                return;
             }
 
-            fetch(`/professor/atraso/${alunoId}/${barraIndice}?data={{ data_iso }}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.erro) {
-                    alert(data.erro);
-                } else {
-                    atualizarBarra(elemento, data.estado);
-                    if (data.media_frequencia !== undefined) {
-                        atualizarMediaTurma(data.media_frequencia);
-                    }
-                }
-            })
-            .catch(err => console.error('Erro ao marcar atraso:', err));
+            const alunoId = elemento.getAttribute('data-aluno');
+            enviarAlteracao(
+                `/professor/atraso/${alunoId}/${barraIndice}?data=${encodeURIComponent(DATA_TELA)}`,
+                elemento
+            );
         }
 
-        // Função utilitária para mudar as classes CSS da barra
         function atualizarBarra(elemento, estado) {
             elemento.classList.remove('on', 'off', 'late');
             if (estado === 'presente') {
@@ -264,7 +317,6 @@
             }
         }
 
-        // Atualiza a média de frequência exibida no card do topo
         function atualizarMediaTurma(media) {
             const mediaEl = document.getElementById('media-frequencia-val');
             if (mediaEl) {
