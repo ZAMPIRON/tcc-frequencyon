@@ -14,6 +14,10 @@ from flask import (Flask, Blueprint, render_template, request, redirect, url_for
                    flash, session, jsonify, Response)
 from sqlalchemy import or_
 
+from email_service import carregar_env, enviar_justificativa
+
+carregar_env(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+
 from database import (db, Admin, Professor, Turma, Aluno, Presenca, ProfessorTurma, Justificativa,
                       AULAS_POR_DIA, DIAS_SELECIONAVEIS, NOMES_DIAS,
                       hoje_local, agora_local, eh_dia_com_aula, ultimo_dia_com_aula,
@@ -853,6 +857,7 @@ def justificar():
             db.session.add(j)
         j.motivo, j.status, j.criada_em, j.respondida_em = motivo, "pendente", agora_local(), None
         db.session.commit()
+        enviar_justificativa(aluno, j, url_for("admin.detalhes_aluno", id=aluno.id, _external=True))
         flash("Justificativa enviada! Aguarde a análise da coordenação.", "success")
     return redirect(url_for("aluno.painel"))
 

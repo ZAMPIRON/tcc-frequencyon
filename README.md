@@ -156,6 +156,11 @@ All settings are environment variables:
 | `HORARIO_ATRASO` | `07:10` | Check-ins up to this time are *late* for lesson 1. |
 | `HORARIOS_AULAS` | `07:00,07:50,…,14:30` | Start time of each of the 10 daily lessons (comma-separated). |
 | `FREQUENCYON_DATA` | *(empty)* | Freezes "today" to a date (`YYYY-MM-DD`), for testing. |
+| `EMAIL_JUSTIFICATIVAS` | *(empty)* | Address that receives an e-mail for every absence justification. |
+| `SMTP_SERVIDOR` / `SMTP_PORTA` | `smtp.gmail.com` / `465` | SMTP server used to send e-mails (465 = SSL, 587 = STARTTLS). |
+| `SMTP_USUARIO` / `SMTP_SENHA` | *(empty)* | Sender account. For Gmail, use an app password. |
+
+Variables can also be placed in a `.env` file in the project root (`EMAIL_JUSTIFICATIVAS=...`, one per line); it is ignored by Git.
 
 The school time zone is `America/Sao_Paulo`.
 
