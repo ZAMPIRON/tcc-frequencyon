@@ -54,8 +54,21 @@ def _hora_env(nome, padrao):
 
 
 # Regras de horário do totem (mude aqui ou por variável de ambiente)
-HORARIO_PRESENTE = _hora_env("HORARIO_PRESENTE", "08:00")  # até aqui = presente
-HORARIO_ATRASO = _hora_env("HORARIO_ATRASO", "08:03")      # até aqui = atraso; depois = falta
+HORARIO_PRESENTE = _hora_env("HORARIO_PRESENTE", "07:05")  # até aqui = presente
+HORARIO_ATRASO = _hora_env("HORARIO_ATRASO", "07:10")      # até aqui = atraso na 1ª aula
+
+# Horário de início de cada aula. Altere esta lista para os horários reais da escola.
+# Por padrão, são 10 aulas de 50 minutos começando às 07:00.
+def _horarios_aulas_env():
+    padrao = "07:00,07:50,08:40,09:30,10:20,11:10,12:00,12:50,13:40,14:30"
+    valores = os.getenv("HORARIOS_AULAS", padrao).split(",")
+    horarios = []
+    for valor in valores[:AULAS_POR_DIA]:
+        h, m = valor.strip().split(":")
+        horarios.append(time(int(h), int(m)))
+    return horarios
+
+HORARIOS_AULAS = _horarios_aulas_env()
 
 
 class UsuarioMixin:
@@ -164,16 +177,34 @@ def status_por_horario(agora=None):
     if t <= HORARIO_PRESENTE:
         return "presente"
     if t <= HORARIO_ATRASO:
-        return "atraso"  # Considera presente mesmo que atrasado, para não prejudicar o aluno
+        return "atraso"
     return "falta"
 
 
+def aula_atual_por_horario(agora=None):
+    """Retorna o índice (0..9) da aula em andamento no momento."""
+    agora = agora or agora_local()
+    t = agora.time()
+
+    atual = 0
+    for indice, inicio in enumerate(HORARIOS_AULAS):
+        if t >= inicio:
+            atual = indice
+        else:
+            break
+    return atual
+
+
 def registrar_presenca_totem(aluno, agora=None):
-    """Registra a entrada do aluno somente no dia atual e uma vez por dia."""
+    """
+    Registra a entrada do aluno somente no dia atual e uma vez por dia.
+
+    Aulas anteriores ao momento do reconhecimento ficam como falta.
+    A aula em andamento e as próximas ficam como presente.
+    """
     agora = agora or agora_local()
     hoje = agora.date()
 
-    # sábado e domingo não são dias de aula do FrequencyON
     if not eh_dia_com_aula(hoje):
         return "sem_aula", False
 
@@ -186,10 +217,17 @@ def registrar_presenca_totem(aluno, agora=None):
     if primeira:
         return primeira.status, True
 
-    status = status_por_horario(agora)
+    aula_atual = aula_atual_por_horario(agora)
+    status_entrada = status_por_horario(agora)
 
     for aula in range(AULAS_POR_DIA):
-        estado = "presente" if (status == "atraso" and aula > 0) else status
+        if aula < aula_atual:
+            estado = "falta"
+        elif aula == 0 and status_entrada == "atraso":
+            estado = "atraso"
+        else:
+            estado = "presente"
+
         db.session.add(
             Presenca(
                 aluno_id=aluno.id,
@@ -204,8 +242,6 @@ def registrar_presenca_totem(aluno, agora=None):
     try:
         db.session.commit()
     except IntegrityError:
-        # Se dois reconhecimentos acontecerem ao mesmo tempo, a restrição única
-        # do banco garante que não haverá dois registros para a mesma aula/dia.
         db.session.rollback()
         primeira = Presenca.query.filter_by(
             aluno_id=aluno.id,
@@ -216,4 +252,6 @@ def registrar_presenca_totem(aluno, agora=None):
             return primeira.status, True
         raise
 
-    return status, False
+    if aula_atual > 0:
+        return "presente", False
+    return status_entrada, False
