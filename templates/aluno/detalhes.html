@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ aluno.nome }} - FrequencyON</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --fo-azul: #0d6efd;
+            --fo-verde: #22c55e;
+            --fo-vermelho: #ef4444;
+            --fo-amarelo: #f59e0b;
+            --fo-cinza: #e5e7eb;
+            --fo-fundo: #f5f7fb;
+        }
+        body { background: var(--fo-fundo); }
+
+        /* ---------- topo ---------- */
+        .topo { background: #fff; border-bottom: 1px solid #eef0f4; }
+        .marca { font-weight: 700; color: #111827; text-decoration: none; letter-spacing: -.2px; }
+        .marca span { color: var(--fo-azul); }
+        .marca-chip {
+            display: inline-flex; align-items: center; gap: .5rem;
+            padding: .35rem .65rem; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff;
+        }
+        .marca-icone {
+            width: 28px; height: 28px; border-radius: 8px; background: #e7f0ff; color: var(--fo-azul);
+            display: inline-flex; align-items: center; justify-content: center;
+        }
+        .menu-mobile a { display: flex; align-items: center; gap: .6rem; padding: .6rem 0; text-decoration: none; color: #374151; }
+        .menu-mobile a.destaque { color: var(--fo-azul); font-weight: 600; }
+
+        /* ---------- cards ---------- */
+        .card-fo { border: 0; border-radius: 14px; box-shadow: 0 1px 3px rgba(16,24,40,.08); background: #fff; }
+        .foto-aluno {
+            width: 120px; height: 120px; border-radius: 50%; object-fit: cover;
+            border: 4px solid #fff; box-shadow: 0 0 0 1px #e5e7eb;
+        }
+        .foto-iniciais {
+            width: 120px; height: 120px; border-radius: 50%; background: #e7f0ff; color: var(--fo-azul);
+            display: flex; align-items: center; justify-content: center; font-size: 2.4rem; font-weight: 700;
+        }
+        .info-linha { display: flex; justify-content: space-between; gap: 1rem; font-size: .85rem; padding: .2rem 0; }
+        .info-linha .rotulo { color: #9ca3af; }
+        .info-linha .valor { font-weight: 600; color: #111827; text-align: right; word-break: break-word; }
+        @media (min-width: 768px) and (max-width: 991.98px) {
+            .perfil-info { border-left: 1px solid #e5e7eb; }
+        }
+
+        /* barra empilhada da frequência */
+        .barra-geral { display: flex; height: 12px; border-radius: 999px; overflow: hidden; background: var(--fo-cinza); }
+        .barra-geral div { height: 100%; transition: width .6s ease; }
+        .indicador {
+            display: flex; align-items: center; gap: .75rem;
+            background: #f3f4f6; border-radius: 10px; padding: .7rem .9rem;
+        }
+        .indicador .icone {
+            width: 30px; height: 30px; border-radius: 50%; color: #fff;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        .indicador .titulo { font-weight: 600; font-size: .9rem; line-height: 1.1; }
+        .indicador small { color: #6b7280; font-size: .72rem; }
+        .indicador .pct { margin-left: auto; font-weight: 700; font-size: 1.25rem; }
+        .frequencia-anel {
+            width: 64px; height: 64px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .95rem;
+            background: conic-gradient(var(--cor) calc(var(--p) * 1%), var(--fo-cinza) 0);
+            position: relative;
+        }
+        .frequencia-anel::before { content: ""; position: absolute; inset: 7px; background: #fff; border-radius: 50%; }
+        .frequencia-anel span { position: relative; }
+
+        /* ---------- histórico ---------- */
+        .tabela-historico th { font-size: .72rem; text-transform: uppercase; color: #6b7280; font-weight: 600; letter-spacing: .3px; }
+        .tabela-historico td { font-size: .85rem; vertical-align: middle; }
+        .quadros { display: flex; gap: 3px; }
+        .q { width: 14px; height: 14px; border-radius: 3px; }
+        .q.presente { background: var(--fo-verde); }
+        .q.falta { background: var(--fo-vermelho); }
+        .q.atraso { background: var(--fo-amarelo); }
+        .q.pendente { background: var(--fo-cinza); }
+        @media (max-width: 400px) { .q { width: 11px; height: 11px; } .quadros { gap: 2px; } }
+        .filtro .btn { font-size: .78rem; }
+        .legenda-ponto { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+        /* botão flutuante (mobile) */
+        .fab {
+            position: fixed; right: 18px; bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+            width: 54px; height: 54px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; font-size: 1.3rem;
+            box-shadow: 0 6px 16px rgba(13,110,253,.35); z-index: 1030;
+        }
+    </style>
+</head>
+<body>
+{% set url_voltar = url_for('admin.alunos') if visao == 'admin' else url_for('logout') %}
+{% set texto_voltar = 'Voltar' if visao == 'admin' else 'Sair' %}
+{% set icone_voltar = 'bi-arrow-left-circle' if visao == 'admin' else 'bi-box-arrow-left' %}
+{% set url_exportar = url_for('admin.exportar_aluno', id=aluno.id) if visao == 'admin' else url_for('aluno.exportar') %}
+
+<!-- ================= TOPO ================= -->
+<header class="topo sticky-top" style="top: env(safe-area-inset-top, 0px);">
+    <div class="container-xl py-2">
+        <!-- desktop -->
+        <div class="d-none d-lg-flex align-items-center justify-content-between">
+            <div class="dropdown">
+                <button class="marca-chip btn p-0 px-2 py-1" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="marca-icone"><i class="bi bi-person-badge"></i></span>
+                    <span class="marca">Frequency<span>ON</span></span>
+                    <i class="bi bi-chevron-down small text-muted"></i>
+                </button>
+                <ul class="dropdown-menu shadow-sm border-0 mt-1">
+                    <li><a class="dropdown-item small" href="{{ url_voltar }}"><i class="bi {{ icone_voltar }} me-2"></i>{{ texto_voltar }}</a></li>
+                    {% if visao == 'aluno' %}
+                    <li><a class="dropdown-item small text-primary fw-semibold" href="#" data-bs-toggle="modal" data-bs-target="#modalJustificar"><i class="bi bi-file-earmark-text me-2"></i>Justificar falta</a></li>
+                    {% endif %}
+                </ul>
+            </div>
+            <div class="d-flex gap-2">
+                {% if visao == 'aluno' %}
+                <button class="btn btn-outline-primary btn-sm px-3" data-bs-toggle="modal" data-bs-target="#modalJustificar">
+                    <i class="bi bi-file-earmark-text me-1"></i> Justificar falta
+                </button>
+                {% endif %}
+                <a href="{{ url_exportar }}" class="btn btn-primary btn-sm px-3">
+                    <i class="bi bi-box-arrow-up me-1"></i> Exportar conteúdo
+                </a>
+            </div>
+        </div>
+
+        <!-- tablet / celular -->
+        <div class="d-flex d-lg-none align-items-center justify-content-between position-relative" style="min-height: 38px;">
+            <span style="width: 38px;"></span>
+            <a class="marca position-absolute start-50 translate-middle-x" href="#">Frequency<span>ON</span></a>
+            <button class="btn btn-light btn-sm d-md-none" data-bs-toggle="collapse" data-bs-target="#menuMobile" aria-label="Abrir menu">
+                <i class="bi bi-list fs-5"></i>
+            </button>
+        </div>
+        <div class="collapse d-md-none menu-mobile border-top mt-2" id="menuMobile">
+            <a href="{{ url_voltar }}"><i class="bi {{ icone_voltar }}"></i> {{ texto_voltar }}</a>
+            {% if visao == 'aluno' %}
+            <a href="#" data-bs-toggle="modal" data-bs-target="#modalJustificar"><i class="bi bi-file-earmark-text"></i> Justificar falta</a>
+            {% endif %}
+            <a href="{{ url_exportar }}" class="destaque"><i class="bi bi-box-arrow-up"></i> Exportar conteúdo</a>
+        </div>
+    </div>
+</header>
+
+<main class="container-xl py-4">
+    <!-- botões do tablet -->
+    <div class="d-none d-md-flex d-lg-none gap-3 mb-4">
+        <a href="{{ url_voltar }}" class="btn btn-light border flex-fill"><i class="bi {{ icone_voltar }} me-1"></i> {{ texto_voltar }}</a>
+        {% if visao == 'aluno' %}
+        <button class="btn btn-outline-primary flex-fill" data-bs-toggle="modal" data-bs-target="#modalJustificar"><i class="bi bi-file-earmark-text me-1"></i> Justificar falta</button>
+        {% endif %}
+        <a href="{{ url_exportar }}" class="btn btn-primary flex-fill"><i class="bi bi-box-arrow-up me-1"></i> Exportar conteúdo</a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show small" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="row g-4">
+        <!-- ============ COLUNA ESQUERDA ============ -->
+        <div class="col-12 col-lg-4 d-flex flex-column gap-4">
+            <!-- perfil -->
+            <div class="card-fo p-4">
+                <div class="row g-4 align-items-center">
+                    <div class="col-12 col-md-6 col-lg-12 text-center">
+                        {% if aluno.foto %}
+                            <img src="{{ aluno.foto }}" alt="Foto de {{ aluno.nome }}" class="foto-aluno mb-3">
+                        {% else %}
+                            <div class="foto-iniciais mx-auto mb-3">{{ aluno.nome.split()[:2]|map('first')|join|upper }}</div>
+                        {% endif %}
+                        <h1 class="h5 fw-bold mb-0">{{ aluno.nome }}</h1>
+                        <small class="text-muted">Matrícula: {{ aluno.matricula }}</small>
+                    </div>
+                    <div class="col-12 col-md-6 col-lg-12 perfil-info px-md-4 px-lg-2">
+                        <hr class="d-md-none d-lg-block mt-0">
+                        <div class="info-linha"><span class="rotulo">Turma</span><span class="valor">{{ aluno.turma.nome if aluno.turma else 'Sem turma' }}</span></div>
+                        <div class="info-linha"><span class="rotulo">Curso</span><span class="valor">{{ aluno.turma.curso if aluno.turma else '-' }}</span></div>
+                        <div class="info-linha"><span class="rotulo">E-mail</span><span class="valor">{{ aluno.email or '-' }}</span></div>
+                        {% if aluno.turma %}
+                        <div class="info-linha"><span class="rotulo">Dias de aula</span><span class="valor">{{ aluno.turma.dias_aula_nomes }}</span></div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- frequência geral -->
+            <div class="card-fo p-4">
+                {% set cor_freq = 'var(--fo-verde)' if frequencia >= 75 else ('var(--fo-amarelo)' if frequencia >= 50 else 'var(--fo-vermelho)') %}
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div>
+                        <h2 class="h6 fw-bold mb-1">Frequência geral</h2>
+                        {% if total_aulas %}
+                            <span class="badge rounded-pill {{ 'bg-success' if frequencia >= 75 else ('bg-warning text-dark' if frequencia >= 50 else 'bg-danger') }}">
+                                {{ 'Regular' if frequencia >= 75 else ('Atenção' if frequencia >= 50 else 'Crítico') }}
+                            </span>
+                            <small class="text-muted ms-1">{{ total_aulas }} aulas</small>
+                        {% else %}
+                            <small class="text-muted">Nenhuma chamada registrada ainda.</small>
+                        {% endif %}
+                    </div>
+                    <div class="frequencia-anel" style="--p: {{ frequencia }}; --cor: {{ cor_freq }};" title="Presenças + atrasos">
+                        <span>{{ frequencia }}%</span>
+                    </div>
+                </div>
+
+                <div class="barra-geral mb-4" role="img" aria-label="Presenças {{ pct_presenca }}%, faltas {{ pct_falta }}%, atrasos {{ pct_atraso }}%">
+                    <div style="width: {{ pct_presenca }}%; background: var(--fo-verde);"></div>
+                    <div style="width: {{ pct_falta }}%; background: var(--fo-vermelho);"></div>
+                    <div style="width: {{ pct_atraso }}%; background: var(--fo-amarelo);"></div>
+                </div>
+
+                <div class="d-flex flex-column gap-2">
+                    <div class="indicador">
+                        <span class="icone" style="background: var(--fo-verde);"><i class="bi bi-check-lg"></i></span>
+                        <div><div class="titulo">Presenças</div><small>Aulas assistidas</small></div>
+                        <span class="pct text-success">{{ pct_presenca }}%</span>
+                    </div>
+                    <div class="indicador">
+                        <span class="icone" style="background: var(--fo-vermelho);"><i class="bi bi-x-lg"></i></span>
+                        <div><div class="titulo">Faltas</div><small>Ausências registradas</small></div>
+                        <span class="pct text-danger">{{ pct_falta }}%</span>
+                    </div>
+                    <div class="indicador">
+                        <span class="icone" style="background: var(--fo-amarelo);"><i class="bi bi-clock"></i></span>
+                        <div><div class="titulo">Atrasos</div><small>Entradas com atraso</small></div>
+                        <span class="pct" style="color: #b45309;">{{ pct_atraso }}%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- justificativas -->
+            {% if aluno.justificativas or visao == 'aluno' %}
+            <div class="card-fo p-4">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h2 class="h6 fw-bold mb-0">Justificativas</h2>
+                    {% if visao == 'aluno' %}
+                    <button class="btn btn-link btn-sm p-0 text-decoration-none" data-bs-toggle="modal" data-bs-target="#modalJustificar">
+                        <i class="bi bi-plus-circle me-1"></i>Nova
+                    </button>
+                    {% endif %}
+                </div>
+                {% for j in aluno.justificativas %}
+                <div class="border rounded-3 p-2 px-3 mb-2 small">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <strong>{{ j.data.strftime('%d/%m/%Y') }}</strong>
+                        <span class="badge {{ {'pendente': 'bg-secondary', 'aceita': 'bg-success', 'recusada': 'bg-danger'}[j.status] }}">{{ j.status|capitalize }}</span>
+                    </div>
+                    <div class="text-muted mt-1">{{ j.motivo }}</div>
+                    {% if visao == 'admin' and j.status == 'pendente' %}
+                    <div class="d-flex gap-2 mt-2">
+                        <form method="POST" action="{{ url_for('admin.responder_justificativa', id=j.id, acao='aceita') }}">
+                            <button class="btn btn-success btn-sm py-0"><i class="bi bi-check-lg"></i> Aceitar</button>
+                        </form>
+                        <form method="POST" action="{{ url_for('admin.responder_justificativa', id=j.id, acao='recusada') }}">
+                            <button class="btn btn-outline-danger btn-sm py-0"><i class="bi bi-x-lg"></i> Recusar</button>
+                        </form>
+                    </div>
+                    {% endif %}
+                </div>
+                {% else %}
+                <p class="text-muted small mb-0">Nenhuma justificativa enviada.</p>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- ============ COLUNA DIREITA: HISTÓRICO ============ -->
+        <div class="col-12 col-lg-8">
+            <div class="card-fo">
+                <div class="p-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom">
+                    <div>
+                        <h2 class="h6 fw-bold mb-0">Histórico de aulas</h2>
+                        <small class="text-muted">{{ linhas|length }} dia(s) de aula</small>
+                    </div>
+                    <div class="btn-group filtro" role="group" aria-label="Filtrar histórico">
+                        <button type="button" class="btn btn-outline-secondary active" data-filtro="todos">Todos</button>
+                        <button type="button" class="btn btn-outline-secondary" data-filtro="falta">Com faltas</button>
+                        <button type="button" class="btn btn-outline-secondary" data-filtro="atraso">Com atrasos</button>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table tabela-historico mb-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-4">Data</th>
+                                <th class="d-none d-md-table-cell">Professor</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for l in linhas %}
+                            <tr data-falta="{{ 1 if l.faltas else 0 }}" data-atraso="{{ 1 if l.atrasos else 0 }}">
+                                <td class="ps-4 text-nowrap">
+                                    <div class="fw-semibold">{{ l.data.strftime('%d/%m/%Y') }}</div>
+                                    <small class="text-muted">{{ l.dia_nome }}</small>
+                                </td>
+                                <td class="d-none d-md-table-cell">
+                                    {% for p in l.professores %}
+                                        <div>{{ p.nome }}{% if p.departamento %} <small class="text-muted">· {{ p.departamento }}</small>{% endif %}</div>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endfor %}
+                                </td>
+                                <td>
+                                    <div class="quadros">
+                                        {% for s in l.status %}
+                                        <span class="q {{ s }}" title="Aula {{ loop.index }}: {{ 'Chamada não lançada' if s == 'pendente' else s|capitalize }}"></span>
+                                        {% endfor %}
+                                    </div>
+                                    {% if l.justificativa %}
+                                    <small class="d-inline-block mt-1 {{ {'pendente': 'text-secondary', 'aceita': 'text-success', 'recusada': 'text-danger'}[l.justificativa.status] }}">
+                                        <i class="bi bi-file-earmark-text"></i> Justificativa {{ l.justificativa.status }}
+                                    </small>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted py-5">
+                                    <i class="bi bi-calendar-x d-block fs-2 mb-2"></i>
+                                    Nenhuma aula registrada ainda.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            <tr id="semResultado" hidden>
+                                <td colspan="3" class="text-center text-muted py-4">Nenhum dia encontrado com esse filtro.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="p-3 px-4 border-top d-flex flex-wrap gap-3 small text-muted">
+                    <span class="d-flex align-items-center gap-1"><span class="legenda-ponto" style="background: var(--fo-verde);"></span> Presente</span>
+                    <span class="d-flex align-items-center gap-1"><span class="legenda-ponto" style="background: var(--fo-vermelho);"></span> Falta</span>
+                    <span class="d-flex align-items-center gap-1"><span class="legenda-ponto" style="background: var(--fo-amarelo);"></span> Atraso</span>
+                    <span class="d-flex align-items-center gap-1"><span class="legenda-ponto" style="background: var(--fo-cinza);"></span> Chamada não lançada</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<!-- botão flutuante de exportar (celular) -->
+<a href="{{ url_exportar }}" class="btn btn-primary fab d-md-none" title="Exportar conteúdo" aria-label="Exportar conteúdo">
+    <i class="bi bi-box-arrow-up"></i>
+</a>
+
+{% if visao == 'aluno' %}
+<!-- ================= MODAL JUSTIFICAR FALTA ================= -->
+<div class="modal fade" id="modalJustificar" tabindex="-1" aria-labelledby="tituloJustificar">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 rounded-4">
+            <form method="POST" action="{{ url_for('aluno.justificar') }}">
+                <div class="modal-header border-0">
+                    <h5 class="modal-title h6 fw-bold" id="tituloJustificar"><i class="bi bi-file-earmark-text text-primary me-1"></i> Justificar falta</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body pt-0">
+                    {% if justificaveis %}
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold" for="dataFalta">Dia da falta</label>
+                        <select name="data" id="dataFalta" class="form-select" required>
+                            {% for d in justificaveis %}
+                            <option value="{{ d.isoformat() }}">{{ d.strftime('%d/%m/%Y') }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label small fw-bold" for="motivo">Motivo</label>
+                        <textarea name="motivo" id="motivo" class="form-control" rows="4" minlength="5" required
+                                  placeholder="Ex.: consulta médica, atestado entregue na secretaria..."></textarea>
+                    </div>
+                    {% else %}
+                    <p class="text-muted mb-0">Você não tem faltas pendentes de justificativa. 🎉</p>
+                    {% endif %}
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    {% if justificaveis %}<button type="submit" class="btn btn-primary">Enviar justificativa</button>{% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // filtro do histórico: todos / com faltas / com atrasos
+    document.querySelectorAll('[data-filtro]').forEach(botao => {
+        botao.addEventListener('click', () => {
+            document.querySelectorAll('[data-filtro]').forEach(b => b.classList.toggle('active', b === botao));
+            const filtro = botao.dataset.filtro;
+            let visiveis = 0;
+            document.querySelectorAll('tbody tr[data-falta]').forEach(tr => {
+                const mostrar = filtro === 'todos' || tr.dataset[filtro] === '1';
+                tr.hidden = !mostrar;
+                visiveis += mostrar;
+            });
+            const vazio = document.getElementById('semResultado');
+            vazio.hidden = visiveis > 0 || !document.querySelector('tbody tr[data-falta]');
+        });
+    });
+</script>
+</body>
+</html>

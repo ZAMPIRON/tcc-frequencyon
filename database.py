@@ -208,6 +208,8 @@ class Aluno(UsuarioMixin, db.Model):
     turma_id = db.Column(db.Integer, db.ForeignKey("turmas.id"))
     turma = db.relationship("Turma", back_populates="alunos")
     presencas = db.relationship("Presenca", cascade="all, delete-orphan", backref="aluno")
+    justificativas = db.relationship("Justificativa", cascade="all, delete-orphan", backref="aluno",
+                                     order_by="Justificativa.data.desc()")
 
     @property
     def frequencia(self):
@@ -251,6 +253,19 @@ class Presenca(db.Model):
     status = db.Column(db.String(10), nullable=False)
     origem = db.Column(db.String(10), default="totem")   # totem | professor
     registrado_em = db.Column(db.DateTime, default=agora_local)
+
+
+class Justificativa(db.Model):
+    """Pedido do aluno para justificar as faltas de um dia. status: pendente | aceita | recusada."""
+    __tablename__ = "justificativas"
+    __table_args__ = (db.UniqueConstraint("aluno_id", "data"),)
+    id = db.Column(db.Integer, primary_key=True)
+    aluno_id = db.Column(db.Integer, db.ForeignKey("alunos.id"), nullable=False, index=True)
+    data = db.Column(db.Date, nullable=False)
+    motivo = db.Column(db.Text, nullable=False)
+    status = db.Column(db.String(10), nullable=False, default="pendente")
+    criada_em = db.Column(db.DateTime, default=agora_local)
+    respondida_em = db.Column(db.DateTime)
 
 
 def status_por_horario(agora=None):

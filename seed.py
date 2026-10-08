@@ -1,6 +1,6 @@
 # seed.py
 from app import create_app  # Importe a instância do seu app Flask (ajuste o nome se necessário)
-from database import db, Admin, Professor, Turma, Aluno, Presenca, ProfessorTurma
+from database import db, Admin, Professor, Turma, Aluno, Presenca, ProfessorTurma, Justificativa
 
 
 
@@ -14,6 +14,7 @@ def popular_banco():
         print("Limpando dados antigos (opcional)...")
         # Se quiser apagar tudo antes de recriar, descomente as linhas abaixo com cuidado:
         Presenca.query.delete()
+        Justificativa.query.delete()
         ProfessorTurma.query.delete()
         Aluno.query.delete()
         Turma.query.delete()

@@ -1,4 +1,6 @@
 """app.py - FrequencyON: create_app, rotas e integração do totem com o banco."""
+import csv
+import io
 import os
 import uuid
 from datetime import date, timedelta
@@ -9,14 +11,15 @@ from flask import (Flask, Blueprint, render_template, request, redirect, url_for
                    flash, session, jsonify, Response)
 from sqlalchemy import or_
 
-from database import (db, Admin, Professor, Turma, Aluno, Presenca, ProfessorTurma,
+from database import (db, Admin, Professor, Turma, Aluno, Presenca, ProfessorTurma, Justificativa,
                       AULAS_POR_DIA, DIAS_SELECIONAVEIS, NOMES_DIAS,
-                      hoje_local, eh_dia_com_aula, ultimo_dia_com_aula,
+                      hoje_local, agora_local, eh_dia_com_aula, ultimo_dia_com_aula,
                       dias_de_formulario, migrar_professor_turma)
 from face_service import Totem, encoding_de_arquivo
 
 admin = Blueprint("admin", __name__, url_prefix="/admin")
 professor = Blueprint("professor", __name__, url_prefix="/professor")
+area_aluno = Blueprint("aluno", __name__, url_prefix="/aluno")
 reconhecimento = Blueprint("reconhecimento", __name__)
 totem = None  # definido em create_app
 
@@ -60,7 +63,8 @@ def requer(tipo):
         @wraps(f)
         def wrapper(*a, **kw):
             if session.get("tipo") != tipo or not usuario_atual():
-                return redirect(url_for("login_admin" if tipo == "admin" else "login_professor"))
+                return redirect(url_for({"admin": "login_admin", "professor": "login_professor"}
+                                        .get(tipo, "login_aluno")))
             return f(*a, **kw)
         return wrapper
     return deco
@@ -572,6 +576,152 @@ def atraso(aluno_id, barra):
     return _alterar(aluno_id, barra, lambda s: "presente" if s == "atraso" else "atraso")
 
 
+# ============================ ALUNO ============================
+def _historico_aluno(aluno):
+    """Dados da tela de detalhes: histórico por dia de aula, totais e justificativas."""
+    hoje = hoje_local()
+    turma = aluno.turma
+    dias_aula = turma.dias_aula if turma else ()
+    linhas, justificaveis = [], []
+    presentes = atrasos = total = 0
+
+    if dias_aula:
+        # dias em que houve chamada na turma (mesmo critério de Aluno.frequencia)
+        datas = {d for (d,) in db.session.query(Presenca.data).join(Aluno)
+                 .filter(Aluno.turma_id == turma.id).distinct()
+                 if eh_dia_com_aula(d, dias_aula)}
+        mapa = {}
+        for p in aluno.presencas:
+            mapa.setdefault(p.data, {})[p.aula] = p.status
+        justificativas = {j.data: j for j in aluno.justificativas}
+
+        pendente_hoje = eh_dia_com_aula(hoje, dias_aula) and hoje not in datas
+        for d in sorted(datas | ({hoje} if pendente_hoje else set()), reverse=True):
+            sem_chamada = d not in datas
+            st = (["pendente"] * AULAS_POR_DIA if sem_chamada else
+                  [mapa.get(d, {}).get(i, "falta") for i in range(AULAS_POR_DIA)])
+            if not sem_chamada:
+                total += AULAS_POR_DIA
+                presentes += st.count("presente")
+                atrasos += st.count("atraso")
+            faltas_dia = st.count("falta")
+            linhas.append({
+                "data": d,
+                "dia_nome": NOMES_DIAS[d.weekday()],
+                "professores": [v.professor for v in turma.vinculos if d.weekday() in v.dias_semana],
+                "status": st,
+                "faltas": faltas_dia,
+                "atrasos": st.count("atraso"),
+                "justificativa": justificativas.get(d),
+            })
+            if faltas_dia and (d not in justificativas or justificativas[d].status == "recusada"):
+                justificaveis.append(d)
+
+    pct_presenca = round(100 * presentes / total) if total else 0
+    pct_atraso = round(100 * atrasos / total) if total else 0
+    pct_falta = 100 - pct_presenca - pct_atraso if total else 0
+    return {
+        "linhas": linhas,
+        "justificaveis": justificaveis,
+        "total_aulas": total,
+        "pct_presenca": pct_presenca,
+        "pct_atraso": pct_atraso,
+        "pct_falta": pct_falta,
+        "frequencia": aluno.frequencia,
+    }
+
+
+def _render_detalhes(aluno, visao):
+    return render_template("aluno/detalhes.html", aluno=aluno, visao=visao,
+                           **_historico_aluno(aluno))
+
+
+def _exportar_csv(aluno):
+    """CSV (separado por ';', com BOM para abrir certo no Excel) com o histórico do aluno."""
+    dados = _historico_aluno(aluno)
+    rotulo = {"presente": "P", "atraso": "A", "falta": "F", "pendente": "-"}
+    saida = io.StringIO()
+    w = csv.writer(saida, delimiter=";")
+    w.writerow(["Aluno", aluno.nome, "Matrícula", aluno.matricula,
+                "Turma", aluno.turma.nome if aluno.turma else "-"])
+    w.writerow(["Frequência", f"{dados['frequencia']}%", "Presenças", f"{dados['pct_presenca']}%",
+                "Faltas", f"{dados['pct_falta']}%", "Atrasos", f"{dados['pct_atraso']}%"])
+    w.writerow([])
+    w.writerow(["Data", "Dia", "Professor(es)"] + [f"Aula {i + 1}" for i in range(AULAS_POR_DIA)]
+               + ["Faltas", "Atrasos", "Justificativa"])
+    for l in dados["linhas"]:
+        j = l["justificativa"]
+        w.writerow([l["data"].strftime("%d/%m/%Y"), l["dia_nome"],
+                    ", ".join(p.nome for p in l["professores"])]
+                   + [rotulo[s] for s in l["status"]]
+                   + [l["faltas"], l["atrasos"], j.status if j else ""])
+    w.writerow([])
+    w.writerow(["Legenda: P = presente, A = atraso, F = falta, - = chamada ainda não lançada"])
+    nome = f"frequencia_{aluno.matricula}.csv"
+    return Response("﻿" + saida.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": f"attachment; filename={nome}"})
+
+
+@area_aluno.route("/")
+@requer("aluno")
+def painel():
+    return _render_detalhes(usuario_atual(), "aluno")
+
+
+@area_aluno.route("/exportar")
+@requer("aluno")
+def exportar():
+    return _exportar_csv(usuario_atual())
+
+
+@area_aluno.route("/justificar", methods=["POST"])
+@requer("aluno")
+def justificar():
+    aluno = usuario_atual()
+    motivo = (request.form.get("motivo") or "").strip()
+    try:
+        data_falta = date.fromisoformat(request.form.get("data", ""))
+    except ValueError:
+        data_falta = None
+
+    if data_falta not in _historico_aluno(aluno)["justificaveis"]:
+        flash("Escolha um dia com falta que ainda não foi justificado.", "danger")
+    elif len(motivo) < 5:
+        flash("Descreva o motivo da falta.", "danger")
+    else:
+        j = Justificativa.query.filter_by(aluno_id=aluno.id, data=data_falta).first()
+        if not j:
+            j = Justificativa(aluno_id=aluno.id, data=data_falta)
+            db.session.add(j)
+        j.motivo, j.status, j.criada_em, j.respondida_em = motivo, "pendente", agora_local(), None
+        db.session.commit()
+        flash("Justificativa enviada! Aguarde a análise da coordenação.", "success")
+    return redirect(url_for("aluno.painel"))
+
+
+@admin.route("/alunos/<int:id>")
+@requer("admin")
+def detalhes_aluno(id):
+    return _render_detalhes(db.get_or_404(Aluno, id), "admin")
+
+
+@admin.route("/alunos/<int:id>/exportar")
+@requer("admin")
+def exportar_aluno(id):
+    return _exportar_csv(db.get_or_404(Aluno, id))
+
+
+@admin.route("/justificativas/<int:id>/<acao>", methods=["POST"])
+@requer("admin")
+def responder_justificativa(id, acao):
+    j = db.get_or_404(Justificativa, id)
+    if acao in ("aceita", "recusada"):
+        j.status, j.respondida_em = acao, agora_local()
+        db.session.commit()
+        flash(f"Justificativa {acao}.", "success")
+    return redirect(url_for("admin.detalhes_aluno", id=j.aluno_id))
+
+
 # ============================ APP ============================
 def create_app():
     global totem
@@ -586,6 +736,7 @@ def create_app():
     totem = Totem(app, camera=int(os.getenv("TOTEM_CAMERA", "0")))
     app.register_blueprint(admin)
     app.register_blueprint(professor)
+    app.register_blueprint(area_aluno)
     app.register_blueprint(reconhecimento)
     app.jinja_env.filters["inicial"] = lambda n: (n or "A")[0].upper()
     app.context_processor(lambda: {"usuario": usuario_atual()})
@@ -609,7 +760,7 @@ def create_app():
     @app.route("/login", methods=["GET", "POST"])
     @app.route("/login/aluno", methods=["GET", "POST"])
     def login_aluno():
-        return entrar(Aluno, "aluno", url_for("index"), "login.html")
+        return entrar(Aluno, "aluno", url_for("aluno.painel"), "login.html")
 
     @app.route("/login/professor", methods=["GET", "POST"])
     def login_professor():
