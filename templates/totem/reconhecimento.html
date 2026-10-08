@@ -128,7 +128,7 @@
                             <span id="studentMatricula" class="badge bg-secondary fs-6 px-3 py-2 mb-3">Matrícula: ---</span>
                             <div class="alert alert-success d-flex align-items-center justify-content-center gap-2 mb-0 fw-bold fs-5 shadow-sm" role="alert">
                                 <i class="fa-solid fa-circle-check fs-4"></i>
-                                <span>Presença Confirmada!</span>
+                                <span id="presenceMessage">Presença Confirmada!</span>
                             </div>
                         </div>
 
@@ -248,7 +248,7 @@
             }
         }
 
-        function exibirSucessoAluno(nome, matricula, fotoUrl) {
+        function exibirSucessoAluno(nome, matricula, fotoUrl, jaRegistrado, status) {
             const scannerOverlay = document.getElementById('scannerOverlay');
             const iconWrapper = document.getElementById('iconWrapper');
             const studentAvatar = document.getElementById('studentAvatar');
@@ -257,8 +257,11 @@
             const studentInfo = document.getElementById('studentInfo');
             const studentMatricula = document.getElementById('studentMatricula');
 
-            adicionarAoHistorico(nome, matricula, fotoUrl);
+            if (status !== 'sem_aula' && !jaRegistrado) {
+                adicionarAoHistorico(nome, matricula, fotoUrl);
+            }
 
+            const presenceMessage = document.getElementById('presenceMessage');
             scannerOverlay.classList.add('success');
             iconWrapper.classList.add('d-none');
             
@@ -267,9 +270,35 @@
                 studentAvatar.classList.remove('d-none');
             }
 
-            statusTitle.innerText = `Bem-vindo(a), ${nome}!`;
-            statusTitle.className = 'card-title fw-bold text-success mb-2';
-            statusSubtitle.innerText = 'Presença registrada no sistema.';
+            if (status === 'sem_aula') {
+                statusTitle.innerText = 'Hoje não há aula';
+                statusTitle.className = 'card-title fw-bold text-warning mb-2';
+                statusSubtitle.innerText = 'O reconhecimento foi realizado, mas o sistema não registra presença aos fins de semana.';
+                presenceMessage.innerText = 'Nenhuma presença foi registrada.';
+                scannerOverlay.classList.remove('success');
+            } else if (jaRegistrado) {
+                statusTitle.innerText = `${nome}, presença já registrada!`;
+                statusTitle.className = 'card-title fw-bold text-warning mb-2';
+                statusSubtitle.innerText = 'A presença deste aluno já está salva no dia atual.';
+                presenceMessage.innerText = 'Presença já confirmada hoje.';
+                scannerOverlay.classList.remove('success');
+            } else if (status === 'atraso') {
+                statusTitle.innerText = `Bem-vindo(a), ${nome}!`;
+                statusTitle.className = 'card-title fw-bold text-warning mb-2';
+                statusSubtitle.innerText = 'Presença registrada no dia atual com atraso.';
+                presenceMessage.innerText = 'Presença Confirmada com Atraso!';
+            } else if (status === 'falta') {
+                statusTitle.innerText = `${nome}, registro fora do horário`;
+                statusTitle.className = 'card-title fw-bold text-danger mb-2';
+                statusSubtitle.innerText = 'O reconhecimento ocorreu, mas o horário ultrapassou o limite configurado para presença.';
+                presenceMessage.innerText = 'Registro salvo como Falta.';
+                scannerOverlay.classList.remove('success');
+            } else {
+                statusTitle.innerText = `Bem-vindo(a), ${nome}!`;
+                statusTitle.className = 'card-title fw-bold text-success mb-2';
+                statusSubtitle.innerText = 'Presença registrada no dia atual.';
+                presenceMessage.innerText = 'Presença Confirmada!';
+            }
             
             studentMatricula.innerText = `Matrícula: ${matricula}`;
             studentInfo.classList.remove('d-none');
@@ -294,6 +323,8 @@
             statusTitle.className = 'card-title fw-bold text-white mb-2';
             statusSubtitle.innerText = "Posicione seu rosto centralizado na câmera para registrar a presença.";
             studentInfo.classList.add('d-none');
+            const presenceMessage = document.getElementById('presenceMessage');
+            if (presenceMessage) presenceMessage.innerText = 'Presença Confirmada!';
         }
 
         // FUNÇÃO DE CADASTRO DIRETO NO TOTEM
@@ -358,7 +389,7 @@
             .then(data => {
                 if (data && data.reconhecido) {
                     const dados = data.dados;
-                    exibirSucessoAluno(dados.nome, dados.matricula, dados.foto);
+                    exibirSucessoAluno(dados.nome, dados.matricula, dados.foto, dados.ja_registrado, dados.status);
                 }
             })
             .catch(() => {});
