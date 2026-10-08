@@ -2,8 +2,6 @@ import os
 import threading
 import time
 from collections import deque
-from datetime import datetime
-
 import cv2
 import numpy as np
 
@@ -12,7 +10,7 @@ try:
 except ImportError:  # permite subir o site sem a lib (o totem fica indisponível)
     face_recognition = None
 
-from database import db, Aluno, registrar_presenca_totem
+from database import db, Aluno, registrar_presenca_totem, agora_local, hoje_local
 
 TOLERANCIA = 0.50        # menor = mais rígido
 ESCALA = 0.5             # reduz o frame p/ detectar (menor = mais rápido)
@@ -184,10 +182,15 @@ class Totem:
             if not aluno:
                 return
             status, ja = registrar_presenca_totem(aluno)
+            agora = agora_local()
             self.eventos.append({
-                "nome": aluno.nome, "matricula": aluno.matricula, "foto": aluno.foto,
-                "status": status, "ja_registrado": ja,
-                "hora": datetime.now().strftime("%H:%M:%S"),
+                "nome": aluno.nome,
+                "matricula": aluno.matricula,
+                "foto": aluno.foto,
+                "status": status,
+                "ja_registrado": ja,
+                "data": hoje_local().strftime("%d/%m/%Y"),
+                "hora": agora.strftime("%H:%M:%S"),
             })
             print(f"[totem] {aluno.nome} -> {status}{' (já registrado hoje)' if ja else ''}")
 

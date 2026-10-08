@@ -1,7 +1,7 @@
 """app.py - FrequencyON: create_app, rotas e integração do totem com o banco."""
 import os
 import uuid
-from datetime import date
+from datetime import date, timedelta
 from functools import wraps
 
 import cv2
@@ -9,7 +9,8 @@ from flask import (Flask, Blueprint, render_template, request, redirect, url_for
                    flash, session, jsonify, Response)
 from sqlalchemy import or_
 
-from database import db, Admin, Professor, Turma, Aluno, Presenca, AULAS_POR_DIA
+from database import (db, Admin, Professor, Turma, Aluno, Presenca, AULAS_POR_DIA,
+                      hoje_local, eh_dia_com_aula, NOMES_DIAS)
 from face_service import Totem, encoding_de_arquivo
 
 admin = Blueprint("admin", __name__, url_prefix="/admin")
@@ -285,41 +286,174 @@ def relatorios():
 
 
 # ============================ PROFESSOR ============================
+def _normalizar_data_chamada(valor=None):
+    """Retorna uma data válida de aula: nunca futura e nunca no fim de semana."""
+    hoje = hoje_local()
+
+    if not valor:
+        selecionada = hoje
+    else:
+        try:
+            selecionada = date.fromisoformat(valor)
+        except (TypeError, ValueError):
+            selecionada = hoje
+
+    if selecionada > hoje:
+        selecionada = hoje
+
+    if not eh_dia_com_aula(selecionada):
+        # sábado/domingo apontam para a sexta-feira anterior
+        selecionada -= timedelta(days=selecionada.weekday() - 4)
+
+    return selecionada
+
+
+def _dias_uteis_semana(data_ref, hoje):
+    """Monta as cinco opções da semana atual para a tela do professor."""
+    inicio = data_ref - timedelta(days=data_ref.weekday())
+    dias = []
+    for indice in range(5):
+        d = inicio + timedelta(days=indice)
+        dias.append({
+            "data": d,
+            "iso": d.isoformat(),
+            "nome": NOMES_DIAS[indice],
+            "display": d.strftime("%d/%m"),
+            "disponivel": d <= hoje,
+            "editavel": d == hoje and eh_dia_com_aula(hoje),
+            "selecionado": d == data_ref,
+        })
+    return dias
+
+
 @professor.route("/chamada")
 @requer("professor")
 def chamada():
     prof = usuario_atual()
     turma_id = request.args.get("turma_id", type=int)
+    data_selecionada = _normalizar_data_chamada(request.args.get("data"))
+    hoje = hoje_local()
+
     turma = next((t for t in prof.turmas if t.id == turma_id), prof.turmas[0] if prof.turmas else None)
     alunos, presentes, faltas = [], 0, 0
+
     if turma:
         ids = [a.id for a in turma.alunos]
         mapa = {}
         if ids:
-            for r in Presenca.query.filter(Presenca.aluno_id.in_(ids), Presenca.data == date.today()):
+            registros = Presenca.query.filter(
+                Presenca.aluno_id.in_(ids),
+                Presenca.data == data_selecionada
+            ).all()
+            for r in registros:
                 mapa.setdefault(r.aluno_id, {})[r.aula] = r.status
+
         for a in sorted(turma.alunos, key=lambda x: (x.numero_chamada or 999, x.nome)):
             st = [mapa.get(a.id, {}).get(i, "falta") for i in range(AULAS_POR_DIA)]
-            presentes += any(s != "falta" for s in st)
-            faltas += any(s == "falta" for s in st)
-            alunos.append({"id": a.id, "nome": a.nome, "matricula": a.matricula,
-                           "iniciais": "".join(p[0] for p in a.nome.split()[:2]).upper(),
-                           "data": date.today().strftime("%d/%m/%Y"), "status": st})
-    return render_template("professor/frequencia.html", turmas=prof.turmas, turma_selecionada=turma,
-                           alunos=alunos, total_matriculados=len(alunos), total_presentes=presentes,
-                           total_faltas=faltas, media_frequencia=turma.frequencia_media if turma else 0)
+            tem_presenca = any(s in ("presente", "atraso") for s in st)
+            faltou_dia = all(s == "falta" for s in st)
+            presentes += int(tem_presenca)
+            faltas += int(faltou_dia)
+            alunos.append({
+                "id": a.id,
+                "nome": a.nome,
+                "matricula": a.matricula,
+                "iniciais": "".join(p[0] for p in a.nome.split()[:2]).upper(),
+                "data": data_selecionada.strftime("%d/%m/%Y"),
+                "status": st,
+            })
+
+    eh_hoje = data_selecionada == hoje
+    pode_editar = eh_hoje and eh_dia_com_aula(hoje)
+
+    return render_template(
+        "professor/frequencia.html",
+        turmas=prof.turmas,
+        turma_selecionada=turma,
+        alunos=alunos,
+        total_matriculados=len(alunos),
+        total_presentes=presentes,
+        total_faltas=faltas,
+        media_frequencia=turma.frequencia_media if turma else 0,
+        data_iso=data_selecionada.isoformat(),
+        data_exibicao=data_selecionada.strftime("%d/%m/%Y"),
+        hoje_iso=hoje.isoformat(),
+        eh_hoje=eh_hoje,
+        pode_editar=pode_editar,
+        dias_semana=_dias_uteis_semana(data_selecionada, hoje),
+        dia_nome=NOMES_DIAS[data_selecionada.weekday()],
+    )
+
+
+def _dados_postagem():
+    dados = request.get_json(silent=True) or {}
+    valor = request.args.get("data") or dados.get("data") or ""
+    senha_admin = (dados.get("admin_senha") or "").strip()
+
+    try:
+        data_requisitada = date.fromisoformat(valor)
+    except (TypeError, ValueError):
+        data_requisitada = None
+
+    return data_requisitada, senha_admin
+
+
+def _senha_admin_valida(senha):
+    if not senha:
+        return False
+    return any(admin.check_senha(senha) for admin in Admin.query.all())
+
+
+def _pode_alterar_data(data_requisitada, senha_admin):
+    hoje = hoje_local()
+
+    if data_requisitada is None:
+        return False, "Data inválida."
+
+    if data_requisitada > hoje:
+        return False, "Não é possível alterar uma chamada futura."
+
+    if not eh_dia_com_aula(data_requisitada):
+        return False, "Não há chamada em finais de semana."
+
+    if data_requisitada == hoje:
+        return True, None
+
+    if not _senha_admin_valida(senha_admin):
+        return False, "Para alterar uma chamada anterior, informe a senha de um administrador."
+
+    return True, None
 
 
 def _alterar(aluno_id, barra, regra):
+    data_requisitada, senha_admin = _dados_postagem()
+    permitido, erro = _pode_alterar_data(data_requisitada, senha_admin)
+    if not permitido:
+        return jsonify(erro=erro), 403
+
+    if barra < 0 or barra >= AULAS_POR_DIA:
+        return jsonify(erro="Aula inválida."), 400
+
     aluno = db.get_or_404(Aluno, aluno_id)
     if not aluno.turma or aluno.turma.professor_id != session["uid"]:
         return jsonify(erro="Aluno não pertence às suas turmas."), 403
-    p = Presenca.query.filter_by(aluno_id=aluno_id, data=date.today(), aula=barra).first()
+
+    p = Presenca.query.filter_by(
+        aluno_id=aluno_id, data=data_requisitada, aula=barra
+    ).first()
+
     if not p:
-        p = Presenca(aluno_id=aluno_id, data=date.today(), aula=barra, status="falta")
+        p = Presenca(
+            aluno_id=aluno_id,
+            data=data_requisitada,
+            aula=barra,
+            status="falta"
+        )
         db.session.add(p)
+
     p.status, p.origem = regra(p.status), "professor"
     db.session.commit()
+
     return jsonify(estado=p.status, media_frequencia=aluno.turma.frequencia_media)
 
 
@@ -333,7 +467,7 @@ def toggle(aluno_id, barra):
 @requer("professor")
 def atraso(aluno_id, barra):
     if barra > 1:
-        return jsonify(erro="Atraso só pode ser marcado nas aulas 1 e 2.")
+        return jsonify(erro="Atraso só pode ser marcado nas aulas 1 e 2."), 400
     return _alterar(aluno_id, barra, lambda s: "presente" if s == "atraso" else "atraso")
 
 
