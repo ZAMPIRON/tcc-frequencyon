@@ -1,6 +1,7 @@
 import os
 import threading
 import time
+import uuid
 from collections import deque
 import cv2
 import numpy as np
@@ -171,17 +172,19 @@ class Totem:
                     if time.time() - self.ultimo_evento.get(aluno_id, 0) > COOLDOWN:
                         self.ultimo_evento[aluno_id] = time.time()
                         self._livre_em = time.time() + PAUSA_APOS_EVENTO
-                        self._registrar(aluno_id)
+                        self._registrar(aluno_id, frame, (t, r, b, l))
             except Exception as e:                  # uma falha não pode matar a thread
                 print(f"[totem] erro no reconhecimento: {e}")
                 time.sleep(0.5)
 
-    def _registrar(self, aluno_id):
+    def _registrar(self, aluno_id, frame=None, caixa=None):
         with self.app.app_context():
             aluno = db.session.get(Aluno, aluno_id)
             if not aluno:
                 return
             status, ja = registrar_presenca_totem(aluno)
+            if frame is not None:
+                self._atualizar_foto(aluno, frame, caixa)
             agora = agora_local()
             self.eventos.append({
                 "nome": aluno.nome,
@@ -193,6 +196,30 @@ class Totem:
                 "hora": agora.strftime("%H:%M:%S"),
             })
             print(f"[totem] {aluno.nome} -> {status}{' (já registrado hoje)' if ja else ''}")
+
+    def _atualizar_foto(self, aluno, frame, caixa):
+        """Troca a foto do aluno pelo rosto que a câmera acabou de ver (só a imagem de exibição)."""
+        try:
+            t, r, b, l = caixa
+            altura, largura = frame.shape[:2]
+            margem = int(max(b - t, r - l) * 0.45)
+            recorte = frame[max(0, t - margem):min(altura, b + margem), max(0, l - margem):min(largura, r + margem)]
+            if recorte.size == 0:
+                return
+            pasta = os.path.join(self.app.static_folder, "uploads")
+            os.makedirs(pasta, exist_ok=True)
+            nome = f"{uuid.uuid4().hex}.jpg"
+            if not cv2.imwrite(os.path.join(pasta, nome), recorte, [cv2.IMWRITE_JPEG_QUALITY, 90]):
+                return
+            antiga, aluno.foto = aluno.foto, f"/static/uploads/{nome}"
+            db.session.commit()
+            if antiga and antiga.startswith("/static/uploads/"):
+                caminho = os.path.join(pasta, os.path.basename(antiga))
+                if os.path.isfile(caminho):
+                    os.remove(caminho)
+        except Exception as e:  # a presença já foi salva; a foto é só um extra
+            db.session.rollback()
+            print(f"[totem] não consegui atualizar a foto: {e}")
 
     # ---------- API usada pelas rotas ----------
     def proximo_evento(self):
