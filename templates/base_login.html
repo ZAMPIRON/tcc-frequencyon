@@ -1,89 +1,63 @@
-{# Base das telas de login. Variáveis definidas pelo template filho:
-   papel_nome, papel_icone, papel_classe, papel_action, papel_rotulo, papel_placeholder, papel_frases #}
+{# Base das telas de login. O template filho define: papel_nome, papel_action, papel_rotulo #}
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login {{ papel_nome }} - FrequencyON</title>
-    {% include 'componentes/cabecalho.html' %}
-    <link href="{{ url_for('static', filename='css/login.css') }}" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
 </head>
-<body class="{{ papel_classe }}">
-    <canvas class="fundo-particulas" data-fo-particulas aria-hidden="true"></canvas>
 
-    <div class="auth-wrap">
-        <!-- painel lateral (desktop) -->
-        <aside class="painel-marca">
-            <span class="bolha b1"></span><span class="bolha b2"></span>
-            <a href="{{ url_for('index') }}" class="d-flex align-items-center gap-2 text-decoration-none fo-display fw-bold fs-5 link-marca">
-                <span class="fo-logo-icone"><i class="bi bi-person-bounding-box"></i></span>
-                <span>Frequency<span class="fo-gradient-text">ON</span></span>
-            </a>
-            <div>
-                <div class="icone-papel mb-4"><i class="bi {{ papel_icone }}"></i></div>
-                <h2 class="mb-3">Área do<br><span class="fo-gradient-text">{{ papel_nome }}</span></h2>
-                <p class="digitando"><span data-typewriter="{{ papel_frases }}"></span></p>
-            </div>
-            <small class="text-muted"><i class="bi bi-shield-check me-1"></i> Conexão protegida • FrequencyON</small>
-        </aside>
+<body class="login-bg d-flex align-items-center justify-content-center min-vh-100 p-3">
 
-        <!-- formulário -->
-        <main class="lado-form">
-            <div class="cartao-login fo-glass fo-border-anim {% if get_flashed_messages() %}erro{% endif %}" data-fo-reveal>
-                <div class="d-flex align-items-center justify-content-between mb-4">
-                    <a href="{{ url_for('index') }}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left"></i> Perfis</a>
-                    <button type="button" class="fo-theme-btn" data-fo-theme-toggle></button>
+    <div class="card login-card formulario border-0 shadow-lg p-4 p-sm-5 rounded-4 w-100">
+        <form action="{{ papel_action }}" method="POST">
+
+            {% include 'componentes/logo_login.html' %}
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show small" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+                    </div>
+                {% endfor %}
+            {% endwith %}
+
+            <div class="mb-3">
+                <label for="email" class="form-label fw-semibold text-secondary small">{{ papel_rotulo }}</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0 text-muted fs-5">
+                        <i class="bi bi-envelope"></i>
+                    </span>
+                    <input type="text" id="email" name="email" class="form-control border-start-0 py-2" placeholder="seuemail@gmail.com" required>
                 </div>
-
-                <span class="chip-papel mb-3"><i class="bi {{ papel_icone }}"></i> {{ papel_nome }}</span>
-                <h1 class="h2 fw-bold mb-1">Bem-vindo de volta</h1>
-                <p class="text-muted mb-4">Entre para acessar o FrequencyON.</p>
-
-                {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ category }} small py-2" role="alert"><i class="bi bi-exclamation-triangle me-1"></i> {{ message }}</div>
-                    {% endfor %}
-                {% endwith %}
-
-                <form action="{{ papel_action }}" method="POST">
-                    <label for="email" class="form-label small fw-semibold">{{ papel_rotulo }}</label>
-                    <div class="campo">
-                        <i class="bi bi-person"></i>
-                        <input type="text" id="email" name="email" class="form-control" placeholder="{{ papel_placeholder }}" autocomplete="username" required autofocus>
-                    </div>
-
-                    <label for="senhaInput" class="form-label small fw-semibold">Senha</label>
-                    <div class="campo">
-                        <i class="bi bi-lock"></i>
-                        <input type="password" id="senhaInput" name="senha" class="form-control" placeholder="••••••••" autocomplete="current-password" required>
-                        <button type="button" class="olho" id="toggleSenha" aria-label="Mostrar senha"><i class="bi bi-eye"></i></button>
-                    </div>
-                    <div class="aviso-caps" id="avisoCaps" hidden><i class="bi bi-capslock-fill"></i> Caps Lock ativado</div>
-
-                    <button type="submit" class="btn btn-primary btn-entrar w-100 mt-2" data-magnetic>
-                        Entrar <i class="bi bi-arrow-right-short fs-5 align-middle"></i>
-                    </button>
-                </form>
             </div>
-        </main>
+
+            <div class="mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <label for="senhaInput" class="form-label fw-semibold text-secondary small mb-0">Senha</label>
+                    <a href="#" class="text-decoration-none text-primary small fw-semibold">Esqueci minha senha</a>
+                </div>
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0 text-muted fs-5">
+                        <i class="bi bi-lock"></i>
+                    </span>
+                    <input type="password" id="senhaInput" name="senha" class="form-control border-start-0 border-end-0 py-2" placeholder="••••••••••••" required>
+                    <span class="input-group-text bg-white border-start-0 text-muted fs-5 cursor-pointer" id="toggleIcon">
+                        <i class="bi bi-eye"></i>
+                    </span>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 py-2 fw-bold rounded-3 fs-6">Entrar</button>
+
+        </form>
     </div>
 
-    {% include 'componentes/scripts.html' %}
-    <script>
-        const senha = document.getElementById('senhaInput');
-        const olho = document.getElementById('toggleSenha');
-        olho.addEventListener('click', () => {
-            const mostrar = senha.type === 'password';
-            senha.type = mostrar ? 'text' : 'password';
-            olho.innerHTML = mostrar ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
-            olho.setAttribute('aria-label', mostrar ? 'Esconder senha' : 'Mostrar senha');
-            senha.focus();
-        });
-        const avisoCaps = document.getElementById('avisoCaps');
-        senha.addEventListener('keyup', (e) => {
-            avisoCaps.hidden = !(e.getModifierState && e.getModifierState('CapsLock'));
-        });
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/login.js') }}"></script>
 </body>
 </html>
