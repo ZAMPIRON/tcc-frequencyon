@@ -185,8 +185,7 @@ The school time zone is `America/Sao_Paulo`.
 ├── static/
 │   ├── css/
 │   │   ├── tema.css        # Design system: colours, components, animations (dark/light)
-│   │   ├── inicio.css      # Landing page
-│   │   ├── login.css       # Login screens
+│   │   ├── login.css       # Profile chooser and login screens
 │   │   ├── admin.css       # Admin console
 │   │   ├── professor.css   # Teacher workspace
 │   │   ├── aluno.css       # Student page
