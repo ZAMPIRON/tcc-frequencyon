@@ -21,7 +21,8 @@ def dashboard():
     por_curso = {}
     for t in turmas:
         por_curso.setdefault(t.curso, []).append(t.frequencia_media)
-    freqs = [a.frequencia for a in alunos]
+    # aluno sem turma não tem frequência (seria 0%), então fica fora da média
+    freqs = [a.frequencia for a in alunos if a.turma_id]
     return render_template(
         "admin/dashboard.html",
         total_alunos=len(alunos), total_professores=Professor.query.count(),

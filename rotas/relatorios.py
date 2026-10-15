@@ -7,7 +7,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-from database import (Aluno, Justificativa, Presenca, Professor, Turma,
+from database import (AULAS_POR_DIA, Aluno, Justificativa, Presenca, Professor, Turma,
                       agora_local, eh_dia_com_aula, hoje_local)
 from .admin import admin
 from .comum import requer
@@ -20,27 +20,38 @@ def _situacao(freq):
 def _dados_relatorio():
     # numeros que aparecem na pagina de relatorios e tambem na planilha
     alunos, turmas = Aluno.query.all(), Turma.query.all()
-    freqs = [a.frequencia for a in alunos]
+    # aluno sem turma não tem frequência (seria 0%), então fica fora da média
+    freqs = [a.frequencia for a in alunos if a.turma_id]
 
     por_curso = {}
     for t in turmas:
         por_curso.setdefault(t.curso, []).append(t.frequencia_media)
 
-    # frequencia mes a mes, contando so os dias que a turma tem aula
-    dias_por_turma = {t.id: t.dias_aula for t in turmas}
-    meses = {}
+    # frequencia mes a mes com o mesmo criterio do Aluno.frequencia: cada dia com chamada
+    # na turma vale 10 aulas para cada aluno dela, e aula sem registro conta como falta
+    turma_do_aluno = {x.id: x.turma_id for x in alunos}
+    dias_aula = {t.id: t.dias_aula for t in turmas}
+    alunos_na_turma = {t.id: len(t.alunos) for t in turmas}
+    presentes_no_dia, dias_com_chamada = {}, set()
     for p in Presenca.query.all():
-        if not eh_dia_com_aula(p.data, dias_por_turma.get(p.aluno.turma_id, ())):
+        tid = turma_do_aluno.get(p.aluno_id)
+        if tid is None or not eh_dia_com_aula(p.data, dias_aula.get(tid, ())):
             continue
-        ok, tot = meses.get(p.data.strftime("%Y-%m"), (0, 0))
-        meses[p.data.strftime("%Y-%m")] = (ok + (p.status != "falta"), tot + 1)
+        dias_com_chamada.add((tid, p.data))
+        if p.status in ("presente", "atraso"):
+            presentes_no_dia[(tid, p.data)] = presentes_no_dia.get((tid, p.data), 0) + 1
+    meses = {}
+    for tid, dia in dias_com_chamada:
+        ok, tot = meses.get(dia.strftime("%Y-%m"), (0, 0))
+        meses[dia.strftime("%Y-%m")] = (ok + presentes_no_dia.get((tid, dia), 0),
+                                         tot + alunos_na_turma[tid] * AULAS_POR_DIA)
     chaves = sorted(meses)[-6:]  # so os ultimos 6 meses
 
     n = len(alunos)
     em_risco = sum(1 for x in alunos if x.presencas and x.frequencia < 75)
     return dict(
         alunos=alunos, turmas=turmas, total_alunos=n,
-        media_geral=round(sum(freqs) / n) if n else 0,
+        media_geral=round(sum(freqs) / len(freqs)) if freqs else 0,
         alunos_criticos=em_risco,
         taxa_evasao=round(100 * em_risco / n, 1) if n else 0,
         cursos_labels=list(por_curso), cursos_valores=[round(sum(v) / len(v)) for v in por_curso.values()],
