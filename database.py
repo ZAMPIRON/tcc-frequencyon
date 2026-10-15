@@ -320,8 +320,8 @@ def registrar_presenca_totem(aluno, agora=None):
     for aula in range(AULAS_POR_DIA):
         if aula < aula_atual:
             estado = "falta"
-        elif aula == 0 and status_entrada == "atraso":
-            estado = "atraso"
+        elif aula == 0 and status_entrada != "presente":
+            estado = status_entrada   # atraso, ou falta se passou do limite de atraso
         else:
             estado = "presente"
 

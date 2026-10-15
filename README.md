@@ -168,8 +168,17 @@ The school time zone is `America/Sao_Paulo`.
 
 ```
 .
-├── app.py                  # Flask app: routes for admin, teacher, student and totem
+├── app.py                  # Entry point: create_app() and server start
+├── rotas/                  # Routes, one file per area
+│   ├── comum.py            # Shared helpers: login guard, photo upload, totem access
+│   ├── login.py            # Landing page, logins, logout
+│   ├── totem.py            # Totem page, video stream, face enrolment API
+│   ├── admin.py            # Admin console: students, teachers, classes, justifications
+│   ├── relatorios.py       # Admin reports and Excel export
+│   ├── professor.py        # Teacher roll call and calendar
+│   └── aluno.py            # Student page, CSV export, absence justification
 ├── database.py             # Models, attendance rules and timetable settings
+├── email_service.py        # .env loader and justification e-mails
 ├── face_service.py         # Camera + face recognition service used by the totem
 ├── seed.py                 # Demo data (wipes the database!)
 ├── requirements.txt
