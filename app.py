@@ -25,6 +25,11 @@ def create_app():
     # cookie de login: o JavaScript não lê e outro site não consegue usar
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    # HTTPS ligado por padrão (HTTPS=0 no .env desliga, por exemplo para testes)
+    usar_https = os.getenv("HTTPS", "1") != "0"
+    app.config["USAR_HTTPS"] = usar_https
+    app.config["SESSION_COOKIE_SECURE"] = usar_https      # cookie de login só trafega criptografado
+    app.config["PREFERRED_URL_SCHEME"] = "https" if usar_https else "http"
     # o token CSRF vale enquanto a sessão durar (o totem fica aberto o dia todo)
     app.config["WTF_CSRF_TIME_LIMIT"] = None
     CSRFProtect(app)
@@ -44,6 +49,14 @@ def create_app():
     app.jinja_env.filters["inicial"] = lambda n: (n or "A")[0].upper()
     # a foto só aparece se o arquivo existir (o banco pode vir de outro computador sem as imagens)
     app.jinja_env.filters["foto_existe"] = lambda url: bool(url) and url.startswith("/static/") and         os.path.isfile(os.path.join(app.static_folder, url[len("/static/"):]))
+
+    if usar_https and os.getenv("SSL_CERT"):
+        # com certificado de verdade, o navegador passa a só aceitar HTTPS neste endereço.
+        # (não vale para o certificado local: se ele não estiver instalado, o site ficaria inacessível)
+        @app.after_request
+        def hsts(resposta):
+            resposta.headers["Strict-Transport-Security"] = "max-age=31536000"
+            return resposta
 
     @app.errorhandler(CSRFError)
     def csrf_invalido(e):
@@ -100,6 +113,40 @@ def _avisar_senhas_fracas(app):
             print(f"    - {tipo}: {login}")
 
 
+def _redirecionar_para_https(porta_http, porta_https):
+    """Servidor mínimo na porta antiga (HTTP) que manda tudo para o endereço HTTPS."""
+    from werkzeug.serving import make_server
+
+    def app_redirecionar(environ, start_response):
+        host = environ.get("HTTP_HOST", "localhost").rsplit(":", 1)[0]
+        destino = f"https://{host}:{porta_https}{environ.get('PATH_INFO', '/')}"
+        if environ.get("QUERY_STRING"):
+            destino += "?" + environ["QUERY_STRING"]
+        start_response("302 Found", [("Location", destino), ("Content-Length", "0")])
+        return [b""]
+
+    try:
+        make_server("0.0.0.0", porta_http, app_redirecionar, threaded=True).serve_forever()
+    except OSError as e:
+        print(f"[https] porta {porta_http} ocupada, sem redirecionamento de HTTP: {e}")
+
+
 if __name__ == "__main__":
+    app = create_app()
+    porta = int(os.getenv("PORTA", "5000"))
     # debug fica desligado porque o reloader abriria a camera duas vezes
-    create_app().run(host="0.0.0.0", port=5000, threaded=True, debug=False)
+    if not app.config["USAR_HTTPS"]:
+        app.run(host="0.0.0.0", port=porta, threaded=True, debug=False)
+    else:
+        from certificado import certificado_local, ips_da_maquina
+        porta_https = int(os.getenv("PORTA_HTTPS", "5443"))
+        if os.getenv("SSL_CERT") and os.getenv("SSL_KEY"):
+            cert, chave = os.getenv("SSL_CERT"), os.getenv("SSL_KEY")
+        else:
+            cert, chave = certificado_local(app.instance_path)
+            print(f"[https] para o navegador confiar no site, instale uma vez: "
+                  f"{os.path.join(app.instance_path, 'ca-frequencyon.pem')}")
+        threading.Thread(target=_redirecionar_para_https, args=(porta, porta_https), daemon=True).start()
+        for ip in ["localhost"] + [i for i in ips_da_maquina() if i != "127.0.0.1"]:
+            print(f"[https] acesse: https://{ip}:{porta_https}   (http://{ip}:{porta} redireciona)")
+        app.run(host="0.0.0.0", port=porta_https, threaded=True, debug=False, ssl_context=(cert, chave))

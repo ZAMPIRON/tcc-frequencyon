@@ -127,7 +127,22 @@ pip install -r requirements.txt
 python app.py
 ```
 
-Open **http://localhost:5000**. The totem is at **http://localhost:5000/totem**.
+Open **https://localhost:5443**. The totem is at **https://localhost:5443/totem**. The old address (`http://localhost:5000`) still works and redirects to HTTPS. The terminal also prints the address to use from other devices on the network (e.g. `https://192.168.0.113:5443`).
+
+### HTTPS
+
+The app runs over HTTPS by default. On first start it creates, in `instance/` (never committed):
+
+- a **local certificate authority** (`ca-frequencyon.pem`), restricted to `localhost`, this computer's name and private-network IPs, so its key cannot be used to impersonate other websites;
+- the **server certificate**, renewed automatically when it expires or when the machine's IP changes.
+
+Until the CA is installed, browsers show a "not secure" warning. Install it **once on each device** that opens the system:
+
+- **Windows (Chrome/Edge):** in an administrator terminal, `certutil -addstore -f Root instance\ca-frequencyon.pem`
+- **Android:** copy the file to the phone → *Settings → Security → Encryption & credentials → Install a certificate → CA certificate*
+- **Firefox:** *Settings → Privacy & Security → Certificates → View Certificates → Authorities → Import*
+
+With a real certificate (e.g. a public domain), set `SSL_CERT` and `SSL_KEY`; HSTS is then enabled too.
 
 On first start the database is created in `instance/frequencyon.db` with one administrator. Its login is `ADMIN_EMAIL` (default `admin@frequencyon.com`) and its password is `ADMIN_SENHA`; if that is not set, a random password is printed **once** in the terminal.
 
@@ -158,6 +173,9 @@ All settings are environment variables:
 | `SENHA_DEMO` | *(random)* | Password for the accounts created by `seed.py`. |
 | `DATABASE_URL` | `sqlite:///frequencyon.db` | Any SQLAlchemy database URL. |
 | `TOTEM_CAMERA` | `0` | Camera index used by the totem. |
+| `HTTPS` | `1` | `0` turns HTTPS off and serves plain HTTP on `PORTA` (only for local testing). |
+| `PORTA_HTTPS` / `PORTA` | `5443` / `5000` | HTTPS port, and the HTTP port that redirects to it. |
+| `SSL_CERT` / `SSL_KEY` | *(local CA)* | Paths to a real certificate and key, instead of the generated ones. |
 | `HORARIO_PRESENTE` | `07:05` | Check-ins up to this time are *present* for lesson 1. |
 | `HORARIO_ATRASO` | `07:10` | Check-ins up to this time are *late* for lesson 1. |
 | `HORARIOS_AULAS` | `07:00,07:50,…,14:30` | Start time of each of the 10 daily lessons (comma-separated). |
@@ -216,12 +234,11 @@ FrequencyON processes **biometric data of students, many of them minors**. Biome
 - Faces are stored as numeric encodings (128 floats per student) in the database. Recognition runs on the school's own machine, and no images are sent to third-party services.
 - Profile photos are saved in `static/uploads/`, which the web server **serves publicly** to anyone who knows the file name.
 - The database, photos and secret key are **not** stored in Git (`instance/`, `static/uploads/` and `.env` are in `.gitignore`).
-- Every form and every JavaScript `POST` is protected against CSRF (Flask-WTF). Session cookies are `HttpOnly` and `SameSite=Lax`.
+- Traffic is encrypted with HTTPS (TLS 1.3); plain HTTP only redirects. Every form and every JavaScript `POST` is protected against CSRF (Flask-WTF). Session cookies are `Secure`, `HttpOnly` and `SameSite=Lax`.
 - Re-enrolling a face at the totem requires the student's password, so nobody can swap in their own face to clock in for someone else.
 
 **Before using it with real students, at minimum:**
 - [ ] Change every default password (`python trocar_senha.py ...`); the terminal lists the ones still weak.
-- [ ] Serve the app over HTTPS.
 - [ ] Move photos out of `static/` and serve them only to logged-in users.
 - [ ] Collect consent from students and guardians, with a retention and deletion policy for face data.
 - [ ] Add liveness detection: HOG + encoding matching alone can be fooled by a printed photo.
