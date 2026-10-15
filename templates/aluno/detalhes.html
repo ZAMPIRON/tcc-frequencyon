@@ -173,9 +173,11 @@
                     {% if visao == 'admin' and j.status == 'pendente' %}
                     <div class="d-flex gap-2 mt-2">
                         <form method="POST" action="{{ url_for('admin.responder_justificativa', id=j.id, acao='aceita') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button class="btn btn-success btn-sm py-0"><i class="bi bi-check-lg"></i> Aceitar</button>
                         </form>
                         <form method="POST" action="{{ url_for('admin.responder_justificativa', id=j.id, acao='recusada') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button class="btn btn-outline-danger btn-sm py-0"><i class="bi bi-x-lg"></i> Recusar</button>
                         </form>
                     </div>
@@ -276,6 +278,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 rounded-4">
             <form method="POST" action="{{ url_for('aluno.justificar') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-header border-0">
                     <h5 class="modal-title h6 fw-bold" id="tituloJustificar"><i class="bi bi-file-earmark-text text-primary me-1"></i> Justificar falta</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
