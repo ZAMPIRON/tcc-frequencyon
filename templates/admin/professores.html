@@ -31,7 +31,7 @@
                     {% for professor in professores %}
                     <tr>
                         <td class="ps-3">
-                            {% if professor.foto %}
+                            {% if professor.foto | foto_existe %}
                                 <img src="{{ professor.foto }}" 
                                      alt="{{ professor.nome }}" 
                                      class="rounded-circle border object-fit-cover quadrado-36" 

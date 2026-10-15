@@ -57,7 +57,7 @@
                     {% for aluno in alunos %}
                     <tr>
                         <td>
-                            {% if aluno.foto %}
+                            {% if aluno.foto | foto_existe %}
                                 <img src="{{ aluno.foto }}" alt="{{ aluno.nome }}" class="rounded-circle border object-fit-cover quadrado-36">
                             {% else %}
                                 <div class="avatar-initial rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center quadrado-36">

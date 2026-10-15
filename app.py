@@ -33,6 +33,8 @@ def create_app():
 
     # coisas que todo template pode usar
     app.jinja_env.filters["inicial"] = lambda n: (n or "A")[0].upper()
+    # a foto só aparece se o arquivo existir (o banco pode vir de outro computador sem as imagens)
+    app.jinja_env.filters["foto_existe"] = lambda url: bool(url) and url.startswith("/static/") and         os.path.isfile(os.path.join(app.static_folder, url[len("/static/"):]))
     app.context_processor(lambda: {"usuario": usuario_atual()})
 
     with app.app_context():

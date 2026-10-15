@@ -40,7 +40,6 @@
                 <a href="{{ url_exportar }}" class="btn btn-primary btn-sm px-3">
                     <i class="bi bi-box-arrow-up me-1"></i> Exportar conteúdo
                 </a>
-                <button type="button" class="fo-theme-btn pequeno" data-fo-theme-toggle></button>
             </div>
         </div>
 
@@ -85,10 +84,10 @@
         <!-- ============ COLUNA ESQUERDA ============ -->
         <div class="col-12 col-lg-4 d-flex flex-column gap-4">
             <!-- perfil -->
-            <div class="card-fo fo-glass p-4" data-fo-reveal>
+            <div class="card-fo fo-glass p-4">
                 <div class="row g-4 align-items-center">
                     <div class="col-12 col-md-6 col-lg-12 text-center">
-                        {% if aluno.foto %}
+                        {% if aluno.foto | foto_existe %}
                             <img src="{{ aluno.foto }}" alt="Foto de {{ aluno.nome }}" class="foto-aluno mb-3">
                         {% else %}
                             <div class="foto-iniciais mx-auto mb-3">{{ aluno.nome.split()[:2]|map('first')|join|upper }}</div>
@@ -109,7 +108,7 @@
             </div>
 
             <!-- frequência geral -->
-            <div class="card-fo fo-glass p-4" data-fo-reveal>
+            <div class="card-fo fo-glass p-4">
                 {% set nivel_freq = 'bom' if frequencia >= 75 else ('medio' if frequencia >= 50 else 'ruim') %}
                 <div class="d-flex align-items-center justify-content-between mb-3">
                     <div>
@@ -124,7 +123,7 @@
                         {% endif %}
                     </div>
                     <div class="frequencia-anel {{ nivel_freq }}" style="--p: {{ frequencia }}" title="Presenças + atrasos">
-                        <span data-countup>{{ frequencia }}%</span>
+                        <span>{{ frequencia }}%</span>
                     </div>
                 </div>
 
@@ -138,24 +137,24 @@
                     <div class="indicador">
                         <span class="icone presente"><i class="bi bi-check-lg"></i></span>
                         <div><div class="titulo">Presenças</div><small>Aulas assistidas</small></div>
-                        <span class="pct text-success" data-countup>{{ pct_presenca }}%</span>
+                        <span class="pct text-success">{{ pct_presenca }}%</span>
                     </div>
                     <div class="indicador">
                         <span class="icone falta"><i class="bi bi-x-lg"></i></span>
                         <div><div class="titulo">Faltas</div><small>Ausências registradas</small></div>
-                        <span class="pct text-danger" data-countup>{{ pct_falta }}%</span>
+                        <span class="pct text-danger">{{ pct_falta }}%</span>
                     </div>
                     <div class="indicador">
                         <span class="icone atraso"><i class="bi bi-clock"></i></span>
                         <div><div class="titulo">Atrasos</div><small>Entradas com atraso</small></div>
-                        <span class="pct text-warning" data-countup>{{ pct_atraso }}%</span>
+                        <span class="pct text-warning">{{ pct_atraso }}%</span>
                     </div>
                 </div>
             </div>
 
             <!-- justificativas -->
             {% if aluno.justificativas or visao == 'aluno' %}
-            <div class="card-fo fo-glass p-4" data-fo-reveal>
+            <div class="card-fo fo-glass p-4">
                 <div class="d-flex align-items-center justify-content-between mb-3">
                     <h2 class="h6 fw-bold mb-0">Justificativas</h2>
                     {% if visao == 'aluno' %}
@@ -191,7 +190,7 @@
 
         <!-- ============ COLUNA DIREITA: HISTÓRICO ============ -->
         <div class="col-12 col-lg-8">
-            <div class="card-fo fo-glass" data-fo-reveal>
+            <div class="card-fo fo-glass">
                 <div class="p-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom">
                     <div>
                         <h2 class="h6 fw-bold mb-0">Histórico de aulas</h2>
