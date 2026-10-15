@@ -1,3 +1,11 @@
+# segredos e configuração local
 .env
-__pycache__/
+
+# dados pessoais: banco (nomes, senhas, rostos), fotos e chave secreta. Nunca vão para o Git.
+instance/
+*.db
 static/uploads/
+
+# arquivos gerados pelo Python
+__pycache__/
+*.pyc

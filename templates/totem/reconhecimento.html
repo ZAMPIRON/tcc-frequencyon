@@ -8,7 +8,7 @@
     <link href="{{ url_for('static', filename='css/totem.css') }}" rel="stylesheet">
     <script>document.documentElement.setAttribute('data-bs-theme', 'dark');</script>
 </head>
-<body class="d-flex flex-column h-100" data-fo-sem-tema>
+<body class="totem d-flex flex-column h-100">
 
     <!-- CABEÇALHO -->
     <header class="topo-totem fo-glass d-flex flex-wrap justify-content-between align-items-center gap-3">
@@ -110,11 +110,15 @@
                 <div class="modal-body p-4 text-center">
                     <div class="fo-logo-icone mx-auto mb-3 tamanho-70 flutuando"><i class="bi bi-person-bounding-box"></i></div>
                     <p class="text-muted small mb-3">
-                        Olhe diretamente para a câmera do totem e digite sua matrícula abaixo para cadastrar seu rosto.
+                        Olhe diretamente para a câmera do totem e digite sua matrícula e senha para cadastrar seu rosto.
                     </p>
                     <div class="mb-3 text-start">
                         <label for="inputMatricula" class="form-label fw-bold small">Número da matrícula</label>
-                        <input type="text" id="inputMatricula" class="form-control form-control-lg text-center fw-bold" placeholder="Ex.: 2026001" inputmode="numeric">
+                        <input type="text" id="inputMatricula" class="form-control form-control-lg text-center fw-bold" placeholder="Ex.: 2026001" inputmode="numeric" autocomplete="off">
+                    </div>
+                    <div class="mb-3 text-start">
+                        <label for="inputSenha" class="form-label fw-bold small">Senha do aluno</label>
+                        <input type="password" id="inputSenha" class="form-control form-control-lg text-center" placeholder="A mesma do login" autocomplete="off">
                     </div>
                     <div id="modalAlert" class="alert d-none py-2 small" role="alert"></div>
                 </div>
@@ -225,6 +229,11 @@
             iconWrapper.classList.add('d-none');
             studentAvatar.classList.add('d-none');
             if (fotoUrl) {
+                // foto apagada ou de outro computador: volta para o ícone
+                studentAvatar.onerror = () => {
+                    studentAvatar.classList.add('d-none');
+                    iconWrapper.classList.remove('d-none');
+                };
                 studentAvatar.src = fotoUrl;
                 void studentAvatar.offsetWidth;
                 studentAvatar.classList.remove('d-none');
@@ -280,12 +289,13 @@
         // CADASTRO DE FACE DIRETO NO TOTEM
         function salvarFotoTotem() {
             const matricula = document.getElementById('inputMatricula').value.trim();
+            const senha = document.getElementById('inputSenha').value;
             const modalAlert = document.getElementById('modalAlert');
             const btnCapturar = document.getElementById('btnCapturarFoto');
 
-            if (!matricula) {
+            if (!matricula || !senha) {
                 modalAlert.className = 'alert alert-danger py-2 small';
-                modalAlert.innerText = 'Informe a matrícula antes de capturar!';
+                modalAlert.innerText = 'Informe a matrícula e a senha antes de capturar!';
                 modalAlert.classList.remove('d-none');
                 return;
             }
@@ -295,8 +305,11 @@
 
             fetch('/api/cadastrar_foto', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ matricula: matricula })
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content,
+                },
+                body: JSON.stringify({ matricula: matricula, senha: senha })
             })
             .then(async res => {
                 const data = await res.json();
@@ -312,6 +325,7 @@
 
                     setTimeout(() => {
                         document.getElementById('inputMatricula').value = '';
+                        document.getElementById('inputSenha').value = '';
                         modalAlert.classList.add('d-none');
                         const modalInstance = bootstrap.Modal.getInstance(document.getElementById('cadastrarFaceModal'));
                         if (modalInstance) modalInstance.hide();
@@ -319,6 +333,7 @@
                 } else {
                     modalAlert.className = 'alert alert-danger py-2 small';
                     modalAlert.innerText = data.mensagem || 'Erro ao cadastrar foto.';
+                    document.getElementById('inputSenha').value = '';
                     modalAlert.classList.remove('d-none');
                     FO.som('erro');
                 }
@@ -348,8 +363,10 @@
         setInterval(verificarReconhecimento, 1000);
 
         // Enter no modal também cadastra
-        document.getElementById('inputMatricula').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') salvarFotoTotem();
+        ['inputMatricula', 'inputSenha'].forEach((id) => {
+            document.getElementById(id).addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') salvarFotoTotem();
+            });
         });
     </script>
 </body>

@@ -114,6 +114,7 @@
                         </td>
                         <td>
                             <form method="POST" action="{{ url_for('admin.dias_professor_turma', turma_id=turma.id, professor_id=v.professor_id) }}" class="d-flex align-items-center gap-2 flex-wrap">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 {% for d, nome in dias_opcoes %}
                                 <div class="form-check form-check-inline me-1">
                                     <input class="form-check-input" type="checkbox" name="dias" value="{{ d }}" id="d{{ v.professor_id }}_{{ d }}" {% if d in v.dias_semana %}checked{% endif %}>
@@ -125,6 +126,7 @@
                         </td>
                         <td>
                             <form class="d-inline" method="POST" action="{{ url_for('admin.desvincular_professor', turma_id=turma.id, professor_id=v.professor_id) }}" onsubmit="return confirm('Remover este professor da turma?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-sm btn-link text-danger p-0 border-0 fw-semibold text-decoration-none">
                                     <i class="fa-solid fa-user-minus me-1"></i>Remover
                                 </button>
@@ -165,7 +167,7 @@
                     {% for aluno in turma.alunos %}
                     <tr>
                         <td>
-                            {% if aluno.foto %}
+                            {% if aluno.foto | foto_existe %}
                                 <img src="{{ aluno.foto }}" alt="{{ aluno.nome }}" class="rounded-circle border object-fit-cover quadrado-36">
                             {% else %}
                                 <div class="avatar-initial rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center quadrado-36">
@@ -196,6 +198,7 @@
                         <!-- 7. AÇÕES -->
                         <td>
                             <form class="d-inline" method="POST" action="{{ url_for('admin.desvincular_aluno', aluno_id=aluno.id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-sm btn-link text-warning p-0 border-0 fw-semibold text-decoration-none">
                                     <i class="fa-solid fa-user-minus me-1"></i>Desvincular
                                 </button>
@@ -214,6 +217,7 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <form method="POST" action="{{ url_for('admin.vincular_professor', turma_id=turma.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-header">
                     <h5 class="modal-title h6 fw-bold">Vincular Professor à Turma</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -250,6 +254,7 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <form method="POST" action="{{ url_for('admin.adicionar_aluno_turma', turma_id=turma.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-header">
                     <h5 class="modal-title h6 fw-bold">Adicionar Aluno à Turma</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

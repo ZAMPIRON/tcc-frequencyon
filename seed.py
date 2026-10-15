@@ -1,10 +1,15 @@
 # seed.py
+import os
+import secrets
+
 from app import create_app  # Importe a instância do seu app Flask (ajuste o nome se necessário)
 from database import db, Admin, Professor, Turma, Aluno, Presenca, ProfessorTurma, Justificativa
 
 
 
 def popular_banco():
+    # senha das contas de demonstração: SENHA_DEMO do .env ou uma sorteada (mostrada no final)
+    senha = os.getenv("SENHA_DEMO") or secrets.token_urlsafe(8)
     app = create_app()
     # O Flask-SQLAlchemy exige que as operações de banco rodem dentro do contexto do app
     with app.app_context():
@@ -23,12 +28,12 @@ def popular_banco():
 
         print("Criando Administrador...")
         admin = Admin(nome="Admin Principal", email="admin@senai.com")
-        admin.set_senha("admin123") # Usa o seu UsuarioMixin para gerar o hash
+        admin.set_senha(senha)
         db.session.add(admin)
 
         print("Criando Professor...")
         prof = Professor(nome="Carlos Silva", email="carlos@professor.senai.com", departamento="TI")
-        prof.set_senha("prof123")
+        prof.set_senha(senha)
         db.session.add(prof)
 
         # Precisamos fazer um commit parcial aqui para gerar o ID do professor no banco,
@@ -52,7 +57,7 @@ def popular_banco():
             numero_chamada=9, 
             turma_id=turma.id
         )
-        aluno1.set_senha("123")
+        aluno1.set_senha(senha)
         
         aluno2 = Aluno(
             nome="Nicolas Luciani", 
@@ -61,7 +66,7 @@ def popular_banco():
             numero_chamada=25, 
             turma_id=turma.id
         )
-        aluno2.set_senha("123")
+        aluno2.set_senha(senha)
 
         aluno3 = Aluno(
             nome="Samuel Gustavo", 
@@ -70,7 +75,7 @@ def popular_banco():
             numero_chamada=30, 
             turma_id=turma.id
         )
-        aluno3.set_senha("123")
+        aluno3.set_senha(senha)
 
         db.session.add(aluno1)
         db.session.add(aluno2)
@@ -79,6 +84,7 @@ def popular_banco():
         # Salva tudo no banco definitivamente
         db.session.commit()
         print("Banco de dados populado com sucesso!")
+        print(f"Senha de todas as contas de demonstração: {senha}")
 
 if __name__ == '__main__':
     popular_banco()

@@ -2,6 +2,8 @@
 # a parte pesada (camera e reconhecimento) fica em face_service.py,
 # aqui so tem a ponte entre o navegador e o totem
 import os
+import threading
+import time
 import uuid
 
 import cv2
@@ -35,15 +37,45 @@ def api_reconhecimento():
     return jsonify({"reconhecido": True, "dados": ev} if ev else {"reconhecido": False})
 
 
+# tentativas erradas de senha no cadastro de rosto: matricula -> [quantidade, bloqueado_ate]
+TENTATIVAS_MAX = 5
+BLOQUEIO_SEGUNDOS = 15 * 60
+_tentativas = {}
+_tentativas_lock = threading.Lock()
+
+
+def _bloqueado(matricula):
+    with _tentativas_lock:
+        _, ate = _tentativas.get(matricula, (0, 0))
+        return time.time() < ate
+
+
+def _errou_senha(matricula):
+    with _tentativas_lock:
+        n, _ = _tentativas.get(matricula, (0, 0))
+        n += 1
+        _tentativas[matricula] = (0, time.time() + BLOQUEIO_SEGUNDOS) if n >= TENTATIVAS_MAX else (n, 0)
+
+
 @reconhecimento.route("/api/cadastrar_foto", methods=["POST"])
 def api_cadastrar_foto():
-    # o aluno digita a matricula no totem e a camera tira umas fotos do rosto dele
+    # o aluno digita matricula e senha no totem e a camera tira umas fotos do rosto dele.
+    # sem a senha, qualquer um trocaria o rosto de outro aluno pelo seu e "bateria ponto" por ele
     try:
         totem = pegar_totem()
-        matricula = ((request.get_json(silent=True) or {}).get("matricula") or "").strip()
+        dados = request.get_json(silent=True) or {}
+        matricula = (dados.get("matricula") or "").strip()
+        senha = dados.get("senha") or ""
+        if _bloqueado(matricula):
+            return jsonify(sucesso=False, mensagem="Muitas tentativas erradas. Tente de novo em 15 minutos ou procure a coordenação."), 429
         aluno = Aluno.query.filter_by(matricula=matricula).first()
-        if not aluno:
-            return jsonify(sucesso=False, mensagem="Matrícula não encontrada."), 404
+        if not aluno or not aluno.check_senha(senha):
+            if aluno:
+                _errou_senha(matricula)
+            # mesma resposta para matrícula inexistente e senha errada: não revela quem existe
+            return jsonify(sucesso=False, mensagem="Matrícula ou senha incorretas."), 403
+        with _tentativas_lock:
+            _tentativas.pop(matricula, None)
         totem.iniciar()
         enc, frame = totem.capturar_encoding()
         if enc is None:

@@ -36,6 +36,7 @@
                             {{ turma.frequencia_media }}%
                         </span>
                         <form class="d-inline-block" method="POST" action="{{ url_for('admin.deletar_turma', id=turma.id) }}" onsubmit="return confirm('Tem certeza que deseja excluir?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-outline-danger btn-sm border-0">   
                                 <i class="fa-solid fa-trash"></i>
                             </button>
@@ -66,6 +67,7 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <form method="POST" action="{{ url_for('admin.turmas') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-header">
                     <h5 class="modal-title h6 fw-bold">Criar Nova Turma</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

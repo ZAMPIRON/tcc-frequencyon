@@ -57,7 +57,7 @@
                     {% for aluno in alunos %}
                     <tr>
                         <td>
-                            {% if aluno.foto %}
+                            {% if aluno.foto | foto_existe %}
                                 <img src="{{ aluno.foto }}" alt="{{ aluno.nome }}" class="rounded-circle border object-fit-cover quadrado-36">
                             {% else %}
                                 <div class="avatar-initial rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center quadrado-36">
@@ -80,6 +80,7 @@
                                 <i class="fa-solid fa-eye"></i>
                             </a>
                             <form class="d-inline" method="POST" action="{{ url_for('admin.deletar_aluno', id=aluno.id) }}" onsubmit="return confirm('Tem certeza que deseja excluir?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-outline-danger btn-sm border-0">
                                     <i class="fa-solid fa-trash"></i>
                                 </button>

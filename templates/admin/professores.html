@@ -31,7 +31,7 @@
                     {% for professor in professores %}
                     <tr>
                         <td class="ps-3">
-                            {% if professor.foto %}
+                            {% if professor.foto | foto_existe %}
                                 <img src="{{ professor.foto }}" 
                                      alt="{{ professor.nome }}" 
                                      class="rounded-circle border object-fit-cover quadrado-36" 
@@ -48,6 +48,7 @@
                         <td><span class="badge bg-info bg-opacity-10 text-info fw-semibold">{{ professor.turmas|length if professor.turmas else 0 }} turma(s)</span></td>
                         <td class="text-end pe-3">
                             <form class="d-inline" method="POST" action="{{ url_for('admin.deletar_professor', id=professor.id) }}" onsubmit="return confirm('Tem certeza que deseja excluir este professor?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-outline-danger btn-sm border-0" title="Excluir Professor">
                                     <i class="fa-solid fa-trash"></i>
                                 </button>
@@ -70,6 +71,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
             <form method="POST" action="{{ url_for('admin.professores') }}" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-header border-bottom-0 pb-0">
                     <h5 class="modal-title h6 fw-bold">Novo Professor</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>

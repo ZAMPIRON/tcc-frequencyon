@@ -14,6 +14,7 @@
 
     <div class="card login-card formulario border-0 shadow-lg p-4 p-sm-5 rounded-4 w-100">
         <form action="{{ papel_action }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
             {% include 'componentes/logo_login.html' %}
 

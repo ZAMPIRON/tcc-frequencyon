@@ -8,7 +8,7 @@
     <link href="{{ url_for('static', filename='css/admin.css') }}" rel="stylesheet">
     {% block extra_css %}{% endblock %}
 </head>
-<body data-fo-sem-tema>
+<body>
     <div class="veu d-lg-none" id="veu"></div>
 
     <div class="d-flex h-100">
@@ -37,7 +37,7 @@
             </div>
 
             <div class="perfil-rodape d-flex align-items-center gap-2">
-                {% if usuario.foto %}
+                {% if usuario.foto | foto_existe %}
                     <img src="{{ usuario.foto }}" alt="{{ usuario.nome }}" class="avatar-fo">
                 {% else %}
                     <span class="avatar-fo">{{ usuario.nome | inicial }}</span>
@@ -68,7 +68,6 @@
                         <kbd class="d-none d-xl-inline">/</kbd>
                     </div>
                     <span class="chip-data d-none d-xl-inline-flex align-items-center gap-2"><i class="bi bi-calendar3"></i> <span id="dataHoje"></span></span>
-                    <button type="button" class="fo-theme-btn" data-fo-theme-toggle></button>
                 </div>
             </header>
 

@@ -1,7 +1,10 @@
+import multiprocessing as mp
 import os
+import queue
 import threading
 import time
-from collections import deque
+import uuid
+from collections import OrderedDict, deque
 import cv2
 import numpy as np
 
@@ -14,12 +17,18 @@ from database import db, Aluno, registrar_presenca_totem, agora_local, hoje_loca
 
 TOLERANCIA = 0.50        # menor = mais rígido
 ESCALA = 0.5             # reduz o frame p/ detectar (menor = mais rápido)
-CONFIRMACOES = 2         # frames seguidos com o mesmo aluno antes de registrar
+CONFIRMACOES = 2         # encodings seguidos com o mesmo aluno antes de registrar
 COOLDOWN = 8.0           # segundos antes de reconhecer o MESMO aluno de novo
 PAUSA_APOS_EVENTO = 3.0  # segundos "descansando" depois de qualquer registro
-INTERVALO = 0.15         # segundos mínimos entre dois reconhecimentos
+INTERVALO = 0.15         # segundos mínimos entre dois frames enviados ao processo de reconhecimento
 
-DLIB_LOCK = threading.Lock()   # só uma thread por vez pode usar o dlib
+# quando calcular o encoding (a parte cara)
+ROSTO_MINIMO = 40        # px de altura no frame reduzido; menor que isso está longe demais
+TENTAR_DE_NOVO = 0.5     # rosto desconhecido: no máximo 2 encodings por segundo
+REVERIFICAR = 3.0        # rosto já reconhecido: confere de novo a cada 3 s
+MESMO_ROSTO_IOU = 0.4    # sobreposição mínima entre caixas p/ considerar o mesmo rosto
+
+DLIB_LOCK = threading.Lock()   # cadastro por foto (admin) roda no processo do site
 
 
 def encoding_de_arquivo(caminho):
@@ -37,6 +46,104 @@ def encoding_de_arquivo(caminho):
         return face_recognition.face_encodings(rgb, locs)[0].astype(np.float64)
 
 
+# =====================================================================
+# Processo de reconhecimento (roda separado do site, com o próprio GIL)
+# =====================================================================
+def _iou(a, b):
+    """Quanto duas caixas (top, right, bottom, left) se sobrepõem, de 0 a 1."""
+    t, r = max(a[0], b[0]), min(a[1], b[1])
+    bo, l = min(a[2], b[2]), max(a[3], b[3])
+    inter = max(0, r - l) * max(0, bo - t)
+    area = lambda c: (c[2] - c[0]) * (c[1] - c[3])
+    return inter / float(area(a) + area(b) - inter or 1)
+
+
+def processo_reconhecimento(entrada, saida):
+    """Recebe frames reduzidos (RGB) e devolve onde está o rosto e de quem é.
+
+    Detecta rosto em todo frame (barato), mas só calcula o encoding (caro) quando:
+    aparece um rosto novo, faltam confirmações, ou chegou a hora de reverificar.
+    Mensagens de entrada: ("frame", fid, rgb) | ("rostos", ids, encs) | ("cadastro", pedido, [rgb]) | ("fim",)
+    """
+    import face_recognition as fr
+
+    ids, encs = [], np.empty((0, 128))
+    trilha = None   # rosto que está sendo acompanhado: caixa, aluno_id, seq, confirmado, t_enc
+
+    def identificar(enc):
+        if not len(ids):
+            return None
+        dist = np.linalg.norm(encs - enc, axis=1)
+        i = int(np.argmin(dist))
+        return ids[i] if dist[i] <= TOLERANCIA else None
+
+    while True:
+        msg = entrada.get()
+        tipo = msg[0]
+        try:
+            if tipo == "fim":
+                return
+            if tipo == "rostos":
+                ids, encs, trilha = msg[1], msg[2], None
+                continue
+            if tipo == "cadastro":
+                _, pedido, frames = msg
+                achados = []
+                for rgb in frames:
+                    locs = fr.face_locations(rgb, model="hog")
+                    if len(locs) == 1:
+                        achados.append(fr.face_encodings(rgb, locs)[0])
+                media = np.mean(achados, axis=0).astype(np.float64) if achados else None
+                saida.put(("cadastro", pedido, media))
+                continue
+
+            _, fid, rgb = msg
+            locs = fr.face_locations(rgb, model="hog")
+            if not locs:
+                trilha = None
+                saida.put(("deteccao", fid, None, None, False))
+                continue
+
+            caixa = max(locs, key=lambda c: (c[2] - c[0]) * (c[1] - c[3]))
+            agora = time.time()
+            if trilha is None or _iou(caixa, trilha["caixa"]) < MESMO_ROSTO_IOU:
+                trilha = {"aluno_id": None, "seq": 0, "confirmado": False, "t_enc": 0.0}
+            trilha["caixa"] = caixa
+
+            perto = (caixa[2] - caixa[0]) >= ROSTO_MINIMO
+            if trilha["confirmado"]:
+                precisa = agora - trilha["t_enc"] >= REVERIFICAR
+            elif trilha["seq"] > 0:
+                precisa = True                                  # falta confirmar
+            else:
+                precisa = agora - trilha["t_enc"] >= TENTAR_DE_NOVO
+
+            novo_evento = False
+            if perto and precisa:
+                aluno_id = identificar(fr.face_encodings(rgb, [caixa])[0])
+                trilha["t_enc"] = agora
+                if trilha["confirmado"]:
+                    if aluno_id != trilha["aluno_id"]:          # trocou a pessoa na frente da câmera
+                        trilha.update(aluno_id=aluno_id, seq=1 if aluno_id else 0, confirmado=False)
+                elif aluno_id is None:
+                    trilha.update(aluno_id=None, seq=0)
+                elif aluno_id == trilha["aluno_id"]:
+                    trilha["seq"] += 1
+                else:
+                    trilha.update(aluno_id=aluno_id, seq=1)
+                if trilha["aluno_id"] and not trilha["confirmado"] and trilha["seq"] >= CONFIRMACOES:
+                    trilha["confirmado"] = novo_evento = True
+
+            saida.put(("deteccao", fid, caixa, trilha["aluno_id"], novo_evento))
+        except Exception as e:                    # uma falha não pode matar o processo
+            print(f"[reconhecimento] erro: {e}")
+            if tipo == "cadastro":
+                saida.put(("cadastro", msg[1], None))
+
+
+# =====================================================================
+# Totem (processo do site): câmera, vídeo, presença e foto
+# =====================================================================
 class Totem:
     def __init__(self, app, camera=0):
         self.app, self.camera = app, camera
@@ -55,6 +162,11 @@ class Totem:
         self.ultimo_evento = {}      # aluno_id -> timestamp
         self._livre_em = 0.0         # não reconhece antes desse instante
         self._pausar = threading.Event()   # pausa o reconhecimento (cadastro de face)
+
+        self._proc = None
+        self._entrada = self._saida = None
+        self._enviados = OrderedDict()     # fid -> frame cheio (p/ recortar a foto)
+        self._cadastros = {}               # pedido -> [Event, resultado]
 
     # ---------- ciclo de vida ----------
     def iniciar(self):
@@ -84,23 +196,35 @@ class Totem:
                 self.erro = "Não foi possível abrir a câmera (tente TOTEM_CAMERA=1)."
                 return
             self.cap, self.erro = cap, None
-            self.recarregar()
+            self._iniciar_processo()
             self.rodando = True
             threading.Thread(target=self._capturar, daemon=True).start()
-            threading.Thread(target=self._reconhecer, daemon=True).start()
+            threading.Thread(target=self._alimentar, daemon=True).start()
+            threading.Thread(target=self._ler_resultados, daemon=True).start()
         except Exception as e:                      # nunca derruba o servidor
             self.erro = f"Erro ao iniciar a câmera: {e}"
         finally:
             self.iniciando = False
 
+    def _iniciar_processo(self):
+        ctx = mp.get_context("spawn")
+        self._entrada = ctx.Queue(maxsize=2)   # fila curta: frame velho é descartado, não acumula atraso
+        self._saida = ctx.Queue()
+        self._proc = ctx.Process(target=processo_reconhecimento, args=(self._entrada, self._saida),
+                                 name="reconhecimento-facial", daemon=True)
+        self._proc.start()
+        self.recarregar()
+
     def recarregar(self):
-        """Carrega os rostos do banco para a memória (rápido na hora de comparar)."""
+        """Carrega os rostos do banco e manda para o processo de reconhecimento."""
         with self.app.app_context():
             alunos = Aluno.query.filter(Aluno.face_encoding.isnot(None)).all()
             ids = [a.id for a in alunos]
             encs = [np.frombuffer(a.face_encoding, dtype=np.float64) for a in alunos]
         self.ids = ids
         self.encs = np.array(encs) if encs else np.empty((0, 128))
+        if self._proc is not None and self._proc.is_alive():
+            self._entrada.put(("rostos", self.ids, self.encs))
 
     # ---------- threads ----------
     def _capturar(self):
@@ -124,64 +248,65 @@ class Totem:
         with self.lock:
             return (None, 0) if self.frame is None else (self.frame.copy(), self.frame_id)
 
-    @staticmethod
-    def _maior_rosto(locs):
-        return max(locs, key=lambda l: (l[2] - l[0]) * (l[1] - l[3]))
-
-    def _reconhecer(self):
-        ultimo_id, seq, visto = None, 0, -1
+    def _alimentar(self):
+        """Manda o frame mais novo (reduzido) para o processo de reconhecimento."""
+        visto = -1
         while self.rodando:
             time.sleep(INTERVALO)
+            if not self._proc.is_alive():
+                print("[totem] processo de reconhecimento caiu; reiniciando")
+                self._iniciar_processo()
+                continue
+            if self._pausar.is_set() or time.time() < self._livre_em:
+                continue
+            frame, fid = self._frame_atual()
+            if frame is None or fid == visto:
+                continue
+            rgb = cv2.cvtColor(cv2.resize(frame, (0, 0), fx=ESCALA, fy=ESCALA), cv2.COLOR_BGR2RGB)
             try:
-                if self._pausar.is_set() or time.time() < self._livre_em:
-                    continue
-                frame, fid = self._frame_atual()
-                if frame is None or fid == visto:
-                    continue
-                visto = fid
+                self._entrada.put_nowait(("frame", fid, rgb))
+            except queue.Full:                      # processo ocupado: pula este frame
+                continue
+            visto = fid
+            self._enviados[fid] = frame
+            while len(self._enviados) > 5:
+                self._enviados.popitem(last=False)
 
-                rgb = cv2.cvtColor(cv2.resize(frame, (0, 0), fx=ESCALA, fy=ESCALA),
-                                   cv2.COLOR_BGR2RGB)
-                with DLIB_LOCK:
-                    locs = face_recognition.face_locations(rgb, model="hog")
-                    if not locs:
-                        self.caixas, ultimo_id, seq = [], None, 0
-                        continue
-                    loc = self._maior_rosto(locs)
-                    enc = face_recognition.face_encodings(rgb, [loc])[0]
-
-                t, r, b, l = [int(v / ESCALA) for v in loc]
-                aluno_id = None
-                if len(self.ids):
-                    dist = np.linalg.norm(self.encs - enc, axis=1)
-                    i = int(np.argmin(dist))
-                    if dist[i] <= TOLERANCIA:
-                        aluno_id = self.ids[i]
-
-                if aluno_id is None:
-                    self.caixas = [(t, r, b, l, (0, 0, 255))]
-                    ultimo_id, seq = None, 0
+    def _ler_resultados(self):
+        while self.rodando:
+            try:
+                msg = self._saida.get(timeout=0.5)
+            except queue.Empty:
+                continue
+            try:
+                if msg[0] == "cadastro":
+                    _, pedido, enc = msg
+                    if pedido in self._cadastros:
+                        self._cadastros[pedido][1] = enc
+                        self._cadastros[pedido][0].set()
                     continue
 
-                self.caixas = [(t, r, b, l, (0, 200, 0))]
-                seq = seq + 1 if aluno_id == ultimo_id else 1
-                ultimo_id = aluno_id
-                if seq >= CONFIRMACOES:
-                    seq = 0
-                    if time.time() - self.ultimo_evento.get(aluno_id, 0) > COOLDOWN:
-                        self.ultimo_evento[aluno_id] = time.time()
-                        self._livre_em = time.time() + PAUSA_APOS_EVENTO
-                        self._registrar(aluno_id)
+                _, fid, caixa, aluno_id, novo_evento = msg
+                if caixa is None:
+                    self.caixas = []
+                    continue
+                t, r, b, l = [int(v / ESCALA) for v in caixa]
+                self.caixas = [(t, r, b, l, (0, 200, 0) if aluno_id else (0, 0, 255))]
+                if novo_evento and time.time() - self.ultimo_evento.get(aluno_id, 0) > COOLDOWN:
+                    self.ultimo_evento[aluno_id] = time.time()
+                    self._livre_em = time.time() + PAUSA_APOS_EVENTO
+                    self._registrar(aluno_id, self._enviados.get(fid), (t, r, b, l))
             except Exception as e:                  # uma falha não pode matar a thread
-                print(f"[totem] erro no reconhecimento: {e}")
-                time.sleep(0.5)
+                print(f"[totem] erro ao tratar reconhecimento: {e}")
 
-    def _registrar(self, aluno_id):
+    def _registrar(self, aluno_id, frame=None, caixa=None):
         with self.app.app_context():
             aluno = db.session.get(Aluno, aluno_id)
             if not aluno:
                 return
             status, ja = registrar_presenca_totem(aluno)
+            if frame is not None:
+                self._atualizar_foto(aluno, frame, caixa)
             agora = agora_local()
             self.eventos.append({
                 "nome": aluno.nome,
@@ -193,6 +318,30 @@ class Totem:
                 "hora": agora.strftime("%H:%M:%S"),
             })
             print(f"[totem] {aluno.nome} -> {status}{' (já registrado hoje)' if ja else ''}")
+
+    def _atualizar_foto(self, aluno, frame, caixa):
+        """Troca a foto do aluno pelo rosto que a câmera acabou de ver (só a imagem de exibição)."""
+        try:
+            t, r, b, l = caixa
+            altura, largura = frame.shape[:2]
+            margem = int(max(b - t, r - l) * 0.45)
+            recorte = frame[max(0, t - margem):min(altura, b + margem), max(0, l - margem):min(largura, r + margem)]
+            if recorte.size == 0:
+                return
+            pasta = os.path.join(self.app.static_folder, "uploads")
+            os.makedirs(pasta, exist_ok=True)
+            nome = f"{uuid.uuid4().hex}.jpg"
+            if not cv2.imwrite(os.path.join(pasta, nome), recorte, [cv2.IMWRITE_JPEG_QUALITY, 90]):
+                return
+            antiga, aluno.foto = aluno.foto, f"/static/uploads/{nome}"
+            db.session.commit()
+            if antiga and antiga.startswith("/static/uploads/"):
+                caminho = os.path.join(pasta, os.path.basename(antiga))
+                if os.path.isfile(caminho):
+                    os.remove(caminho)
+        except Exception as e:  # a presença já foi salva; a foto é só um extra
+            db.session.rollback()
+            print(f"[totem] não consegui atualizar a foto: {e}")
 
     # ---------- API usada pelas rotas ----------
     def proximo_evento(self):
@@ -230,21 +379,27 @@ class Totem:
         """Tira até 'tentativas' fotos e devolve (encoding_médio, frame) ou (None, motivo)."""
         if not self.rodando:
             return None, self.erro or "Câmera ainda iniciando, tente de novo em instantes."
-        encs, melhor = [], None
+        frames, melhor, pedido = [], None, None
         self._pausar.set()                  # reconhecimento descansa enquanto cadastra
         try:
             for _ in range(tentativas):
                 frame, _fid = self._frame_atual()
                 if frame is not None:
-                    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    with DLIB_LOCK:
-                        locs = face_recognition.face_locations(rgb, model="hog")
-                        if len(locs) == 1:
-                            encs.append(face_recognition.face_encodings(rgb, locs)[0])
-                            melhor = frame
+                    frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                    melhor = frame
                 time.sleep(0.15)
+            pedido = uuid.uuid4().hex
+            pronto = threading.Event()
+            self._cadastros[pedido] = [pronto, None]
+            self._entrada.put(("cadastro", pedido, frames), timeout=5)
+            if not pronto.wait(timeout=30):
+                return None, "O reconhecimento demorou demais. Tente de novo."
+            enc = self._cadastros[pedido][1]
+        except queue.Full:
+            return None, "O reconhecimento está ocupado. Tente de novo."
         finally:
+            self._cadastros.pop(pedido, None)
             self._pausar.clear()
-        if not encs:
+        if enc is None:
             return None, "Nenhum rosto único detectado. Fique sozinho e de frente para a câmera."
-        return np.mean(encs, axis=0).astype(np.float64), melhor
+        return enc, melhor

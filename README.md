@@ -38,7 +38,7 @@ FrequencyON fixes both ends of that problem:
 
 ### Totem check-in
 - Live camera feed in the browser with on-screen feedback: confetti and a sound on success, distinct states for *late*, *outside the allowed time* and *no class today*.
-- **Self-enrolment**: a student types their student ID in front of the totem and the system captures and stores their face encoding.
+- **Self-enrolment**: a student types their student ID **and password** in front of the totem and the system captures and stores their face encoding. Five wrong passwords lock that student ID for 15 minutes.
 - Lessons that have already happened when the student arrives are marked absent; the current and upcoming lessons are marked present. The first lesson is *present* up to `07:05` and *late* up to `07:10` (both configurable).
 - Check-ins only count on the class's scheduled weekdays, and each student is registered once per day.
 
@@ -129,11 +129,15 @@ python app.py
 
 Open **http://localhost:5000**. The totem is at **http://localhost:5000/totem**.
 
-On first start the database is created in `instance/frequencyon.db` along with a default administrator:
+On first start the database is created in `instance/frequencyon.db` with one administrator. Its login is `ADMIN_EMAIL` (default `admin@frequencyon.com`) and its password is `ADMIN_SENHA`; if that is not set, a random password is printed **once** in the terminal.
 
-| Role | Login | Password |
-|---|---|---|
-| Admin | `admin@frequencyon.com` | `admin123` |
+To change any password later (admin, teacher or student):
+
+```bash
+python trocar_senha.py <email or student ID>
+```
+
+On startup, the server warns in the terminal about accounts that still use a default or weak password.
 
 ### Demo data (optional)
 
@@ -141,7 +145,7 @@ On first start the database is created in `instance/frequencyon.db` along with a
 python seed.py
 ```
 
-> WARNING: `seed.py` **deletes all existing data** (students, classes, attendance, justifications) before creating one admin, one teacher, one class (Tue/Thu) and three students. Use it only on a demo database.
+> WARNING: `seed.py` **deletes all existing data** (students, classes, attendance, justifications) before creating one admin, one teacher, one class (Tue/Thu) and three students. All demo accounts share the password `SENHA_DEMO` (or a random one printed at the end). Use it only on a demo database.
 
 ## Configuration
 
@@ -149,7 +153,9 @@ All settings are environment variables:
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `SECRET_KEY` | `troque-esta-chave` | Flask session key. **Must be changed in production.** |
+| `SECRET_KEY` | *(generated)* | Flask session key. If unset, a random key is created once in `instance/secret_key`. |
+| `ADMIN_EMAIL` / `ADMIN_SENHA` | `admin@frequencyon.com` / *(random)* | First administrator, created only on an empty database. |
+| `SENHA_DEMO` | *(random)* | Password for the accounts created by `seed.py`. |
 | `DATABASE_URL` | `sqlite:///frequencyon.db` | Any SQLAlchemy database URL. |
 | `TOTEM_CAMERA` | `0` | Camera index used by the totem. |
 | `HORARIO_PRESENTE` | `07:05` | Check-ins up to this time are *present* for lesson 1. |
@@ -209,13 +215,15 @@ FrequencyON processes **biometric data of students, many of them minors**. Biome
 **How it works today:**
 - Faces are stored as numeric encodings (128 floats per student) in the database. Recognition runs on the school's own machine, and no images are sent to third-party services.
 - Profile photos are saved in `static/uploads/`, which the web server **serves publicly** to anyone who knows the file name.
+- The database, photos and secret key are **not** stored in Git (`instance/`, `static/uploads/` and `.env` are in `.gitignore`).
+- Every form and every JavaScript `POST` is protected against CSRF (Flask-WTF). Session cookies are `HttpOnly` and `SameSite=Lax`.
+- Re-enrolling a face at the totem requires the student's password, so nobody can swap in their own face to clock in for someone else.
 
 **Before using it with real students, at minimum:**
-- [ ] Set a strong `SECRET_KEY` and replace the default admin password.
+- [ ] Change every default password (`python trocar_senha.py ...`); the terminal lists the ones still weak.
 - [ ] Serve the app over HTTPS.
 - [ ] Move photos out of `static/` and serve them only to logged-in users.
 - [ ] Collect consent from students and guardians, with a retention and deletion policy for face data.
-- [ ] Add CSRF protection to forms.
 - [ ] Add liveness detection: HOG + encoding matching alone can be fooled by a printed photo.
 
 ## Roadmap

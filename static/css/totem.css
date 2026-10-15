@@ -111,3 +111,16 @@ body { min-height: 100vh; }
 
 /* ---------- peças da tela ---------- */
 .altura-min-400 { min-height: 400px; }
+
+/* ---------- animações do totem ---------- */
+.flutuando { animation: fo-float 3s ease-in-out infinite; }
+@keyframes fo-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+@keyframes fo-pulse { 0% { box-shadow: 0 0 0 0 rgba(91, 140, 255, .55); } 100% { box-shadow: 0 0 0 18px rgba(91, 140, 255, 0); } }
+@keyframes fo-pop-in { from { opacity: 0; transform: translateY(-8px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes fo-shimmer { to { transform: translateX(100%); } }
+@keyframes fo-shake {
+    10%, 90% { transform: translateX(-2px); }
+    20%, 80% { transform: translateX(4px); }
+    30%, 50%, 70% { transform: translateX(-6px); }
+    40%, 60% { transform: translateX(6px); }
+}
