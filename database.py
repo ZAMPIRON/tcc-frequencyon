@@ -255,6 +255,16 @@ class Presenca(db.Model):
     registrado_em = db.Column(db.DateTime, default=agora_local)
 
 
+class Dispositivo(db.Model):
+    """Tablet (ou computador) autorizado a funcionar como totem. Guarda só o hash do token do aparelho."""
+    __tablename__ = "dispositivos"
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(80), nullable=False)
+    token_hash = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    ativado_em = db.Column(db.DateTime, default=agora_local)
+    ultimo_uso = db.Column(db.DateTime)
+
+
 class Justificativa(db.Model):
     """Pedido do aluno para justificar as faltas de um dia. status: pendente | aceita | recusada."""
     __tablename__ = "justificativas"

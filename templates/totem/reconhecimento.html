@@ -16,7 +16,7 @@
             <span class="fo-logo-icone tamanho-52"><i class="bi bi-person-bounding-box"></i></span>
             <div>
                 <h3 class="mb-0 fw-bold">Frequency<span class="fo-gradient-text">ON</span></h3>
-                <span class="ao-vivo">TOTEM AO VIVO</span>
+                <span class="ao-vivo">AO VIVO &middot; {{ nome_totem }}</span>
             </div>
         </div>
 
@@ -40,7 +40,12 @@
             <div class="col-lg-5">
                 <div class="moldura-camera fo-glass fo-border-anim">
                     <div class="video-container" id="videoBox">
+                        {% if modo == 'tablet' %}
+                        <video id="camTablet" autoplay playsinline muted></video>
+                        <canvas id="sobreposicao"></canvas>
+                        {% else %}
                         <img id="videoStream" src="{{ url_for('reconhecimento.video_feed') }}" alt="Câmera do Totem">
+                        {% endif %}
                         <span class="canto tl"></span><span class="canto tr"></span>
                         <span class="canto bl"></span><span class="canto br"></span>
                         <div class="laser"></div>
@@ -150,6 +155,7 @@
         updateClock();
 
         let resetTimer = null;
+        let estadoMostrado = null;
         let totalRegistros = 0;
         const AVATAR_PADRAO = 'data:image/svg+xml;utf8,' + encodeURIComponent(
             '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#5b8cff"/><circle cx="32" cy="25" r="11" fill="#fff"/><path d="M12 56c3-11 11-16 20-16s17 5 20 16" fill="#fff"/></svg>');
@@ -273,6 +279,8 @@
         }
 
         function resetarInterface() {
+            resetTimer = null;
+            estadoMostrado = null;   // a câmera do tablet volta a atualizar a etiqueta
             document.getElementById('scannerOverlay').classList.remove('success');
             document.getElementById('videoBox').classList.remove('ok');
             document.getElementById('studentAvatar').classList.add('d-none');
@@ -350,7 +358,10 @@
         // POLLING PERIÓDICO DE EVENTOS DE PRESENÇA
         function verificarReconhecimento() {
             fetch('/api/reconhecimento')
-            .then(res => res.json())
+            .then(res => {
+                if (res.status === 401) location.reload();   // aparelho desativado pela coordenação
+                return res.json();
+            })
             .then(data => {
                 if (data && data.reconhecido) {
                     const dados = data.dados;
@@ -361,6 +372,105 @@
         }
 
         setInterval(verificarReconhecimento, 1000);
+
+        // ---------------- câmera do tablet ----------------
+        const MODO = {{ modo|tojson }};
+        const ROTULOS = {
+            iniciando: ['bi-hourglass-split', 'Iniciando reconhecimento...', ''],
+            sem_rosto: ['bi-broadcast', 'Procurando rostos...', ''],
+            longe: ['bi-arrows-angle-contract', 'Chegue mais perto da câmera', 'atencao'],
+            verificando: ['bi-search', 'Verificando...', ''],
+            desconhecido: ['bi-person-x', 'Rosto não cadastrado', 'erro'],
+            pisque: ['bi-eye', 'Pisque os olhos para confirmar', 'atencao'],
+            ok: ['bi-check-circle-fill', 'Rosto reconhecido', ''],
+        };
+        const CORES_CAIXA = { longe: '#94a3b8', verificando: '#22d3ee', desconhecido: '#ef4444', pisque: '#f59e0b', ok: '#22c55e' };
+        const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
+
+        function mostrarRotulo(estado, textoErro) {
+            const rotulo = document.getElementById('rotuloCamera');
+            const [icone, texto, classe] = textoErro ? ['bi-exclamation-triangle-fill', textoErro, 'erro'] : (ROTULOS[estado] || ROTULOS.sem_rosto);
+            rotulo.className = 'rotulo-camera ' + classe;
+            rotulo.innerHTML = '<i class="bi ' + icone + ' me-1"></i> ' + escaparHtml(texto);
+        }
+
+        function desenharCaixa(tela, d) {
+            if (tela.width !== d.largura || tela.height !== d.altura) { tela.width = d.largura; tela.height = d.altura; }
+            const ctx = tela.getContext('2d');
+            ctx.clearRect(0, 0, tela.width, tela.height);
+            if (!d.caixa) return;
+            const [t, r, b, l] = d.caixa;
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = CORES_CAIXA[d.estado] || '#22d3ee';
+            ctx.strokeRect(l, t, r - l, b - t);
+        }
+
+        async function manterTelaLigada() {
+            // tablet de totem não pode apagar a tela
+            try {
+                if (!('wakeLock' in navigator)) return;
+                await navigator.wakeLock.request('screen');
+                document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'visible') navigator.wakeLock.request('screen').catch(() => {});
+                });
+            } catch (e) { /* sem suporte: configure a tela para não desligar no próprio tablet */ }
+        }
+
+        async function iniciarCameraTablet() {
+            const video = document.getElementById('camTablet');
+            const tela = document.getElementById('sobreposicao');
+            if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                mostrarRotulo(null, 'Abra o totem pelo endereço https:// para liberar a câmera');
+                return;
+            }
+            try {
+                video.srcObject = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false,
+                });
+                await video.play();
+            } catch (e) {
+                mostrarRotulo(null, 'Permita o acesso à câmera para usar o totem');
+                return;
+            }
+            manterTelaLigada();
+
+            const captura = document.createElement('canvas');
+            const csrf = document.querySelector('meta[name="csrf-token"]').content;
+            let ultimoEnvio = 0;
+            mostrarRotulo('iniciando');
+            while (true) {
+                await esperar(Math.max(0, 125 - (performance.now() - ultimoEnvio)));   // até 8 fotos por segundo
+                ultimoEnvio = performance.now();
+                if (document.hidden || !video.videoWidth) { await esperar(500); continue; }
+
+                captura.width = 640;
+                captura.height = Math.round(640 * video.videoHeight / video.videoWidth);
+                captura.getContext('2d').drawImage(video, 0, 0, captura.width, captura.height);
+                const foto = await new Promise((r) => captura.toBlob(r, 'image/jpeg', 0.7));
+                try {
+                    const res = await fetch('/api/totem/frame', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'image/jpeg', 'X-CSRFToken': csrf },
+                        body: foto,
+                    });
+                    if (res.status === 401 || res.status === 400) { location.reload(); return; }   // desativado ou sessão vencida
+                    const d = await res.json();
+                    desenharCaixa(tela, d);
+                    const estado = d.pronto ? d.estado : 'iniciando';
+                    // depois de um reconhecimento, a mensagem de sucesso fica na tela por alguns segundos
+                    if (estado !== estadoMostrado && !resetTimer) {
+                        mostrarRotulo(estado, d.erro);
+                        estadoMostrado = estado;
+                    }
+                } catch (e) {
+                    mostrarRotulo(null, 'Sem conexão com o servidor');
+                    estadoMostrado = null;
+                    await esperar(1500);
+                }
+            }
+        }
+
+        if (MODO === 'tablet') iniciarCameraTablet();
 
         // Enter no modal também cadastra
         ['inputMatricula', 'inputSenha'].forEach((id) => {

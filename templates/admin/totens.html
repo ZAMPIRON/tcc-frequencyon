@@ -1,0 +1,80 @@
+{% extends 'admin/base.html' %}
+
+{% block title %}Totens - FrequencyOn{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h1 class="h3 fw-bold mb-1">Totens de <span class="fo-gradient-text">presença</span></h1>
+        <p class="text-muted mb-0 small">Tablets autorizados a registrar a presença por reconhecimento facial</p>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-body p-4">
+                <h6 class="fw-bold mb-1">Ativar um tablet</h6>
+                <p class="text-muted small mb-3">
+                    Gere um código, abra <strong>{{ url_for('reconhecimento.pagina_totem', _external=True) }}</strong>
+                    no navegador do tablet e digite o código. Ele vale uma vez só, por {{ minutos }} minutos.
+                </p>
+
+                {% if codigo %}
+                <div class="codigo-ativacao mb-3">
+                    <small class="text-muted d-block mb-1">Código para "{{ nome_codigo }}"</small>
+                    <span class="codigo">{{ codigo[:4] }} {{ codigo[4:] }}</span>
+                </div>
+                {% endif %}
+
+                <form method="POST" action="{{ url_for('admin.totens') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <label for="nome" class="form-label small fw-bold">Nome do aparelho</label>
+                    <div class="input-group">
+                        <input type="text" id="nome" name="nome" class="form-control" maxlength="80" placeholder="Ex.: Tablet da entrada principal">
+                        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-key me-1"></i> Gerar código</button>
+                    </div>
+                </form>
+
+                {% if modo == 'camera' %}
+                <p class="small text-warning mt-3 mb-0">
+                    <i class="fa-solid fa-circle-info me-1"></i> O sistema está no modo webcam do servidor
+                    (<code>TOTEM_FONTE=camera</code>): todos os totens mostram a mesma câmera.
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card h-100 overflow-hidden">
+            <div class="p-3 border-bottom d-flex align-items-center justify-content-between">
+                <h6 class="fw-bold mb-0">Aparelhos ativados</h6>
+                <span class="badge bg-secondary">{{ dispositivos|length }}</span>
+            </div>
+            <table class="table align-middle mb-0">
+                <thead class="small">
+                    <tr><th class="ps-3">Nome</th><th>Ativado em</th><th>Último uso</th><th class="text-end pe-3">Ações</th></tr>
+                </thead>
+                <tbody class="small">
+                    {% for d in dispositivos %}
+                    <tr>
+                        <td class="ps-3 fw-semibold"><i class="fa-solid fa-tablet-screen-button text-muted me-2"></i>{{ d.nome }}</td>
+                        <td>{{ d.ativado_em.strftime('%d/%m/%Y %H:%M') if d.ativado_em else '-' }}</td>
+                        <td>{{ d.ultimo_uso.strftime('%d/%m/%Y %H:%M') if d.ultimo_uso else 'nunca' }}</td>
+                        <td class="text-end pe-3">
+                            <form class="d-inline" method="POST" action="{{ url_for('admin.remover_totem', id=d.id) }}" onsubmit="return confirm('Desativar este totem? Ele para de funcionar na hora.');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button class="btn btn-outline-danger btn-sm border-0" title="Desativar"><i class="fa-solid fa-ban"></i></button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" class="text-center text-muted py-4">Nenhum tablet ativado ainda.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

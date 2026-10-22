@@ -37,6 +37,9 @@ FrequencyON fixes both ends of that problem:
 ## Product tour
 
 ### Totem check-in
+- The totem is a **school tablet** (or any device with a camera) running the `/totem` page in kiosk mode. The page uses the tablet's own camera and sends a few frames per second to the server, which does the recognition.
+- **Device activation**: only devices activated by the coordination can act as a totem. In *Admin → Totens* the coordinator generates a single-use code (valid for 15 minutes) and types it on the tablet once. Devices can be deactivated at any time.
+- **Liveness check**: attendance is only recorded after the student **blinks**, so a printed or on-screen photo held still is not accepted.
 - Live camera feed in the browser with on-screen feedback: confetti and a sound on success, distinct states for *late*, *outside the allowed time* and *no class today*.
 - **Self-enrolment**: a student types their student ID **and password** in front of the totem and the system captures and stores their face encoding. Five wrong passwords lock that student ID for 15 minutes.
 - Lessons that have already happened when the student arrives are marked absent; the current and upcoming lessons are marked present. The first lesson is *present* up to `07:05` and *late* up to `07:10` (both configurable).
@@ -172,7 +175,9 @@ All settings are environment variables:
 | `ADMIN_EMAIL` / `ADMIN_SENHA` | `admin@frequencyon.com` / *(random)* | First administrator, created only on an empty database. |
 | `SENHA_DEMO` | *(random)* | Password for the accounts created by `seed.py`. |
 | `DATABASE_URL` | `sqlite:///frequencyon.db` | Any SQLAlchemy database URL. |
-| `TOTEM_CAMERA` | `0` | Camera index used by the totem. |
+| `TOTEM_FONTE` | `tablet` | `tablet` uses the camera of the device that opens `/totem`; `camera` uses a webcam plugged into the server (for development). |
+| `PROVA_DE_VIDA` | `1` | `0` disables the blink check (only for tests). |
+| `TOTEM_CAMERA` | `0` | Server webcam index (only in `camera` mode). |
 | `HTTPS` | `1` | `0` turns HTTPS off and serves plain HTTP on `PORTA` (only for local testing). |
 | `PORTA_HTTPS` / `PORTA` | `5443` / `5000` | HTTPS port, and the HTTP port that redirects to it. |
 | `SSL_CERT` / `SSL_KEY` | *(local CA)* | Paths to a real certificate and key, instead of the generated ones. |

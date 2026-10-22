@@ -84,3 +84,7 @@ main.conteudo { padding: 1.5rem 12px 2rem; }
     height: var(--altura, 0%);
     border-radius: 6px 6px 0 0 !important;
 }
+
+/* código de ativação de totem */
+.codigo-ativacao { padding: .9rem 1rem; border-radius: 10px; background: #eef4ff; border: 1px dashed var(--fo-primary); text-align: center; }
+.codigo-ativacao .codigo { font-family: ui-monospace, Consolas, monospace; font-size: 2rem; font-weight: 700; letter-spacing: .15em; color: var(--fo-primary); }
