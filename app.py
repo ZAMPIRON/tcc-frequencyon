@@ -70,8 +70,8 @@ def create_app(avisar_senhas=True):
 
     with app.app_context():
         db.create_all()
+        migrar_dispositivos()       # antes: cria colunas que as consultas de Professor já usam
         migrar_professor_turma()
-        migrar_dispositivos()
         # banco novo: cria um admin pra conseguir entrar a primeira vez.
         # a senha vem do .env (ADMIN_SENHA) ou é sorteada e mostrada uma vez no terminal
         if not Admin.query.first():

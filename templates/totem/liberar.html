@@ -6,29 +6,152 @@
     <title>Liberar totem - FrequencyON</title>
     {% include 'componentes/cabecalho.html' %}
     <link href="{{ url_for('static', filename='css/totem.css') }}" rel="stylesheet">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest-totem.json') }}">
     <script>document.documentElement.setAttribute('data-bs-theme', 'dark');</script>
 </head>
 <body class="totem d-flex align-items-center justify-content-center h-100 p-3">
     <div class="card ativar-card p-4 p-sm-5 text-center">
         <span class="fo-logo-icone tamanho-70 mx-auto mb-3"><i class="bi bi-person-bounding-box"></i></span>
         <h1 class="h3 fw-bold mb-1">Frequency<span class="fo-gradient-text">ON</span></h1>
-        <p class="text-muted mb-4">Totem bloqueado. Professor, entre com seu e-mail e senha para liberar a presença de hoje.</p>
+
+        {% if modo == 'tablet' %}
+        <p class="text-muted mb-3">Totem bloqueado. <strong>Professor, olhe para a câmera</strong> para liberar a presença de hoje.</p>
+        <div class="moldura-camera fo-glass mb-3">
+            <div class="video-container" id="videoBox">
+                <video id="camTablet" autoplay playsinline muted></video>
+                <canvas id="sobreposicao"></canvas>
+                <span class="canto tl"></span><span class="canto tr"></span>
+                <span class="canto bl"></span><span class="canto br"></span>
+                <span class="rotulo-camera" id="rotuloCamera"><i class="bi bi-hourglass-split me-1"></i> Iniciando câmera...</span>
+            </div>
+        </div>
+        {% endif %}
 
         {% if erro %}
         <div class="alert alert-danger py-2 small" role="alert">{{ erro }}</div>
         {% endif %}
 
-        <form method="POST" action="{{ url_for('reconhecimento.liberar_totem') }}" class="text-start">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <label for="email" class="form-label fw-bold small">E-mail do professor</label>
-            <input type="email" id="email" name="email" class="form-control form-control-lg mb-3" value="{{ email or '' }}"
-                   placeholder="professor@escola.com" autocomplete="off" required autofocus>
-            <label for="senha" class="form-label fw-bold small">Senha</label>
-            <input type="password" id="senha" name="senha" class="form-control form-control-lg mb-3" autocomplete="off" required>
-            <button type="submit" class="btn btn-primary btn-lg w-100"><i class="bi bi-unlock me-1"></i> Liberar até o fim do dia</button>
-        </form>
+        <details class="text-start" {% if modo != 'tablet' or erro or email %}open{% endif %}>
+            <summary class="small text-muted mb-3">Liberar com e-mail e senha</summary>
+            <form method="POST" action="{{ url_for('reconhecimento.liberar_totem') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <label for="email" class="form-label fw-bold small">E-mail</label>
+                <input type="email" id="email" name="email" class="form-control form-control-lg mb-3" value="{{ email or '' }}"
+                       placeholder="professor@escola.com" autocomplete="off" required>
+                <label for="senha" class="form-label fw-bold small">Senha</label>
+                <input type="password" id="senha" name="senha" class="form-control form-control-lg mb-3" autocomplete="off" required>
+                <button type="submit" class="btn btn-primary btn-lg w-100"><i class="bi bi-unlock me-1"></i> Liberar até o fim do dia</button>
+            </form>
+        </details>
 
-        <p class="small text-muted mt-4 mb-0">O totem volta a bloquear sozinho à meia-noite.</p>
+        <p class="small text-muted mt-3 mb-0">O totem volta a bloquear sozinho à meia-noite.</p>
     </div>
+
+    <script>
+        // tela cheia: o navegador só deixa depois de um toque, então tenta ao abrir e de novo a cada toque
+        function telaCheia() {
+            const el = document.documentElement;
+            if (document.fullscreenElement || document.webkitFullscreenElement) return;
+            const pedir = el.requestFullscreen || el.webkitRequestFullscreen;
+            if (!pedir) return;
+            try {
+                const p = pedir.call(el, { navigationUI: 'hide' });
+                if (p && p.catch) p.catch(() => {});
+            } catch (e) { /* sem permissão ainda: o próximo toque tenta de novo */ }
+        }
+        telaCheia();
+        document.addEventListener('pointerdown', telaCheia);
+    </script>
+
+    {% if modo == 'tablet' %}
+    <script>
+        const ROTULOS = {
+            iniciando: ['bi-hourglass-split', 'Iniciando reconhecimento...', ''],
+            sem_rosto: ['bi-broadcast', 'Procurando o rosto do professor...', ''],
+            longe: ['bi-arrows-angle-contract', 'Chegue mais perto da câmera', 'atencao'],
+            verificando: ['bi-search', 'Verificando...', ''],
+            pisque: ['bi-search', 'Verificando...', ''],
+            desconhecido: ['bi-person-x', 'Rosto de professor não reconhecido', 'erro'],
+            ok: ['bi-check-circle-fill', 'Liberando...', ''],
+        };
+        const CORES_CAIXA = { longe: '#94a3b8', verificando: '#22d3ee', pisque: '#22d3ee', desconhecido: '#ef4444', ok: '#22c55e' };
+        const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
+
+        function mostrarRotulo(estado, textoErro) {
+            const rotulo = document.getElementById('rotuloCamera');
+            const [icone, texto, classe] = textoErro ? ['bi-exclamation-triangle-fill', textoErro, 'erro'] : (ROTULOS[estado] || ROTULOS.sem_rosto);
+            rotulo.className = 'rotulo-camera ' + classe;
+            rotulo.innerHTML = '<i class="bi ' + icone + ' me-1"></i> ';
+            rotulo.append(texto);
+        }
+
+        function desenharCaixa(tela, d) {
+            if (tela.width !== d.largura || tela.height !== d.altura) { tela.width = d.largura; tela.height = d.altura; }
+            const ctx = tela.getContext('2d');
+            ctx.clearRect(0, 0, tela.width, tela.height);
+            if (!d.caixa) return;
+            const [t, r, b, l] = d.caixa;
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = CORES_CAIXA[d.estado] || '#22d3ee';
+            ctx.strokeRect(l, t, r - l, b - t);
+        }
+
+        async function liberarPorRosto() {
+            const video = document.getElementById('camTablet');
+            const tela = document.getElementById('sobreposicao');
+            if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                mostrarRotulo(null, 'Abra o totem pelo endereço https:// para liberar a câmera');
+                return;
+            }
+            try {
+                video.srcObject = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false,
+                });
+                await video.play();
+            } catch (e) {
+                mostrarRotulo(null, 'Permita o acesso à câmera (ou use e-mail e senha abaixo)');
+                return;
+            }
+
+            const captura = document.createElement('canvas');
+            const csrf = document.querySelector('meta[name="csrf-token"]').content;
+            let ultimoEnvio = 0;
+            mostrarRotulo('iniciando');
+            while (true) {
+                await esperar(Math.max(0, 80 - (performance.now() - ultimoEnvio)));
+                ultimoEnvio = performance.now();
+                if (document.hidden || !video.videoWidth) { await esperar(500); continue; }
+
+                captura.width = 640;
+                captura.height = Math.round(640 * video.videoHeight / video.videoWidth);
+                captura.getContext('2d').drawImage(video, 0, 0, captura.width, captura.height);
+                const foto = await new Promise((r) => captura.toBlob(r, 'image/jpeg', 0.7));
+                try {
+                    const res = await fetch('{{ url_for("reconhecimento.liberar_por_rosto") }}', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'image/jpeg', 'X-CSRFToken': csrf },
+                        body: foto,
+                    });
+                    if (res.status === 400) { location.reload(); return; }   // sessão vencida
+                    const d = await res.json();
+                    desenharCaixa(tela, d);
+                    if (d.liberado) {
+                        mostrarRotulo(null, 'Liberado por ' + d.nome);
+                        document.getElementById('rotuloCamera').className = 'rotulo-camera';
+                        await esperar(1200);
+                        location.reload();          // agora o servidor mostra a tela do totem
+                        return;
+                    }
+                    mostrarRotulo(d.pronto ? d.estado : 'iniciando', d.erro);
+                } catch (e) {
+                    mostrarRotulo(null, 'Sem conexão com o servidor');
+                    await esperar(1500);
+                }
+            }
+        }
+
+        liberarPorRosto();
+    </script>
+    {% endif %}
 </body>
 </html>

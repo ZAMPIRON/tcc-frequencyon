@@ -89,7 +89,7 @@ HORARIO_ATRASO = _hora_env("HORARIO_ATRASO", "07:10")      # até aqui = atraso 
 # Horário de início de cada aula. Altere esta lista para os horários reais da escola.
 # Por padrão, são 10 aulas de 50 minutos começando às 07:00.
 def _horarios_aulas_env():
-    padrao = "07:00,07:50,08:40,09:30,10:20,11:10,12:00,12:50,13:40,14:30"
+    padrao = "07:05,07:50,08:35,09:20,9:40,10:25,11:10,12:40,13:25,14:10,14:55,15:10,15:55,16:35"
     valores = os.getenv("HORARIOS_AULAS", padrao).split(",")
     horarios = []
     for valor in valores[:AULAS_POR_DIA]:
@@ -125,6 +125,7 @@ class Professor(UsuarioMixin, db.Model):
     senha_hash = db.Column(db.String(255), nullable=False)
     departamento = db.Column(db.String(120))
     foto = db.Column(db.String(255))
+    face_encoding = db.Column(db.LargeBinary)   # rosto que libera o totem (128 floats float64)
     vinculos = db.relationship("ProfessorTurma", back_populates="professor",
                                cascade="all, delete-orphan")
 
@@ -394,4 +395,7 @@ def migrar_dispositivos():
     for nome, tipo in (("liberado_ate", "DATETIME"), ("liberado_por", "VARCHAR(120)")):
         if nome not in colunas:
             db.session.execute(text(f"ALTER TABLE dispositivos ADD COLUMN {nome} {tipo}"))
+    # rosto do professor (liberação do totem pela câmera)
+    if "face_encoding" not in [c["name"] for c in inspect(db.engine).get_columns("professores")]:
+        db.session.execute(text("ALTER TABLE professores ADD COLUMN face_encoding BLOB"))
     db.session.commit()

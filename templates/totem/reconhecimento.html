@@ -376,7 +376,8 @@
             .catch(() => {});
         }
 
-        setInterval(verificarReconhecimento, 1000);
+        // no modo tablet o reconhecimento já chega na resposta de cada frame; o polling fica só para a webcam do servidor
+        if ({{ modo|tojson }} !== 'tablet') setInterval(verificarReconhecimento, 300);
 
         // ---------------- câmera do tablet ----------------
         const MODO = {{ modo|tojson }};
@@ -444,7 +445,7 @@
             let ultimoEnvio = 0;
             mostrarRotulo('iniciando');
             while (true) {
-                await esperar(Math.max(0, 125 - (performance.now() - ultimoEnvio)));   // até 8 fotos por segundo
+                await esperar(Math.max(0, 80 - (performance.now() - ultimoEnvio)));   // até ~12 fotos por segundo
                 ultimoEnvio = performance.now();
                 if (document.hidden || !video.videoWidth) { await esperar(500); continue; }
 
@@ -460,6 +461,10 @@
                     });
                     if (res.status === 401 || res.status === 400) { location.reload(); return; }   // desativado ou sessão vencida
                     const d = await res.json();
+                    if (d.evento) {
+                        const e = d.evento;
+                        exibirSucessoAluno(e.nome, e.matricula, e.foto, e.ja_registrado, e.status);
+                    }
                     desenharCaixa(tela, d);
                     const estado = d.pronto ? d.estado : 'iniciando';
                     // depois de um reconhecimento, a mensagem de sucesso fica na tela por alguns segundos

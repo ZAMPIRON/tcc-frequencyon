@@ -1,12 +1,17 @@
 # painel da coordenacao: dashboard, cadastros, turmas, risco de evasao e justificativas
 # os relatorios e a planilha ficam em relatorios.py pra esse arquivo nao crescer demais
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+import os
+import uuid
+
+import cv2
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 from sqlalchemy import or_
 
 from database import (db, Aluno, Dispositivo, Justificativa, Professor, ProfessorTurma, Turma,
                       DIAS_SELECIONAVEIS, NOMES_DIAS, agora_local, dias_de_formulario)
 from .aluno import exportar_csv, render_detalhes
-from .comum import encoding_de_foto, pegar_totem, requer, salvar_foto
+from face_service import encoding_de_imagens
+from .comum import encoding_de_foto, pasta_uploads, pegar_totem, requer, salvar_foto
 
 admin = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -118,9 +123,31 @@ def professores():
             p.set_senha(f["senha"])
             db.session.add(p)
             db.session.commit()
-            flash("Professor cadastrado!", "success")
+            flash("Professor cadastrado! Agora cadastre o rosto dele: é com ele que o totem é liberado.", "success")
+            return redirect(url_for("admin.rosto_professor", id=p.id))
         return redirect(url_for("admin.professores"))
     return render_template("admin/professores.html", professores=Professor.query.order_by(Professor.nome).all())
+
+
+@admin.route("/professores/<int:id>/rosto", methods=["GET", "POST"])
+@requer("admin")
+def rosto_professor(id):
+    # tela tipo totem: a camera do computador do admin tira umas fotos e guarda o rosto do professor
+    p = db.get_or_404(Professor, id)
+    if request.method == "GET":
+        return render_template("admin/rosto_professor.html", professor=p)
+    fotos = [f.read() for f in request.files.getlist("fotos")[:8]]
+    enc, frame = encoding_de_imagens([f for f in fotos if f and len(f) <= 600 * 1024])
+    if enc is None:
+        return jsonify(sucesso=False, mensagem=frame), 422
+    p.face_encoding = enc.tobytes()
+    if not p.foto:
+        nome = f"{uuid.uuid4().hex}.jpg"
+        cv2.imwrite(os.path.join(pasta_uploads(), nome), frame)
+        p.foto = f"/static/uploads/{nome}"
+    db.session.commit()
+    pegar_totem().recarregar()
+    return jsonify(sucesso=True, mensagem=f"Rosto de {p.nome} cadastrado! Ele já pode liberar o totem.")
 
 
 @admin.route("/professores/<int:id>/deletar", methods=["POST"])
@@ -129,6 +156,7 @@ def deletar_professor(id):
     p = db.get_or_404(Professor, id)
     db.session.delete(p)  # os vinculos com as turmas vao embora junto
     db.session.commit()
+    pegar_totem().recarregar()   # o rosto dele para de liberar o totem
     return redirect(url_for("admin.professores"))
 
 
