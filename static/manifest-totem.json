@@ -1,0 +1,11 @@
+{
+    "name": "FrequencyON Totem",
+    "short_name": "Totem",
+    "start_url": "/totem",
+    "scope": "/",
+    "display": "fullscreen",
+    "orientation": "any",
+    "background_color": "#0b1020",
+    "theme_color": "#0b1020",
+    "icons": [{ "src": "/static/assets/logo.png", "sizes": "512x512", "type": "image/png" }]
+}

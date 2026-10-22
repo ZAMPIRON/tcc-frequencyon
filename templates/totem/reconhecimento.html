@@ -6,6 +6,11 @@
     <title>FrequencyON - Totem de Presença</title>
     {% include 'componentes/cabecalho.html' %}
     <link href="{{ url_for('static', filename='css/totem.css') }}" rel="stylesheet">
+    <!-- "Adicionar à tela inicial" no tablet abre o totem sempre em tela cheia -->
+    <link rel="manifest" href="{{ url_for('static', filename='manifest-totem.json') }}">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <script>document.documentElement.setAttribute('data-bs-theme', 'dark');</script>
 </head>
 <body class="totem d-flex flex-column h-100">
@@ -469,6 +474,20 @@
                 }
             }
         }
+
+        // tela cheia: o navegador só deixa depois de um toque, então tenta ao abrir e de novo a cada toque
+        function telaCheia() {
+            const el = document.documentElement;
+            if (document.fullscreenElement || document.webkitFullscreenElement) return;
+            const pedir = el.requestFullscreen || el.webkitRequestFullscreen;
+            if (!pedir) return;
+            try {
+                const p = pedir.call(el, { navigationUI: 'hide' });
+                if (p && p.catch) p.catch(() => {});
+            } catch (e) { /* sem permissão ainda: o próximo toque tenta de novo */ }
+        }
+        telaCheia();
+        document.addEventListener('pointerdown', telaCheia);
 
         if (MODO === 'tablet') iniciarCameraTablet();
 

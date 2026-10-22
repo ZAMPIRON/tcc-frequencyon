@@ -19,7 +19,7 @@ from rotas import registrar_rotas  # noqa: E402
 from rotas.comum import usuario_atual  # noqa: E402
 
 
-def create_app():
+def create_app(avisar_senhas=True):
     app = Flask(__name__)
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY") or _chave_secreta(app.instance_path)
     # cookie de login: o JavaScript não lê e outro site não consegue usar
@@ -83,7 +83,8 @@ def create_app():
             db.session.commit()
             print(f"Admin criado: {email}" + ("" if os.getenv("ADMIN_SENHA") else f" / senha: {senha}  (anote, ela não aparece de novo)"))
     # conferir senha é lento de propósito; roda em segundo plano para não atrasar a subida
-    threading.Thread(target=_avisar_senhas_fracas, args=(app,), daemon=True).start()
+    if avisar_senhas:
+        threading.Thread(target=_avisar_senhas_fracas, args=(app,), daemon=True).start()
     return app
 
 

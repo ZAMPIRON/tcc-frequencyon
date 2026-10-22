@@ -1,6 +1,6 @@
 """Troca a senha de um admin, professor ou aluno pelo terminal.
 
-Uso:  python trocar_senha.py <email ou matrícula>
+Uso:  python trocar_senha.py [email ou matrícula]   (sem argumento, ele pergunta)
 A senha nova é digitada sem aparecer na tela.
 """
 import getpass
@@ -13,11 +13,12 @@ from database import Admin, Aluno, Professor, db
 
 
 def main():
-    if len(sys.argv) != 2:
+    if len(sys.argv) > 2:
         print(__doc__)
         sys.exit(1)
-    login = sys.argv[1].strip()
-    app = create_app()
+    # sem argumento (ex.: botão de rodar do VS Code) pergunta no terminal
+    login = (sys.argv[1] if len(sys.argv) == 2 else input("E-mail ou matrícula: ")).strip()
+    app = create_app(avisar_senhas=False)   # sem o aviso de senhas fracas misturado com a pergunta
     with app.app_context():
         conta = (Admin.query.filter_by(email=login).first()
                  or Professor.query.filter_by(email=login).first()
