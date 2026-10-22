@@ -3,7 +3,7 @@
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from sqlalchemy import or_
 
-from database import (db, Aluno, Justificativa, Professor, ProfessorTurma, Turma,
+from database import (db, Aluno, Dispositivo, Justificativa, Professor, ProfessorTurma, Turma,
                       DIAS_SELECIONAVEIS, NOMES_DIAS, agora_local, dias_de_formulario)
 from .aluno import exportar_csv, render_detalhes
 from .comum import encoding_de_foto, pegar_totem, requer, salvar_foto
@@ -241,3 +241,24 @@ def responder_justificativa(id, acao):
         db.session.commit()
         flash(f"Justificativa {acao}.", "success")
     return redirect(url_for("admin.detalhes_aluno", id=j.aluno_id))
+
+
+# ---------- totens (tablets) ----------
+
+@admin.route("/totens")
+@requer("admin")
+def totens():
+    # aparelhos que ja foram usados como totem; cada um e liberado por um professor a cada dia
+    return render_template("admin/totens.html", modo=pegar_totem().fonte,
+                           dispositivos=Dispositivo.query.order_by(Dispositivo.ativado_em.desc()).all())
+
+
+@admin.route("/totens/<int:id>/remover", methods=["POST"])
+@requer("admin")
+def remover_totem(id):
+    # o aparelho perde o acesso na hora (o token dele deixa de existir) e some da lista
+    disp = db.get_or_404(Dispositivo, id)
+    db.session.delete(disp)
+    db.session.commit()
+    flash(f"Totem \"{disp.nome}\" desativado.", "success")
+    return redirect(url_for("admin.totens"))

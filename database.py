@@ -255,6 +255,22 @@ class Presenca(db.Model):
     registrado_em = db.Column(db.DateTime, default=agora_local)
 
 
+class Dispositivo(db.Model):
+    """Tablet (ou computador) autorizado a funcionar como totem. Guarda só o hash do token do aparelho."""
+    __tablename__ = "dispositivos"
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(80), nullable=False)
+    token_hash = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    ativado_em = db.Column(db.DateTime, default=agora_local)
+    ultimo_uso = db.Column(db.DateTime)
+    liberado_ate = db.Column(db.DateTime)          # fim do dia em que um professor liberou o totem
+    liberado_por = db.Column(db.String(120))       # nome de quem liberou
+
+    @property
+    def liberado(self):
+        return bool(self.liberado_ate and self.liberado_ate > agora_local())
+
+
 class Justificativa(db.Model):
     """Pedido do aluno para justificar as faltas de um dia. status: pendente | aceita | recusada."""
     __tablename__ = "justificativas"
@@ -368,4 +384,14 @@ def migrar_professor_turma():
                 ProfessorTurma, (professor_id, turma_id)):
             db.session.add(ProfessorTurma(professor_id=professor_id, turma_id=turma_id, dias="1,3"))
     db.session.execute(text("UPDATE turmas SET professor_id = NULL"))
+    db.session.commit()
+
+
+def migrar_dispositivos():
+    """Bancos criados antes da liberação diária não têm as colunas liberado_ate / liberado_por."""
+    from sqlalchemy import inspect, text
+    colunas = [c["name"] for c in inspect(db.engine).get_columns("dispositivos")]
+    for nome, tipo in (("liberado_ate", "DATETIME"), ("liberado_por", "VARCHAR(120)")):
+        if nome not in colunas:
+            db.session.execute(text(f"ALTER TABLE dispositivos ADD COLUMN {nome} {tipo}"))
     db.session.commit()

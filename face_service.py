@@ -15,18 +15,30 @@ except ImportError:  # permite subir o site sem a lib (o totem fica indisponíve
 
 from database import db, Aluno, registrar_presenca_totem, agora_local, hoje_local
 
+# de onde vêm as imagens: "tablet" (câmera do navegador do tablet) ou "camera" (webcam ligada no servidor)
+FONTE = os.getenv("TOTEM_FONTE", "tablet").strip().lower()
+# só registra depois de ver o rosto se mexer sozinho (foto impressa tem olhos e boca parados)
+PROVA_DE_VIDA = os.getenv("PROVA_DE_VIDA", "1") != "0"
+
 TOLERANCIA = 0.50        # menor = mais rígido
-ESCALA = 0.5             # reduz o frame p/ detectar (menor = mais rápido)
 CONFIRMACOES = 2         # encodings seguidos com o mesmo aluno antes de registrar
 COOLDOWN = 8.0           # segundos antes de reconhecer o MESMO aluno de novo
 PAUSA_APOS_EVENTO = 3.0  # segundos "descansando" depois de qualquer registro
-INTERVALO = 0.15         # segundos mínimos entre dois frames enviados ao processo de reconhecimento
+INTERVALO = 0.05         # segundos entre duas voltas do envio de frames ao processo de reconhecimento
+QUADRO_VELHO = 2.0       # frame mais velho que isso não serve (tablet parou de mandar)
 
 # quando calcular o encoding (a parte cara)
 ROSTO_MINIMO = 40        # px de altura no frame reduzido; menor que isso está longe demais
 TENTAR_DE_NOVO = 0.5     # rosto desconhecido: no máximo 2 encodings por segundo
 REVERIFICAR = 3.0        # rosto já reconhecido: confere de novo a cada 3 s
 MESMO_ROSTO_IOU = 0.4    # sobreposição mínima entre caixas p/ considerar o mesmo rosto
+
+# prova de vida passiva: rosto vivo mexe sozinho (olhos e boca variam entre frames); foto impressa não.
+# vivo = a abertura dos olhos ou da boca variou mais que VARIACAO_VIVO (relativo) em até JANELA_VIVO frames
+OLHO_ABERTO_MIN = 0.20
+VARIACAO_VIVO = float(os.getenv("VARIACAO_VIVO", "0.12"))
+JANELA_VIVO = 8
+FRAMES_MIN_VIVO = 3
 
 DLIB_LOCK = threading.Lock()   # cadastro por foto (admin) roda no processo do site
 
@@ -58,17 +70,57 @@ def _iou(a, b):
     return inter / float(area(a) + area(b) - inter or 1)
 
 
-def processo_reconhecimento(entrada, saida):
-    """Recebe frames reduzidos (RGB) e devolve onde está o rosto e de quem é.
+def abertura_olhos(pontos):
+    """EAR (eye aspect ratio) de um olho com 6 pontos: ~0,3 aberto, ~0,1 fechado."""
+    p = np.asarray(pontos, dtype=float)
+    vertical = np.linalg.norm(p[1] - p[5]) + np.linalg.norm(p[2] - p[4])
+    horizontal = 2.0 * np.linalg.norm(p[0] - p[3])
+    return vertical / horizontal if horizontal else 0.0
 
-    Detecta rosto em todo frame (barato), mas só calcula o encoding (caro) quando:
-    aparece um rosto novo, faltam confirmações, ou chegou a hora de reverificar.
-    Mensagens de entrada: ("frame", fid, rgb) | ("rostos", ids, encs) | ("cadastro", pedido, [rgb]) | ("fim",)
+
+def abertura_boca(top_lip, bottom_lip):
+    """Distância entre os lábios internos dividida pela largura da boca."""
+    t, b = np.asarray(top_lip, dtype=float), np.asarray(bottom_lip, dtype=float)
+    largura = np.linalg.norm(t[0] - t[6])
+    return np.linalg.norm(t[9] - b[9]) / largura if largura else 0.0
+
+
+def _variou(valores, piso):
+    hi = max(valores)
+    return hi >= piso and (hi - min(valores)) / hi >= VARIACAO_VIVO
+
+
+def atualizar_vivo(trilha, marcos):
+    """Guarda olhos/boca dos últimos frames e marca trilha['vivo'] quando o rosto se mexe por conta própria."""
+    ear = (abertura_olhos(marcos["left_eye"]) + abertura_olhos(marcos["right_eye"])) / 2
+    boca = abertura_boca(marcos["top_lip"], marcos["bottom_lip"])
+    trilha["olhos"].append(ear)
+    trilha["boca"].append(boca)
+    if len(trilha["olhos"]) < FRAMES_MIN_VIVO:
+        return
+    if _variou(trilha["olhos"], OLHO_ABERTO_MIN) or _variou(trilha["boca"], 0.05):
+        trilha["vivo"] = True
+
+
+def _nova_trilha():
+    return {"aluno_id": None, "seq": 0, "confirmado": False, "t_enc": 0.0, "vivo": False,
+            "registrado": False, "olhos": deque(maxlen=JANELA_VIVO), "boca": deque(maxlen=JANELA_VIVO)}
+
+
+def processo_reconhecimento(entrada, saida, prova_de_vida=True):
+    """Recebe frames reduzidos (RGB) de um ou mais totens e devolve onde está o rosto e de quem é.
+
+    Detecta rosto em todo frame (barato), mas só calcula o encoding (caro) quando aparece um rosto
+    novo, faltam confirmações, ou chegou a hora de reverificar. Cada totem (chave) tem a sua trilha.
+    Mensagens: ("frame", chave, fid, rgb) | ("rostos", ids, encs) | ("cadastro", pedido, [rgb])
+               ("esquecer", chave) | ("fim",)
+    Resposta:  ("deteccao", chave, fid, caixa, aluno_id, estado, novo_evento)
+    estado: sem_rosto | longe | verificando | desconhecido | pisque | ok
     """
     import face_recognition as fr
 
     ids, encs = [], np.empty((0, 128))
-    trilha = None   # rosto que está sendo acompanhado: caixa, aluno_id, seq, confirmado, t_enc
+    trilhas = {}
 
     def identificar(enc):
         if not len(ids):
@@ -84,7 +136,11 @@ def processo_reconhecimento(entrada, saida):
             if tipo == "fim":
                 return
             if tipo == "rostos":
-                ids, encs, trilha = msg[1], msg[2], None
+                ids, encs = msg[1], msg[2]
+                trilhas.clear()
+                continue
+            if tipo == "esquecer":
+                trilhas.pop(msg[1], None)
                 continue
             if tipo == "cadastro":
                 _, pedido, frames = msg
@@ -97,20 +153,31 @@ def processo_reconhecimento(entrada, saida):
                 saida.put(("cadastro", pedido, media))
                 continue
 
-            _, fid, rgb = msg
+            _, chave, fid, rgb = msg
             locs = fr.face_locations(rgb, model="hog")
             if not locs:
-                trilha = None
-                saida.put(("deteccao", fid, None, None, False))
+                trilhas.pop(chave, None)
+                saida.put(("deteccao", chave, fid, None, None, "sem_rosto", False))
                 continue
 
             caixa = max(locs, key=lambda c: (c[2] - c[0]) * (c[1] - c[3]))
             agora = time.time()
+            trilha = trilhas.get(chave)
             if trilha is None or _iou(caixa, trilha["caixa"]) < MESMO_ROSTO_IOU:
-                trilha = {"aluno_id": None, "seq": 0, "confirmado": False, "t_enc": 0.0}
+                trilha = trilhas[chave] = _nova_trilha()
             trilha["caixa"] = caixa
 
             perto = (caixa[2] - caixa[0]) >= ROSTO_MINIMO
+            if not perto:
+                saida.put(("deteccao", chave, fid, caixa, None, "longe", False))
+                continue
+
+            # prova de vida passiva: mede olhos e boca em todo frame até ver o rosto se mexer
+            if prova_de_vida and not trilha["vivo"]:
+                marcos = fr.face_landmarks(rgb, [caixa])
+                if marcos and "left_eye" in marcos[0] and "top_lip" in marcos[0]:
+                    atualizar_vivo(trilha, marcos[0])
+
             if trilha["confirmado"]:
                 precisa = agora - trilha["t_enc"] >= REVERIFICAR
             elif trilha["seq"] > 0:
@@ -118,23 +185,37 @@ def processo_reconhecimento(entrada, saida):
             else:
                 precisa = agora - trilha["t_enc"] >= TENTAR_DE_NOVO
 
-            novo_evento = False
-            if perto and precisa:
+            if precisa:
                 aluno_id = identificar(fr.face_encodings(rgb, [caixa])[0])
                 trilha["t_enc"] = agora
                 if trilha["confirmado"]:
                     if aluno_id != trilha["aluno_id"]:          # trocou a pessoa na frente da câmera
-                        trilha.update(aluno_id=aluno_id, seq=1 if aluno_id else 0, confirmado=False)
+                        trilha.update(_nova_trilha(), caixa=caixa, t_enc=agora,
+                                      aluno_id=aluno_id, seq=1 if aluno_id else 0)
                 elif aluno_id is None:
                     trilha.update(aluno_id=None, seq=0)
                 elif aluno_id == trilha["aluno_id"]:
                     trilha["seq"] += 1
                 else:
                     trilha.update(aluno_id=aluno_id, seq=1)
-                if trilha["aluno_id"] and not trilha["confirmado"] and trilha["seq"] >= CONFIRMACOES:
-                    trilha["confirmado"] = novo_evento = True
+                if trilha["aluno_id"] and trilha["seq"] >= CONFIRMACOES:
+                    trilha["confirmado"] = True
 
-            saida.put(("deteccao", fid, caixa, trilha["aluno_id"], novo_evento))
+            novo_evento = False
+            if trilha["confirmado"] and not trilha["registrado"]:
+                if trilha["vivo"] or not prova_de_vida:
+                    trilha["registrado"] = novo_evento = True
+                    estado = "ok"
+                else:
+                    estado = "pisque"
+            elif trilha["registrado"]:
+                estado = "ok"
+            elif trilha["t_enc"] and trilha["aluno_id"] is None:
+                estado = "desconhecido"
+            else:
+                estado = "verificando"
+
+            saida.put(("deteccao", chave, fid, caixa, trilha["aluno_id"], estado, novo_evento))
         except Exception as e:                    # uma falha não pode matar o processo
             print(f"[reconhecimento] erro: {e}")
             if tipo == "cadastro":
@@ -142,35 +223,65 @@ def processo_reconhecimento(entrada, saida):
 
 
 # =====================================================================
-# Totem (processo do site): câmera, vídeo, presença e foto
+# Totem (processo do site): frames, presença e foto
 # =====================================================================
+class Fluxo:
+    """Imagens e resultados de UM totem (a webcam do servidor ou um tablet)."""
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.frame = None            # último frame cru (BGR)
+        self.frame_id = 0
+        self.recebido_em = 0.0
+        self.enviado = -1            # último frame mandado ao processo de reconhecimento
+        self.enviados = OrderedDict()   # fid -> frame cheio (p/ recortar a foto)
+        self.caixas = []             # [(top, right, bottom, left, cor)] no tamanho do frame
+        self.estado = "sem_rosto"
+        self.aluno_id = None
+        self.eventos = deque(maxlen=20)
+        self.livre_em = 0.0          # não reconhece antes desse instante
+        self.pausado = False         # cadastro de rosto em andamento
+
+    def guardar(self, frame):
+        with self.lock:
+            self.frame = frame
+            self.frame_id += 1
+            self.recebido_em = time.time()
+
+    def atual(self):
+        with self.lock:
+            return (None, 0) if self.frame is None else (self.frame.copy(), self.frame_id)
+
+
 class Totem:
-    def __init__(self, app, camera=0):
-        self.app, self.camera = app, camera
+    def __init__(self, app, camera=0, fonte=FONTE):
+        self.app, self.camera, self.fonte = app, camera, fonte
+        self.escala = 0.75 if fonte == "tablet" else 0.5   # tablet manda 640px; reduz menos para ver os olhos
         self.cap = None
         self.rodando = False
         self.iniciando = False
         self.erro = None
         self._start_lock = threading.Lock()
         self._ultima_tentativa = 0.0
-        self.lock = threading.Lock()
-        self.frame = None            # último frame cru da câmera (BGR)
-        self.frame_id = 0
-        self.caixas = []             # [(top,right,bottom,left,cor)]
-        self.eventos = deque(maxlen=20)
+        self.fluxos = {}
+        self._fluxos_lock = threading.Lock()
         self.ids, self.encs = [], np.empty((0, 128))
         self.ultimo_evento = {}      # aluno_id -> timestamp
-        self._livre_em = 0.0         # não reconhece antes desse instante
-        self._pausar = threading.Event()   # pausa o reconhecimento (cadastro de face)
 
         self._proc = None
         self._entrada = self._saida = None
-        self._enviados = OrderedDict()     # fid -> frame cheio (p/ recortar a foto)
-        self._cadastros = {}               # pedido -> [Event, resultado]
+        self._cadastros = {}         # pedido -> [Event, resultado]
+        self._ultimo_reinicio = 0.0
+
+    def fluxo(self, chave):
+        with self._fluxos_lock:
+            if chave not in self.fluxos:
+                self.fluxos[chave] = Fluxo()
+            return self.fluxos[chave]
 
     # ---------- ciclo de vida ----------
     def iniciar(self):
-        """Não bloqueia: abre a câmera em segundo plano. Pode ser chamado à vontade."""
+        """Não bloqueia: sobe o reconhecimento (e a webcam, no modo câmera) em segundo plano."""
         with self._start_lock:
             if self.rodando or self.iniciando:
                 return
@@ -185,24 +296,27 @@ class Totem:
 
     def _abrir_e_rodar(self):
         try:
-            # No Windows o backend padrão (MSMF) demora e engasga; DSHOW é bem mais leve.
-            cap = cv2.VideoCapture(self.camera, cv2.CAP_DSHOW) if os.name == "nt" \
-                else cv2.VideoCapture(self.camera)
-            cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)     # sem fila de frames velhos = sem atraso
-            if not cap.isOpened():
-                self.erro = "Não foi possível abrir a câmera (tente TOTEM_CAMERA=1)."
-                return
-            self.cap, self.erro = cap, None
+            if self.fonte == "camera":
+                # No Windows o backend padrão (MSMF) demora e engasga; DSHOW é bem mais leve.
+                cap = cv2.VideoCapture(self.camera, cv2.CAP_DSHOW) if os.name == "nt" \
+                    else cv2.VideoCapture(self.camera)
+                cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)     # sem fila de frames velhos = sem atraso
+                if not cap.isOpened():
+                    self.erro = "Não foi possível abrir a câmera (tente TOTEM_CAMERA=1)."
+                    return
+                self.cap = cap
+            self.erro = None
             self._iniciar_processo()
             self.rodando = True
-            threading.Thread(target=self._capturar, daemon=True).start()
+            if self.fonte == "camera":
+                threading.Thread(target=self._capturar, daemon=True).start()
             threading.Thread(target=self._alimentar, daemon=True).start()
             threading.Thread(target=self._ler_resultados, daemon=True).start()
         except Exception as e:                      # nunca derruba o servidor
-            self.erro = f"Erro ao iniciar a câmera: {e}"
+            self.erro = f"Erro ao iniciar o reconhecimento: {e}"
         finally:
             self.iniciando = False
 
@@ -210,7 +324,7 @@ class Totem:
         ctx = mp.get_context("spawn")
         self._entrada = ctx.Queue(maxsize=2)   # fila curta: frame velho é descartado, não acumula atraso
         self._saida = ctx.Queue()
-        self._proc = ctx.Process(target=processo_reconhecimento, args=(self._entrada, self._saida),
+        self._proc = ctx.Process(target=processo_reconhecimento, args=(self._entrada, self._saida, PROVA_DE_VIDA),
                                  name="reconhecimento-facial", daemon=True)
         self._proc.start()
         self.recarregar()
@@ -226,9 +340,10 @@ class Totem:
         if self._proc is not None and self._proc.is_alive():
             self._entrada.put(("rostos", self.ids, self.encs))
 
-    # ---------- threads ----------
+    # ---------- entrada de imagens ----------
     def _capturar(self):
-        falhas = 0
+        """Modo câmera: lê a webcam do servidor sem parar."""
+        fluxo, falhas = self.fluxo("camera"), 0
         while self.rodando:
             ok, frame = self.cap.read()
             if not ok:
@@ -240,37 +355,53 @@ class Totem:
                 time.sleep(0.05)
                 continue
             falhas = 0
-            with self.lock:
-                self.frame = frame
-                self.frame_id += 1
+            fluxo.guardar(frame)
 
-    def _frame_atual(self):
-        with self.lock:
-            return (None, 0) if self.frame is None else (self.frame.copy(), self.frame_id)
+    def receber_frame(self, chave, jpeg):
+        """Modo tablet: guarda a foto que o navegador mandou e devolve o último resultado desse totem."""
+        self.iniciar()
+        frame = cv2.imdecode(np.frombuffer(jpeg, np.uint8), cv2.IMREAD_COLOR)
+        if frame is None:
+            raise ValueError("imagem inválida")
+        if max(frame.shape[:2]) > 960:          # tablet que ignorou o tamanho pedido
+            f = 960 / max(frame.shape[:2])
+            frame = cv2.resize(frame, (0, 0), fx=f, fy=f)
+        fluxo = self.fluxo(chave)
+        fluxo.guardar(frame)
+        caixa = fluxo.caixas[0][:4] if fluxo.caixas else None
+        return {"caixa": caixa, "estado": fluxo.estado, "largura": frame.shape[1], "altura": frame.shape[0],
+                "pronto": self.rodando, "erro": self.erro}
 
     def _alimentar(self):
-        """Manda o frame mais novo (reduzido) para o processo de reconhecimento."""
-        visto = -1
+        """Manda o frame mais novo (reduzido) de cada totem para o processo de reconhecimento."""
         while self.rodando:
             time.sleep(INTERVALO)
             if not self._proc.is_alive():
-                print("[totem] processo de reconhecimento caiu; reiniciando")
-                self._iniciar_processo()
+                # espera entre tentativas: se o processo não consegue subir, não fica abrindo sem parar
+                if time.time() - self._ultimo_reinicio > 10:
+                    print("[totem] processo de reconhecimento caiu; reiniciando")
+                    self.erro = "Reconhecimento reiniciando..."
+                    self._ultimo_reinicio = time.time()
+                    self._iniciar_processo()
                 continue
-            if self._pausar.is_set() or time.time() < self._livre_em:
-                continue
-            frame, fid = self._frame_atual()
-            if frame is None or fid == visto:
-                continue
-            rgb = cv2.cvtColor(cv2.resize(frame, (0, 0), fx=ESCALA, fy=ESCALA), cv2.COLOR_BGR2RGB)
-            try:
-                self._entrada.put_nowait(("frame", fid, rgb))
-            except queue.Full:                      # processo ocupado: pula este frame
-                continue
-            visto = fid
-            self._enviados[fid] = frame
-            while len(self._enviados) > 5:
-                self._enviados.popitem(last=False)
+            if self.erro == "Reconhecimento reiniciando...":
+                self.erro = None
+            agora = time.time()
+            for chave, fluxo in list(self.fluxos.items()):
+                if fluxo.pausado or agora < fluxo.livre_em or agora - fluxo.recebido_em > QUADRO_VELHO:
+                    continue
+                frame, fid = fluxo.atual()
+                if frame is None or fid == fluxo.enviado:
+                    continue
+                rgb = cv2.cvtColor(cv2.resize(frame, (0, 0), fx=self.escala, fy=self.escala), cv2.COLOR_BGR2RGB)
+                try:
+                    self._entrada.put_nowait(("frame", chave, fid, rgb))
+                except queue.Full:                  # processo ocupado: tenta de novo na próxima volta
+                    break
+                fluxo.enviado = fid
+                fluxo.enviados[fid] = frame
+                while len(fluxo.enviados) > 5:
+                    fluxo.enviados.popitem(last=False)
 
     def _ler_resultados(self):
         while self.rodando:
@@ -286,20 +417,22 @@ class Totem:
                         self._cadastros[pedido][0].set()
                     continue
 
-                _, fid, caixa, aluno_id, novo_evento = msg
+                _, chave, fid, caixa, aluno_id, estado, novo_evento = msg
+                fluxo = self.fluxo(chave)
+                fluxo.estado, fluxo.aluno_id = estado, aluno_id
                 if caixa is None:
-                    self.caixas = []
+                    fluxo.caixas = []
                     continue
-                t, r, b, l = [int(v / ESCALA) for v in caixa]
-                self.caixas = [(t, r, b, l, (0, 200, 0) if aluno_id else (0, 0, 255))]
+                t, r, b, l = [int(v / self.escala) for v in caixa]
+                fluxo.caixas = [(t, r, b, l, (0, 200, 0) if aluno_id else (0, 0, 255))]
                 if novo_evento and time.time() - self.ultimo_evento.get(aluno_id, 0) > COOLDOWN:
                     self.ultimo_evento[aluno_id] = time.time()
-                    self._livre_em = time.time() + PAUSA_APOS_EVENTO
-                    self._registrar(aluno_id, self._enviados.get(fid), (t, r, b, l))
+                    fluxo.livre_em = time.time() + PAUSA_APOS_EVENTO
+                    self._registrar(fluxo, aluno_id, fluxo.enviados.get(fid), (t, r, b, l))
             except Exception as e:                  # uma falha não pode matar a thread
                 print(f"[totem] erro ao tratar reconhecimento: {e}")
 
-    def _registrar(self, aluno_id, frame=None, caixa=None):
+    def _registrar(self, fluxo, aluno_id, frame=None, caixa=None):
         with self.app.app_context():
             aluno = db.session.get(Aluno, aluno_id)
             if not aluno:
@@ -308,7 +441,7 @@ class Totem:
             if frame is not None:
                 self._atualizar_foto(aluno, frame, caixa)
             agora = agora_local()
-            self.eventos.append({
+            fluxo.eventos.append({
                 "nome": aluno.nome,
                 "matricula": aluno.matricula,
                 "foto": aluno.foto,
@@ -344,17 +477,17 @@ class Totem:
             print(f"[totem] não consegui atualizar a foto: {e}")
 
     # ---------- API usada pelas rotas ----------
-    def proximo_evento(self):
+    def proximo_evento(self, chave):
         try:
-            return self.eventos.popleft()
+            return self.fluxo(chave).eventos.popleft()
         except IndexError:
             return None
 
     def stream(self):
-        """Gerador MJPEG para <img src='/video_feed'>. Só codifica quando há frame novo."""
-        ultimo = -1
+        """Modo câmera: gerador MJPEG para <img src='/video_feed'>. Só codifica quando há frame novo."""
+        fluxo, ultimo = self.fluxo("camera"), -1
         while True:
-            frame, fid = self._frame_atual()
+            frame, fid = fluxo.atual()
             if frame is None:
                 img = np.zeros((480, 640, 3), np.uint8)
                 msg = self.erro or "Iniciando camera..."
@@ -368,26 +501,31 @@ class Totem:
                 ultimo = fid
                 w = frame.shape[1]
                 img = cv2.flip(frame, 1)    # espelho só na exibição; o reconhecimento usa o frame cru
-                for (t, r, b, l, cor) in list(self.caixas):
+                for (t, r, b, l, cor) in list(fluxo.caixas):
                     cv2.rectangle(img, (w - r, t), (w - l, b), cor, 2)
             ok, jpg = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 60])
             if ok:
                 yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + jpg.tobytes() + b"\r\n")
             time.sleep(0.05)                # ~20 fps é de sobra
 
-    def capturar_encoding(self, tentativas=5):
-        """Tira até 'tentativas' fotos e devolve (encoding_médio, frame) ou (None, motivo)."""
+    def capturar_encoding(self, chave, tentativas=5):
+        """Junta até 'tentativas' frames recentes desse totem e devolve (encoding_médio, frame) ou (None, motivo)."""
         if not self.rodando:
-            return None, self.erro or "Câmera ainda iniciando, tente de novo em instantes."
-        frames, melhor, pedido = [], None, None
-        self._pausar.set()                  # reconhecimento descansa enquanto cadastra
+            return None, self.erro or "Reconhecimento ainda iniciando, tente de novo em instantes."
+        fluxo = self.fluxo(chave)
+        frames, melhor, pedido, visto = [], None, None, -1
+        fluxo.pausado = True                # reconhecimento desse totem descansa enquanto cadastra
         try:
-            for _ in range(tentativas):
-                frame, _fid = self._frame_atual()
-                if frame is not None:
+            limite = time.time() + 4
+            while len(frames) < tentativas and time.time() < limite:
+                frame, fid = fluxo.atual()
+                if frame is not None and fid != visto and time.time() - fluxo.recebido_em <= QUADRO_VELHO:
+                    visto = fid
                     frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
                     melhor = frame
-                time.sleep(0.15)
+                time.sleep(0.12)
+            if not frames:
+                return None, "A câmera do totem não está enviando imagens."
             pedido = uuid.uuid4().hex
             pronto = threading.Event()
             self._cadastros[pedido] = [pronto, None]
@@ -399,7 +537,7 @@ class Totem:
             return None, "O reconhecimento está ocupado. Tente de novo."
         finally:
             self._cadastros.pop(pedido, None)
-            self._pausar.clear()
+            fluxo.pausado = False
         if enc is None:
             return None, "Nenhum rosto único detectado. Fique sozinho e de frente para a câmera."
         return enc, melhor
