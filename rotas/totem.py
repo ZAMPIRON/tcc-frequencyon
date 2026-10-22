@@ -1,7 +1,7 @@
 # rotas do totem da entrada
 # a parte pesada (reconhecimento) fica em face_service.py,
 # aqui so tem a ponte entre o navegador do totem (tablet) e o servidor.
-# o totem so funciona depois que um professor libera com a senha dele (vale ate o fim do dia)
+# o totem so funciona depois que um professor olha pra camera dele (vale ate o fim do dia)
 import hashlib
 import os
 import secrets
@@ -12,7 +12,7 @@ from datetime import datetime, time as dtime, timedelta
 from functools import wraps
 
 import cv2
-from flask import Blueprint, Response, current_app, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, Response, current_app, jsonify, redirect, render_template, request, session, url_for
 
 from database import db, Admin, Aluno, Dispositivo, Professor, agora_local, hoje_local
 from .comum import pasta_uploads, pegar_totem
@@ -24,8 +24,8 @@ MAX_FOTO_BYTES = 600 * 1024
 
 
 # ---------------------------------------------------------------------
-# liberacao do tablet: quando o professor chega, digita e-mail e senha no
-# totem e ele fica liberado ate o fim do dia. o aparelho guarda um token num
+# liberacao do tablet: quando o professor chega, olha pra camera do totem
+# (ou digita e-mail e senha) e ele fica liberado ate o fim do dia. o aparelho guarda um token num
 # cookie e o banco guarda so o hash dele
 # ---------------------------------------------------------------------
 TENTATIVAS_LIBERAR = 10
@@ -69,21 +69,77 @@ def requer_totem(f):
 def pagina_totem():
     disp = dispositivo_atual()
     if not disp or not disp.liberado:
-        return render_template("totem/liberar.html")
+        totem = pegar_totem()
+        totem.iniciar()
+        return render_template("totem/liberar.html", modo=totem.fonte)
     totem = pegar_totem()
     totem.iniciar()
     return render_template("totem/reconhecimento.html", modo=totem.fonte, nome_totem=disp.nome)
 
 
+def _liberar(pessoa, resp):
+    # libera este aparelho ate o fim do dia em nome de 'pessoa' (aparelho novo ganha um token num cookie)
+    fim_do_dia = datetime.combine(hoje_local(), dtime(23, 59, 59))
+    disp = dispositivo_atual()
+    token = None
+    if not disp:
+        token = secrets.token_urlsafe(32)
+        disp = Dispositivo(nome=f"Totem {Dispositivo.query.count() + 1}", token_hash=_hash(token))
+        db.session.add(disp)
+    disp.liberado_ate, disp.liberado_por, disp.ultimo_uso = fim_do_dia, pessoa.nome, agora_local()
+    db.session.commit()
+    print(f"[totem] {disp.nome} liberado por {pessoa.nome} até {fim_do_dia:%d/%m %H:%M}")
+    if token:
+        # cookie proprio (nao a sessao) pra continuar valendo mesmo se o navegador do tablet reiniciar
+        resp.set_cookie(COOKIE_TOTEM, token, max_age=2 * 365 * 24 * 3600, httponly=True, samesite="Strict",
+                        secure=current_app.config.get("SESSION_COOKIE_SECURE", False))
+    return resp
+
+
+def _chave_bloqueado():
+    # totem bloqueado: aparelho conhecido usa a chave dele; aparelho novo ganha uma chave provisoria na sessao
+    disp = dispositivo_atual()
+    if disp:
+        return chave_do_totem(disp)
+    if pegar_totem().fonte == "camera":
+        return "camera"
+    if "totem_pre" not in session:
+        session["totem_pre"] = secrets.token_hex(8)
+    return f"pre{session['totem_pre']}"
+
+
+@reconhecimento.route("/totem/liberar/frame", methods=["POST"])
+def liberar_por_rosto():
+    # totem bloqueado: o tablet manda fotos e, quando reconhece o rosto de um professor, libera o aparelho
+    jpeg = request.get_data(cache=False)
+    if not jpeg or len(jpeg) > MAX_FOTO_BYTES:
+        return jsonify(sucesso=False, mensagem="Imagem vazia ou grande demais."), 413
+    totem, chave = pegar_totem(), _chave_bloqueado()
+    try:
+        resultado = totem.receber_frame(chave, jpeg, grupo="prof")
+    except ValueError:
+        return jsonify(sucesso=False, mensagem="Imagem inválida."), 400
+    pid = totem.professor_reconhecido(chave)
+    professor = db.session.get(Professor, pid) if pid else None
+    if not professor:
+        return jsonify({**resultado, "liberado": False})
+    resp = _liberar(professor, jsonify({**resultado, "liberado": True, "nome": professor.nome}))
+    if chave.startswith("pre"):
+        totem.esquecer(chave)
+        session.pop("totem_pre", None)
+    return resp
+
+
 @reconhecimento.route("/totem/liberar", methods=["POST"])
 def liberar_totem():
+    # plano B: e-mail e senha (admin sem rosto cadastrado, camera com problema)
     ip = request.remote_addr or "?"
     agora = time.time()
     n, desde = _erros_liberar.get(ip, (0, agora))
     if agora - desde > JANELA_LIBERAR:
         n, desde = 0, agora
     if n >= TENTATIVAS_LIBERAR:
-        return render_template("totem/liberar.html", erro="Muitas tentativas erradas. Aguarde 15 minutos."), 429
+        return render_template("totem/liberar.html", modo=pegar_totem().fonte, erro="Muitas tentativas erradas. Aguarde 15 minutos."), 429
 
     email = (request.form.get("email") or "").strip().lower()
     senha = request.form.get("senha") or ""
@@ -92,27 +148,9 @@ def liberar_totem():
               or Admin.query.filter(db.func.lower(Admin.email) == email).first())
     if not pessoa or not pessoa.check_senha(senha):
         _erros_liberar[ip] = (n + 1, desde)
-        return render_template("totem/liberar.html", erro="E-mail ou senha incorretos.", email=email), 403
+        return render_template("totem/liberar.html", modo=pegar_totem().fonte, erro="E-mail ou senha incorretos.", email=email), 403
     _erros_liberar.pop(ip, None)
-
-    fim_do_dia = datetime.combine(hoje_local(), dtime(23, 59, 59))
-    disp = dispositivo_atual()
-    token = None
-    if not disp:
-        # aparelho novo: ganha um token proprio, guardado num cookie
-        token = secrets.token_urlsafe(32)
-        disp = Dispositivo(nome=f"Totem {Dispositivo.query.count() + 1}", token_hash=_hash(token))
-        db.session.add(disp)
-    disp.liberado_ate, disp.liberado_por, disp.ultimo_uso = fim_do_dia, pessoa.nome, agora_local()
-    db.session.commit()
-    print(f"[totem] {disp.nome} liberado por {pessoa.nome} até {fim_do_dia:%d/%m %H:%M}")
-
-    resp = redirect(url_for("reconhecimento.pagina_totem"))
-    if token:
-        # cookie proprio (nao a sessao) pra continuar valendo mesmo se o navegador do tablet reiniciar
-        resp.set_cookie(COOKIE_TOTEM, token, max_age=2 * 365 * 24 * 3600, httponly=True, samesite="Strict",
-                        secure=current_app.config.get("SESSION_COOKIE_SECURE", False))
-    return resp
+    return _liberar(pessoa, redirect(url_for("reconhecimento.pagina_totem")))
 
 
 # ---------------------------------------------------------------------
@@ -126,7 +164,10 @@ def api_frame(disp):
     if not jpeg or len(jpeg) > MAX_FOTO_BYTES:
         return jsonify(sucesso=False, mensagem="Imagem vazia ou grande demais."), 413
     try:
-        return jsonify(pegar_totem().receber_frame(chave_do_totem(disp), jpeg))
+        totem, chave = pegar_totem(), chave_do_totem(disp)
+        resultado = totem.receber_frame(chave, jpeg)
+        # o reconhecimento volta junto com a resposta do frame: a tela não espera o polling de 1 s
+        return jsonify({**resultado, "evento": totem.proximo_evento(chave)})
     except ValueError:
         return jsonify(sucesso=False, mensagem="Imagem inválida."), 400
 

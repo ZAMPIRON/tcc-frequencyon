@@ -1,0 +1,109 @@
+{% extends 'admin/base.html' %}
+
+{% block title %}Rosto do professor - FrequencyOn{% endblock %}
+
+{% block extra_css %}
+<style>
+    .camera-rosto { position: relative; width: 100%; max-width: 520px; aspect-ratio: 4 / 3; margin: 0 auto;
+                    border-radius: 20px; overflow: hidden; background: #0b1020; }
+    .camera-rosto video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+    /* oval guia: onde o professor deve encaixar o rosto */
+    .camera-rosto .guia { position: absolute; left: 50%; top: 50%; width: 46%; height: 72%; transform: translate(-50%, -50%);
+                          border: 3px dashed rgba(255, 255, 255, .7); border-radius: 50%; pointer-events: none; }
+    .camera-rosto.capturando .guia { border-style: solid; border-color: #22d3ee; }
+    .camera-rosto.ok .guia { border-style: solid; border-color: #22c55e; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h1 class="h3 fw-bold mb-1">Rosto de <span class="fo-gradient-text">{{ professor.nome }}</span></h1>
+        <p class="text-muted mb-0 small">É com este rosto que {{ professor.nome.split()[0] }} libera o totem todo dia, sem digitar senha.</p>
+    </div>
+    <a href="{{ url_for('admin.professores') }}" class="btn btn-light btn-sm"><i class="bi bi-arrow-left me-1"></i> Voltar</a>
+</div>
+
+<div class="card border-0 shadow-sm rounded-3">
+    <div class="card-body p-4 text-center">
+        <div class="camera-rosto mb-3" id="caixaCamera">
+            <video id="camera" autoplay playsinline muted></video>
+            <div class="guia"></div>
+        </div>
+        <p class="small text-muted mb-3">Peça ao professor para ficar sozinho na frente da câmera, encaixar o rosto no oval e olhar reto.</p>
+        <div id="mensagem" class="small mb-3" role="status"></div>
+        <button type="button" id="btnCapturar" class="btn btn-primary px-4" disabled>
+            <i class="bi bi-camera me-1"></i> {{ 'Recadastrar rosto' if professor.face_encoding else 'Capturar rosto' }}
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        const video = document.getElementById('camera');
+        const caixa = document.getElementById('caixaCamera');
+        const botao = document.getElementById('btnCapturar');
+        const msg = document.getElementById('mensagem');
+        const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
+
+        function mostrar(texto, tipo) {
+            msg.className = 'small mb-3 text-' + (tipo || 'muted');
+            msg.textContent = texto;
+        }
+
+        async function ligarCamera() {
+            if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                mostrar('Abra o painel pelo endereço https:// para usar a câmera.', 'danger');
+                return;
+            }
+            try {
+                video.srcObject = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false,
+                });
+                await video.play();
+                botao.disabled = false;
+            } catch (e) {
+                mostrar('Não consegui abrir a câmera. Permita o acesso no navegador.', 'danger');
+            }
+        }
+
+        async function capturar() {
+            botao.disabled = true;
+            caixa.className = 'camera-rosto mb-3 capturando';
+            mostrar('Capturando... fique parado olhando para a câmera.');
+            const canvas = document.createElement('canvas');
+            canvas.width = 640;
+            canvas.height = Math.round(640 * video.videoHeight / video.videoWidth);
+            const dados = new FormData();
+            for (let i = 0; i < 5; i++) {
+                canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+                dados.append('fotos', await new Promise((r) => canvas.toBlob(r, 'image/jpeg', 0.85)), `foto${i}.jpg`);
+                await esperar(200);
+            }
+            mostrar('Processando o rosto...');
+            try {
+                const res = await fetch(location.pathname, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content },
+                    body: dados,
+                });
+                const d = await res.json();
+                caixa.className = 'camera-rosto mb-3' + (d.sucesso ? ' ok' : '');
+                mostrar(d.mensagem, d.sucesso ? 'success' : 'danger');
+                if (d.sucesso) {
+                    botao.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i> Capturar de novo';
+                }
+            } catch (e) {
+                caixa.className = 'camera-rosto mb-3';
+                mostrar('Erro ao enviar as fotos. Tente de novo.', 'danger');
+            }
+            botao.disabled = false;
+        }
+
+        botao.addEventListener('click', capturar);
+        ligarCamera();
+    })();
+</script>
+{% endblock %}

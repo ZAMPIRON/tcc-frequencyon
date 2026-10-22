@@ -13,7 +13,7 @@ try:
 except ImportError:  # permite subir o site sem a lib (o totem fica indisponível)
     face_recognition = None
 
-from database import db, Aluno, registrar_presenca_totem, agora_local, hoje_local
+from database import db, Aluno, Professor, registrar_presenca_totem, agora_local, hoje_local
 
 # de onde vêm as imagens: "tablet" (câmera do navegador do tablet) ou "camera" (webcam ligada no servidor)
 FONTE = os.getenv("TOTEM_FONTE", "tablet").strip().lower()
@@ -21,10 +21,11 @@ FONTE = os.getenv("TOTEM_FONTE", "tablet").strip().lower()
 PROVA_DE_VIDA = os.getenv("PROVA_DE_VIDA", "1") != "0"
 
 TOLERANCIA = 0.50        # menor = mais rígido
-CONFIRMACOES = 2         # encodings seguidos com o mesmo aluno antes de registrar
+CONFIRMACOES = 2         # encodings seguidos com o mesmo aluno antes de registrar...
+CONFIRMA_DIRETO = 0.42   # ...a não ser que o primeiro já seja bem parecido (cada encoding custa ~0,3 s)
 COOLDOWN = 8.0           # segundos antes de reconhecer o MESMO aluno de novo
 PAUSA_APOS_EVENTO = 3.0  # segundos "descansando" depois de qualquer registro
-INTERVALO = 0.05         # segundos entre duas voltas do envio de frames ao processo de reconhecimento
+INTERVALO = 0.02         # segundos entre duas voltas do envio de frames ao processo de reconhecimento
 QUADRO_VELHO = 2.0       # frame mais velho que isso não serve (tablet parou de mandar)
 
 # quando calcular o encoding (a parte cara)
@@ -56,6 +57,28 @@ def encoding_de_arquivo(caminho):
         if len(locs) != 1:
             return None
         return face_recognition.face_encodings(rgb, locs)[0].astype(np.float64)
+
+
+def encoding_de_imagens(jpegs):
+    """Encoding médio de várias fotos JPEG (cadastro de rosto do professor pela câmera do admin).
+    Devolve (encoding, melhor_frame_bgr) ou (None, motivo)."""
+    if face_recognition is None:
+        return None, "Biblioteca face_recognition não instalada."
+    achados, melhor = [], None
+    for jpeg in jpegs:
+        frame = cv2.imdecode(np.frombuffer(jpeg, np.uint8), cv2.IMREAD_COLOR)
+        if frame is None:
+            continue
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        with DLIB_LOCK:
+            locs = face_recognition.face_locations(rgb, model="hog")
+            if len(locs) != 1:
+                continue
+            achados.append(face_recognition.face_encodings(rgb, locs)[0])
+        melhor = frame
+    if len(achados) < 2:
+        return None, "Não deu para ver bem o rosto. Fique sozinho, de frente e perto da câmera."
+    return np.mean(achados, axis=0).astype(np.float64), melhor
 
 
 # =====================================================================
@@ -102,32 +125,35 @@ def atualizar_vivo(trilha, marcos):
         trilha["vivo"] = True
 
 
-def _nova_trilha():
-    return {"aluno_id": None, "seq": 0, "confirmado": False, "t_enc": 0.0, "vivo": False,
+def _nova_trilha(grupo="aluno"):
+    return {"grupo": grupo, "aluno_id": None, "seq": 0, "confirmado": False, "t_enc": 0.0, "vivo": False,
             "registrado": False, "olhos": deque(maxlen=JANELA_VIVO), "boca": deque(maxlen=JANELA_VIVO)}
 
 
-def processo_reconhecimento(entrada, saida, prova_de_vida=True):
+def processo_reconhecimento(entrada, saida, prova_de_vida=True, ampliar=1):
     """Recebe frames reduzidos (RGB) de um ou mais totens e devolve onde está o rosto e de quem é.
 
+    ampliar: quantas vezes o detector amplia a imagem (0 no frame de 640px do tablet = 3x mais rápido).
     Detecta rosto em todo frame (barato), mas só calcula o encoding (caro) quando aparece um rosto
     novo, faltam confirmações, ou chegou a hora de reverificar. Cada totem (chave) tem a sua trilha.
-    Mensagens: ("frame", chave, fid, rgb) | ("rostos", ids, encs) | ("cadastro", pedido, [rgb])
+    grupo: "aluno" (totem liberado, registra presença) ou "prof" (totem bloqueado, professor libera).
+    Mensagens: ("frame", chave, fid, rgb, grupo) | ("rostos", {grupo: (ids, encs)}) | ("cadastro", pedido, [rgb])
                ("esquecer", chave) | ("fim",)
-    Resposta:  ("deteccao", chave, fid, caixa, aluno_id, estado, novo_evento)
+    Resposta:  ("deteccao", chave, fid, caixa, pessoa_id, estado, novo_evento, grupo)
     estado: sem_rosto | longe | verificando | desconhecido | pisque | ok
     """
     import face_recognition as fr
 
-    ids, encs = [], np.empty((0, 128))
+    rostos = {}
     trilhas = {}
 
-    def identificar(enc):
+    def identificar(enc, grupo):
+        ids, encs = rostos.get(grupo, ([], None))
         if not len(ids):
-            return None
+            return None, 1.0
         dist = np.linalg.norm(encs - enc, axis=1)
         i = int(np.argmin(dist))
-        return ids[i] if dist[i] <= TOLERANCIA else None
+        return (ids[i] if dist[i] <= TOLERANCIA else None), float(dist[i])
 
     while True:
         msg = entrada.get()
@@ -136,7 +162,7 @@ def processo_reconhecimento(entrada, saida, prova_de_vida=True):
             if tipo == "fim":
                 return
             if tipo == "rostos":
-                ids, encs = msg[1], msg[2]
+                rostos = msg[1]
                 trilhas.clear()
                 continue
             if tipo == "esquecer":
@@ -153,23 +179,23 @@ def processo_reconhecimento(entrada, saida, prova_de_vida=True):
                 saida.put(("cadastro", pedido, media))
                 continue
 
-            _, chave, fid, rgb = msg
-            locs = fr.face_locations(rgb, model="hog")
+            _, chave, fid, rgb, grupo = msg
+            locs = fr.face_locations(rgb, ampliar, model="hog")
             if not locs:
                 trilhas.pop(chave, None)
-                saida.put(("deteccao", chave, fid, None, None, "sem_rosto", False))
+                saida.put(("deteccao", chave, fid, None, None, "sem_rosto", False, grupo))
                 continue
 
             caixa = max(locs, key=lambda c: (c[2] - c[0]) * (c[1] - c[3]))
             agora = time.time()
             trilha = trilhas.get(chave)
-            if trilha is None or _iou(caixa, trilha["caixa"]) < MESMO_ROSTO_IOU:
-                trilha = trilhas[chave] = _nova_trilha()
+            if trilha is None or trilha["grupo"] != grupo or _iou(caixa, trilha["caixa"]) < MESMO_ROSTO_IOU:
+                trilha = trilhas[chave] = _nova_trilha(grupo)
             trilha["caixa"] = caixa
 
             perto = (caixa[2] - caixa[0]) >= ROSTO_MINIMO
             if not perto:
-                saida.put(("deteccao", chave, fid, caixa, None, "longe", False))
+                saida.put(("deteccao", chave, fid, caixa, None, "longe", False, grupo))
                 continue
 
             # prova de vida passiva: mede olhos e boca em todo frame até ver o rosto se mexer
@@ -186,11 +212,11 @@ def processo_reconhecimento(entrada, saida, prova_de_vida=True):
                 precisa = agora - trilha["t_enc"] >= TENTAR_DE_NOVO
 
             if precisa:
-                aluno_id = identificar(fr.face_encodings(rgb, [caixa])[0])
+                aluno_id, dist = identificar(fr.face_encodings(rgb, [caixa])[0], grupo)
                 trilha["t_enc"] = agora
                 if trilha["confirmado"]:
                     if aluno_id != trilha["aluno_id"]:          # trocou a pessoa na frente da câmera
-                        trilha.update(_nova_trilha(), caixa=caixa, t_enc=agora,
+                        trilha.update(_nova_trilha(grupo), caixa=caixa, t_enc=agora,
                                       aluno_id=aluno_id, seq=1 if aluno_id else 0)
                 elif aluno_id is None:
                     trilha.update(aluno_id=None, seq=0)
@@ -198,7 +224,7 @@ def processo_reconhecimento(entrada, saida, prova_de_vida=True):
                     trilha["seq"] += 1
                 else:
                     trilha.update(aluno_id=aluno_id, seq=1)
-                if trilha["aluno_id"] and trilha["seq"] >= CONFIRMACOES:
+                if trilha["aluno_id"] and (trilha["seq"] >= CONFIRMACOES or dist <= CONFIRMA_DIRETO):
                     trilha["confirmado"] = True
 
             novo_evento = False
@@ -215,7 +241,7 @@ def processo_reconhecimento(entrada, saida, prova_de_vida=True):
             else:
                 estado = "verificando"
 
-            saida.put(("deteccao", chave, fid, caixa, trilha["aluno_id"], estado, novo_evento))
+            saida.put(("deteccao", chave, fid, caixa, trilha["aluno_id"], estado, novo_evento, grupo))
         except Exception as e:                    # uma falha não pode matar o processo
             print(f"[reconhecimento] erro: {e}")
             if tipo == "cadastro":
@@ -241,6 +267,8 @@ class Fluxo:
         self.eventos = deque(maxlen=20)
         self.livre_em = 0.0          # não reconhece antes desse instante
         self.pausado = False         # cadastro de rosto em andamento
+        self.grupo = "aluno"         # "prof" enquanto o totem está bloqueado esperando um professor
+        self.professor_liberou = None   # id do professor reconhecido no totem bloqueado
 
     def guardar(self, frame):
         with self.lock:
@@ -256,7 +284,8 @@ class Fluxo:
 class Totem:
     def __init__(self, app, camera=0, fonte=FONTE):
         self.app, self.camera, self.fonte = app, camera, fonte
-        self.escala = 0.75 if fonte == "tablet" else 0.5   # tablet manda 640px; reduz menos para ver os olhos
+        # tablet manda 640px: usa inteiro e detecta sem ampliar (30 ms); webcam reduz para 320px e amplia 1x
+        self.escala, self.ampliar = (1.0, 0) if fonte == "tablet" else (0.5, 1)
         self.cap = None
         self.rodando = False
         self.iniciando = False
@@ -265,7 +294,7 @@ class Totem:
         self._ultima_tentativa = 0.0
         self.fluxos = {}
         self._fluxos_lock = threading.Lock()
-        self.ids, self.encs = [], np.empty((0, 128))
+        self.rostos = {}             # grupo -> (ids, encs)
         self.ultimo_evento = {}      # aluno_id -> timestamp
 
         self._proc = None
@@ -324,21 +353,22 @@ class Totem:
         ctx = mp.get_context("spawn")
         self._entrada = ctx.Queue(maxsize=2)   # fila curta: frame velho é descartado, não acumula atraso
         self._saida = ctx.Queue()
-        self._proc = ctx.Process(target=processo_reconhecimento, args=(self._entrada, self._saida, PROVA_DE_VIDA),
+        self._proc = ctx.Process(target=processo_reconhecimento, args=(self._entrada, self._saida, PROVA_DE_VIDA, self.ampliar),
                                  name="reconhecimento-facial", daemon=True)
         self._proc.start()
         self.recarregar()
 
     def recarregar(self):
-        """Carrega os rostos do banco e manda para o processo de reconhecimento."""
+        """Carrega os rostos de alunos e professores do banco e manda para o processo de reconhecimento."""
+        rostos = {}
         with self.app.app_context():
-            alunos = Aluno.query.filter(Aluno.face_encoding.isnot(None)).all()
-            ids = [a.id for a in alunos]
-            encs = [np.frombuffer(a.face_encoding, dtype=np.float64) for a in alunos]
-        self.ids = ids
-        self.encs = np.array(encs) if encs else np.empty((0, 128))
+            for grupo, modelo in (("aluno", Aluno), ("prof", Professor)):
+                pessoas = modelo.query.filter(modelo.face_encoding.isnot(None)).all()
+                encs = [np.frombuffer(p.face_encoding, dtype=np.float64) for p in pessoas]
+                rostos[grupo] = ([p.id for p in pessoas], np.array(encs) if encs else np.empty((0, 128)))
+        self.rostos = rostos
         if self._proc is not None and self._proc.is_alive():
-            self._entrada.put(("rostos", self.ids, self.encs))
+            self._entrada.put(("rostos", self.rostos))
 
     # ---------- entrada de imagens ----------
     def _capturar(self):
@@ -357,8 +387,9 @@ class Totem:
             falhas = 0
             fluxo.guardar(frame)
 
-    def receber_frame(self, chave, jpeg):
-        """Modo tablet: guarda a foto que o navegador mandou e devolve o último resultado desse totem."""
+    def receber_frame(self, chave, jpeg, grupo="aluno"):
+        """Modo tablet: guarda a foto que o navegador mandou e devolve o último resultado desse totem.
+        grupo "prof" = totem bloqueado procurando um professor para liberar."""
         self.iniciar()
         frame = cv2.imdecode(np.frombuffer(jpeg, np.uint8), cv2.IMREAD_COLOR)
         if frame is None:
@@ -367,8 +398,10 @@ class Totem:
             f = 960 / max(frame.shape[:2])
             frame = cv2.resize(frame, (0, 0), fx=f, fy=f)
         fluxo = self.fluxo(chave)
+        if fluxo.grupo != grupo:
+            fluxo.grupo, fluxo.estado, fluxo.caixas = grupo, "sem_rosto", []
         fluxo.guardar(frame)
-        caixa = fluxo.caixas[0][:4] if fluxo.caixas else None
+        caixa =fluxo.caixas[0][:4] if fluxo.caixas else None
         return {"caixa": caixa, "estado": fluxo.estado, "largura": frame.shape[1], "altura": frame.shape[0],
                 "pronto": self.rodando, "erro": self.erro}
 
@@ -393,9 +426,10 @@ class Totem:
                 frame, fid = fluxo.atual()
                 if frame is None or fid == fluxo.enviado:
                     continue
-                rgb = cv2.cvtColor(cv2.resize(frame, (0, 0), fx=self.escala, fy=self.escala), cv2.COLOR_BGR2RGB)
+                pequeno = frame if self.escala == 1.0 else cv2.resize(frame, (0, 0), fx=self.escala, fy=self.escala)
+                rgb = cv2.cvtColor(pequeno, cv2.COLOR_BGR2RGB)
                 try:
-                    self._entrada.put_nowait(("frame", chave, fid, rgb))
+                    self._entrada.put_nowait(("frame", chave, fid, rgb, fluxo.grupo))
                 except queue.Full:                  # processo ocupado: tenta de novo na próxima volta
                     break
                 fluxo.enviado = fid
@@ -417,14 +451,20 @@ class Totem:
                         self._cadastros[pedido][0].set()
                     continue
 
-                _, chave, fid, caixa, aluno_id, estado, novo_evento = msg
+                _, chave, fid, caixa, aluno_id, estado, novo_evento, grupo = msg
                 fluxo = self.fluxo(chave)
+                if grupo != fluxo.grupo:            # resultado de antes do totem trocar de modo
+                    continue
                 fluxo.estado, fluxo.aluno_id = estado, aluno_id
                 if caixa is None:
                     fluxo.caixas = []
                     continue
                 t, r, b, l = [int(v / self.escala) for v in caixa]
                 fluxo.caixas = [(t, r, b, l, (0, 200, 0) if aluno_id else (0, 0, 255))]
+                if grupo == "prof":
+                    if novo_evento:
+                        fluxo.professor_liberou = aluno_id
+                    continue
                 if novo_evento and time.time() - self.ultimo_evento.get(aluno_id, 0) > COOLDOWN:
                     self.ultimo_evento[aluno_id] = time.time()
                     fluxo.livre_em = time.time() + PAUSA_APOS_EVENTO
@@ -477,6 +517,22 @@ class Totem:
             print(f"[totem] não consegui atualizar a foto: {e}")
 
     # ---------- API usada pelas rotas ----------
+    def professor_reconhecido(self, chave):
+        """Id do professor que acabou de olhar para o totem bloqueado (entregue uma vez só)."""
+        fluxo = self.fluxo(chave)
+        pid, fluxo.professor_liberou = fluxo.professor_liberou, None
+        return pid
+
+    def esquecer(self, chave):
+        """Apaga as imagens e a trilha de um totem (ex.: a chave provisória de um aparelho recém-liberado)."""
+        with self._fluxos_lock:
+            self.fluxos.pop(chave, None)
+        if self._proc is not None and self._proc.is_alive():
+            try:
+                self._entrada.put_nowait(("esquecer", chave))
+            except queue.Full:
+                pass
+
     def proximo_evento(self, chave):
         try:
             return self.fluxo(chave).eventos.popleft()
