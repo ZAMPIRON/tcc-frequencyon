@@ -381,10 +381,10 @@
             longe: ['bi-arrows-angle-contract', 'Chegue mais perto da câmera', 'atencao'],
             verificando: ['bi-search', 'Verificando...', ''],
             desconhecido: ['bi-person-x', 'Rosto não cadastrado', 'erro'],
-            pisque: ['bi-eye', 'Pisque os olhos para confirmar', 'atencao'],
+            pisque: ['bi-search', 'Verificando...', ''],
             ok: ['bi-check-circle-fill', 'Rosto reconhecido', ''],
         };
-        const CORES_CAIXA = { longe: '#94a3b8', verificando: '#22d3ee', desconhecido: '#ef4444', pisque: '#f59e0b', ok: '#22c55e' };
+        const CORES_CAIXA = { longe: '#94a3b8', verificando: '#22d3ee', desconhecido: '#ef4444', pisque: '#22d3ee', ok: '#22c55e' };
         const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
 
         function mostrarRotulo(estado, textoErro) {

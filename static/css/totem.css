@@ -134,6 +134,5 @@ body { min-height: 100vh; }
 .rotulo-camera.atencao { color: var(--fo-yellow); border-color: rgba(245, 158, 11, .6); }
 .rotulo-camera.erro { color: var(--fo-red); border-color: rgba(239, 68, 68, .6); }
 
-/* ---------- ativação do aparelho ---------- */
+/* ---------- liberação do totem pelo professor ---------- */
 .ativar-card { width: 100%; max-width: 440px; }
-.codigo-input { letter-spacing: .2em; text-transform: uppercase; font-family: ui-monospace, Consolas, monospace; }

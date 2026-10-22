@@ -17,7 +17,7 @@ from database import db, Aluno, registrar_presenca_totem, agora_local, hoje_loca
 
 # de onde vêm as imagens: "tablet" (câmera do navegador do tablet) ou "camera" (webcam ligada no servidor)
 FONTE = os.getenv("TOTEM_FONTE", "tablet").strip().lower()
-# só registra depois de ver o aluno piscar (foto impressa ou parada não pisca)
+# só registra depois de ver o rosto se mexer sozinho (foto impressa tem olhos e boca parados)
 PROVA_DE_VIDA = os.getenv("PROVA_DE_VIDA", "1") != "0"
 
 TOLERANCIA = 0.50        # menor = mais rígido
@@ -33,10 +33,12 @@ TENTAR_DE_NOVO = 0.5     # rosto desconhecido: no máximo 2 encodings por segund
 REVERIFICAR = 3.0        # rosto já reconhecido: confere de novo a cada 3 s
 MESMO_ROSTO_IOU = 0.4    # sobreposição mínima entre caixas p/ considerar o mesmo rosto
 
-# piscada: abertura dos olhos (EAR) cai abaixo de 70% do maior valor visto e depois volta a 85%
+# prova de vida passiva: rosto vivo mexe sozinho (olhos e boca variam entre frames); foto impressa não.
+# vivo = a abertura dos olhos ou da boca variou mais que VARIACAO_VIVO (relativo) em até JANELA_VIVO frames
 OLHO_ABERTO_MIN = 0.20
-PISCADA_FECHA = 0.70
-PISCADA_ABRE = 0.85
+VARIACAO_VIVO = float(os.getenv("VARIACAO_VIVO", "0.12"))
+JANELA_VIVO = 8
+FRAMES_MIN_VIVO = 3
 
 DLIB_LOCK = threading.Lock()   # cadastro por foto (admin) roda no processo do site
 
@@ -76,21 +78,33 @@ def abertura_olhos(pontos):
     return vertical / horizontal if horizontal else 0.0
 
 
-def atualizar_piscada(trilha, ear):
-    """Acompanha a abertura dos olhos de um rosto e marca trilha['vivo'] quando vê uma piscada."""
-    trilha["pico"] = max(trilha.get("pico", 0.0), ear)
-    pico = trilha["pico"]
-    if pico < OLHO_ABERTO_MIN:
+def abertura_boca(top_lip, bottom_lip):
+    """Distância entre os lábios internos dividida pela largura da boca."""
+    t, b = np.asarray(top_lip, dtype=float), np.asarray(bottom_lip, dtype=float)
+    largura = np.linalg.norm(t[0] - t[6])
+    return np.linalg.norm(t[9] - b[9]) / largura if largura else 0.0
+
+
+def _variou(valores, piso):
+    hi = max(valores)
+    return hi >= piso and (hi - min(valores)) / hi >= VARIACAO_VIVO
+
+
+def atualizar_vivo(trilha, marcos):
+    """Guarda olhos/boca dos últimos frames e marca trilha['vivo'] quando o rosto se mexe por conta própria."""
+    ear = (abertura_olhos(marcos["left_eye"]) + abertura_olhos(marcos["right_eye"])) / 2
+    boca = abertura_boca(marcos["top_lip"], marcos["bottom_lip"])
+    trilha["olhos"].append(ear)
+    trilha["boca"].append(boca)
+    if len(trilha["olhos"]) < FRAMES_MIN_VIVO:
         return
-    if not trilha.get("fechou") and ear < PISCADA_FECHA * pico:
-        trilha["fechou"] = True
-    elif trilha.get("fechou") and ear > PISCADA_ABRE * pico:
+    if _variou(trilha["olhos"], OLHO_ABERTO_MIN) or _variou(trilha["boca"], 0.05):
         trilha["vivo"] = True
 
 
 def _nova_trilha():
-    return {"aluno_id": None, "seq": 0, "confirmado": False, "t_enc": 0.0,
-            "vivo": False, "registrado": False, "pico": 0.0, "fechou": False}
+    return {"aluno_id": None, "seq": 0, "confirmado": False, "t_enc": 0.0, "vivo": False,
+            "registrado": False, "olhos": deque(maxlen=JANELA_VIVO), "boca": deque(maxlen=JANELA_VIVO)}
 
 
 def processo_reconhecimento(entrada, saida, prova_de_vida=True):
@@ -158,12 +172,11 @@ def processo_reconhecimento(entrada, saida, prova_de_vida=True):
                 saida.put(("deteccao", chave, fid, caixa, None, "longe", False))
                 continue
 
-            # prova de vida: mede a abertura dos olhos em todo frame até ver uma piscada
+            # prova de vida passiva: mede olhos e boca em todo frame até ver o rosto se mexer
             if prova_de_vida and not trilha["vivo"]:
                 marcos = fr.face_landmarks(rgb, [caixa])
-                if marcos and "left_eye" in marcos[0]:
-                    ear = (abertura_olhos(marcos[0]["left_eye"]) + abertura_olhos(marcos[0]["right_eye"])) / 2
-                    atualizar_piscada(trilha, ear)
+                if marcos and "left_eye" in marcos[0] and "top_lip" in marcos[0]:
+                    atualizar_vivo(trilha, marcos[0])
 
             if trilha["confirmado"]:
                 precisa = agora - trilha["t_enc"] >= REVERIFICAR

@@ -7,7 +7,6 @@ from database import (db, Aluno, Dispositivo, Justificativa, Professor, Professo
                       DIAS_SELECIONAVEIS, NOMES_DIAS, agora_local, dias_de_formulario)
 from .aluno import exportar_csv, render_detalhes
 from .comum import encoding_de_foto, pegar_totem, requer, salvar_foto
-from .totem import CODIGO_VALIDADE, gerar_codigo_ativacao
 
 admin = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -246,23 +245,18 @@ def responder_justificativa(id, acao):
 
 # ---------- totens (tablets) ----------
 
-@admin.route("/totens", methods=["GET", "POST"])
+@admin.route("/totens")
 @requer("admin")
 def totens():
-    # gera um codigo de uso unico; o tablet digita esse codigo uma vez na tela /totem
-    codigo = nome = None
-    if request.method == "POST":
-        nome = (request.form.get("nome") or "").strip()[:80] or "Totem da entrada"
-        codigo = gerar_codigo_ativacao(nome)
-    return render_template("admin/totens.html", codigo=codigo, nome_codigo=nome,
-                           minutos=CODIGO_VALIDADE // 60, modo=pegar_totem().fonte,
+    # aparelhos que ja foram usados como totem; cada um e liberado por um professor a cada dia
+    return render_template("admin/totens.html", modo=pegar_totem().fonte,
                            dispositivos=Dispositivo.query.order_by(Dispositivo.ativado_em.desc()).all())
 
 
 @admin.route("/totens/<int:id>/remover", methods=["POST"])
 @requer("admin")
 def remover_totem(id):
-    # o aparelho perde o acesso na hora (o token dele deixa de existir)
+    # o aparelho perde o acesso na hora (o token dele deixa de existir) e some da lista
     disp = db.get_or_404(Dispositivo, id)
     db.session.delete(disp)
     db.session.commit()
