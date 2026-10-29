@@ -100,6 +100,10 @@ def _horarios_aulas_env():
 HORARIOS_AULAS = _horarios_aulas_env()
 
 
+# senhas padrão/fracas que não podem ser usadas (e que o servidor avisa ao subir)
+SENHAS_FRACAS = ("admin123", "prof123", "123", "1234", "123456", "senha", "admin")
+
+
 class UsuarioMixin:
     def set_senha(self, senha):
         self.senha_hash = generate_password_hash(senha)

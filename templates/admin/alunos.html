@@ -79,6 +79,14 @@
                             <a href="{{ url_for('admin.detalhes_aluno', id=aluno.id) }}" class="btn btn-outline-primary btn-sm border-0" title="Ver detalhes">
                                 <i class="fa-solid fa-eye"></i>
                             </a>
+                            <button type="button" class="btn btn-outline-primary btn-sm border-0 btn-editar-aluno" title="Editar aluno"
+                                    data-bs-toggle="modal" data-bs-target="#modalEditarAluno"
+                                    data-url="{{ url_for('admin.editar_aluno', id=aluno.id) }}"
+                                    data-nome="{{ aluno.nome }}" data-email="{{ aluno.email or '' }}"
+                                    data-matricula="{{ aluno.matricula }}" data-numero="{{ aluno.numero_chamada or '' }}"
+                                    data-turma="{{ aluno.turma_id or '' }}">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
                             <form class="d-inline" method="POST" action="{{ url_for('admin.deletar_aluno', id=aluno.id) }}" onsubmit="return confirm('Tem certeza que deseja excluir?');">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-outline-danger btn-sm border-0">
@@ -97,4 +105,80 @@
         </div>
     </div>
 </div>
+
+<!-- Modal para Editar Aluno (preenchido pelo botão de lápis de cada linha) -->
+<div class="modal fade" id="modalEditarAluno" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form method="POST" id="formEditarAluno" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <h5 class="modal-title h6 fw-bold">Editar Aluno</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-secondary">Nome Completo</label>
+                        <input type="text" name="nome" id="editarAlunoNome" class="form-control form-control-sm" required>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-8">
+                            <label class="form-label small fw-bold text-secondary">E-mail</label>
+                            <input type="email" name="email" id="editarAlunoEmail" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-secondary">Nº Chamada</label>
+                            <input type="number" min="1" name="numero_chamada" id="editarAlunoNumero" class="form-control form-control-sm">
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-secondary">Matrícula (Login)</label>
+                            <input type="text" name="matricula" id="editarAlunoMatricula" class="form-control form-control-sm" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-secondary">Nova senha</label>
+                            <input type="password" name="senha" class="form-control form-control-sm" placeholder="Deixe em branco para manter"
+                                   minlength="8" autocomplete="new-password">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-secondary">Turma</label>
+                        <select name="turma_id" id="editarAlunoTurma" class="form-select form-select-sm">
+                            <option value="">Sem turma</option>
+                            {% for t in turmas %}<option value="{{ t.id }}">{{ t.nome }} - {{ t.curso }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-1">
+                        <label class="form-label small fw-bold text-secondary">Trocar foto</label>
+                        <input type="file" name="foto" class="form-control form-control-sm" accept="image/*">
+                        <div class="form-text">Opcional. Com uma foto nova, o totem passa a reconhecer o aluno por ela.</div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary btn-sm px-4">Salvar alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // copia os dados da linha clicada para o modal de edição
+    document.querySelectorAll('.btn-editar-aluno').forEach((botao) => {
+        botao.addEventListener('click', () => {
+            const form = document.getElementById('formEditarAluno');
+            form.reset();
+            form.action = botao.dataset.url;
+            document.getElementById('editarAlunoNome').value = botao.dataset.nome;
+            document.getElementById('editarAlunoEmail').value = botao.dataset.email;
+            document.getElementById('editarAlunoMatricula').value = botao.dataset.matricula;
+            document.getElementById('editarAlunoNumero').value = botao.dataset.numero;
+            document.getElementById('editarAlunoTurma').value = botao.dataset.turma;
+        });
+    });
+</script>
 {% endblock %}

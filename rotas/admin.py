@@ -10,7 +10,7 @@ from flask import Blueprint, flash, jsonify, redirect, render_template, request,
 from sqlalchemy import or_
 
 from database import (db, Aluno, Dispositivo, Justificativa, Professor, ProfessorTurma, Turma,
-                      DIAS_SELECIONAVEIS, NOMES_DIAS, agora_local, dias_de_formulario)
+                      DIAS_SELECIONAVEIS, SENHAS_FRACAS, NOMES_DIAS, agora_local, dias_de_formulario)
 from .aluno import exportar_csv, render_detalhes
 from face_service import encoding_de_imagens
 from .comum import encoding_de_foto, pasta_uploads, pegar_totem, requer, salvar_foto
@@ -59,7 +59,8 @@ def alunos():
     q = Aluno.query
     if busca:
         q = q.filter(or_(Aluno.nome.ilike(f"%{busca}%"), Aluno.matricula.ilike(f"%{busca}%")))
-    return render_template("admin/alunos.html", alunos=q.order_by(Aluno.nome).all(), busca=busca)
+    return render_template("admin/alunos.html", alunos=q.order_by(Aluno.nome).all(), busca=busca,
+                           turmas=Turma.query.order_by(Turma.nome).all())
 
 
 @admin.route("/alunos/novo", methods=["GET", "POST"])
@@ -88,6 +89,46 @@ def novo_aluno():
     return render_template("admin/cadastro_aluno.html", turmas=Turma.query.all())
 
 
+@admin.route("/alunos/<int:id>/editar", methods=["POST"])
+@requer("admin")
+def editar_aluno(id):
+    # admin troca os dados do aluno; senha e foto so mudam se vierem preenchidas
+    a = db.get_or_404(Aluno, id)
+    f = request.form
+    voltar = redirect(request.referrer or url_for("admin.alunos"))
+    nome, matricula = (f.get("nome") or "").strip(), (f.get("matricula") or "").strip()
+    senha = f.get("senha") or ""
+    if not nome or not matricula:
+        flash("Nome e matrícula são obrigatórios.", "danger")
+        return voltar
+    if Aluno.query.filter(Aluno.matricula == matricula, Aluno.id != a.id).first():
+        flash("Já existe outro aluno com essa matrícula.", "danger")
+        return voltar
+    if _senha_invalida(senha):
+        flash("A senha nova precisa ter pelo menos 8 caracteres e não pode ser uma senha fraca. Nada foi alterado.", "danger")
+        return voltar
+    turma_id = f.get("turma_id", type=int)
+    numero = f.get("numero_chamada", type=int)
+
+    a.nome, a.matricula = nome, matricula
+    a.email = (f.get("email") or "").strip() or None
+    a.numero_chamada = numero if numero and numero > 0 else None
+    a.turma_id = turma_id if turma_id and db.session.get(Turma, turma_id) else None
+    if senha:
+        a.set_senha(senha)
+    aviso = None
+    if _trocar_foto(a, request.files.get("foto")):
+        enc = encoding_de_foto(a.foto)
+        if enc:
+            a.face_encoding = enc          # o totem passa a reconhecer pela foto nova
+        else:
+            aviso = "Foto trocada, mas não achei um rosto único nela: o totem continua usando o rosto anterior."
+    db.session.commit()
+    pegar_totem().recarregar()
+    flash(aviso or f"Dados de {a.nome} atualizados.", "warning" if aviso else "success")
+    return voltar
+
+
 @admin.route("/alunos/<int:id>")
 @requer("admin")
 def detalhes_aluno(id):
@@ -111,6 +152,26 @@ def deletar_aluno(id):
     return redirect(url_for("admin.alunos"))
 
 
+# ---------- edicao (so o admin) ----------
+
+def _trocar_foto(pessoa, arquivo):
+    # salva a foto nova (se veio) e apaga a antiga do disco; devolve True se trocou
+    nova = salvar_foto(arquivo)
+    if not nova:
+        return False
+    antiga, pessoa.foto = pessoa.foto, nova
+    if antiga and antiga.startswith("/static/uploads/"):
+        caminho = os.path.join(pasta_uploads(), os.path.basename(antiga))
+        if os.path.isfile(caminho):
+            os.remove(caminho)
+    return True
+
+
+def _senha_invalida(senha):
+    # senha vazia = manter a atual
+    return bool(senha) and (len(senha) < 8 or senha in SENHAS_FRACAS)
+
+
 # ---------- professores ----------
 
 @admin.route("/professores", methods=["GET", "POST"])
@@ -130,6 +191,33 @@ def professores():
             return redirect(url_for("admin.rosto_professor", id=p.id))
         return redirect(url_for("admin.professores"))
     return render_template("admin/professores.html", professores=Professor.query.order_by(Professor.nome).all())
+
+
+@admin.route("/professores/<int:id>/editar", methods=["POST"])
+@requer("admin")
+def editar_professor(id):
+    # admin troca os dados do professor; senha e foto so mudam se vierem preenchidas
+    p = db.get_or_404(Professor, id)
+    f = request.form
+    nome, email = (f.get("nome") or "").strip(), (f.get("email") or "").strip()
+    senha = f.get("senha") or ""
+    if not nome or not email:
+        flash("Nome e e-mail são obrigatórios.", "danger")
+        return redirect(url_for("admin.professores"))
+    if Professor.query.filter(db.func.lower(Professor.email) == email.lower(), Professor.id != p.id).first():
+        flash("Já existe outro professor com esse e-mail.", "danger")
+        return redirect(url_for("admin.professores"))
+    if _senha_invalida(senha):
+        flash("A senha nova precisa ter pelo menos 8 caracteres e não pode ser uma senha fraca. Nada foi alterado.", "danger")
+        return redirect(url_for("admin.professores"))
+
+    p.nome, p.email, p.departamento = nome, email, (f.get("departamento") or "").strip() or None
+    if senha:
+        p.set_senha(senha)
+    _trocar_foto(p, request.files.get("foto"))
+    db.session.commit()
+    flash(f"Dados de {p.nome} atualizados.", "success")
+    return redirect(url_for("admin.professores"))
 
 
 @admin.route("/professores/<int:id>/rosto", methods=["GET", "POST"])
@@ -193,6 +281,21 @@ def detalhes_turma(id):
                            professores_disponiveis=[p for p in Professor.query.order_by(Professor.nome)
                                                     if p.id not in vinculados],
                            dias_opcoes=[(d, NOMES_DIAS[d]) for d in DIAS_SELECIONAVEIS])
+
+
+@admin.route("/turmas/<int:id>/editar", methods=["POST"])
+@requer("admin")
+def editar_turma(id):
+    # nome e curso; professores, dias e alunos continuam nos detalhes da turma
+    t = db.get_or_404(Turma, id)
+    nome, curso = (request.form.get("nome") or "").strip(), (request.form.get("curso") or "").strip()
+    if not nome or not curso:
+        flash("Nome e curso da turma são obrigatórios.", "danger")
+    else:
+        t.nome, t.curso = nome, curso
+        db.session.commit()
+        flash(f"Turma {t.nome} atualizada.", "success")
+    return redirect(request.referrer or url_for("admin.turmas"))
 
 
 @admin.route("/turmas/<int:id>/deletar", methods=["POST"])

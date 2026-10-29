@@ -35,6 +35,12 @@
                         <span class="badge {% if turma.frequencia_media < 75 %}bg-danger{% else %}bg-primary{% endif %}">
                             {{ turma.frequencia_media }}%
                         </span>
+                        <button type="button" class="btn btn-outline-primary btn-sm border-0 ms-auto btn-editar-turma" title="Editar turma"
+                                data-bs-toggle="modal" data-bs-target="#modalEditarTurma"
+                                data-url="{{ url_for('admin.editar_turma', id=turma.id) }}"
+                                data-nome="{{ turma.nome }}" data-curso="{{ turma.curso }}">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
                         <form class="d-inline-block" method="POST" action="{{ url_for('admin.deletar_turma', id=turma.id) }}" onsubmit="return confirm('Tem certeza que deseja excluir?');">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-outline-danger btn-sm border-0">   
@@ -104,4 +110,47 @@
         </div>
     </div>
 </div>
+
+<!-- Modal para Editar Turma (preenchido pelo botão de lápis de cada card) -->
+<div class="modal fade" id="modalEditarTurma" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form method="POST" id="formEditarTurma">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <h5 class="modal-title h6 fw-bold">Editar Turma</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-secondary">Nome da Turma</label>
+                        <input type="text" name="nome" id="editarTurmaNome" class="form-control form-control-sm" required>
+                    </div>
+                    <div class="mb-1">
+                        <label class="form-label small fw-bold text-secondary">Curso</label>
+                        <input type="text" name="curso" id="editarTurmaCurso" class="form-control form-control-sm" required>
+                        <div class="form-text">Professores, dias de aula e alunos se ajustam nos detalhes da turma.</div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary btn-sm px-4">Salvar alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.querySelectorAll('.btn-editar-turma').forEach((botao) => {
+        botao.addEventListener('click', () => {
+            const form = document.getElementById('formEditarTurma');
+            form.action = botao.dataset.url;
+            document.getElementById('editarTurmaNome').value = botao.dataset.nome;
+            document.getElementById('editarTurmaCurso').value = botao.dataset.curso;
+        });
+    });
+</script>
 {% endblock %}

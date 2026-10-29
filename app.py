@@ -13,7 +13,7 @@ from email_service import carregar_env
 # porque os horarios das aulas sao lidos das variaveis na hora do import
 carregar_env(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
-from database import db, Admin, migrar_dispositivos, migrar_professor_turma  # noqa: E402
+from database import db, Admin, SENHAS_FRACAS, migrar_dispositivos, migrar_professor_turma  # noqa: E402
 from face_service import Totem  # noqa: E402
 from rotas import registrar_rotas  # noqa: E402
 from rotas.comum import usuario_atual  # noqa: E402
@@ -100,7 +100,6 @@ def _chave_secreta(pasta):
         return f.read().strip()
 
 
-SENHAS_FRACAS = ("admin123", "prof123", "123", "1234", "123456", "senha", "admin")
 
 
 def _avisar_senhas_fracas(app):

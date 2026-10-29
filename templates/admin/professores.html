@@ -52,6 +52,13 @@
                                title="{{ 'Recadastrar rosto' if professor.face_encoding else 'Rosto não cadastrado: não consegue liberar o totem' }}">
                                 <i class="bi bi-person-bounding-box"></i> {{ 'Rosto ok' if professor.face_encoding else 'Cadastrar rosto' }}
                             </a>
+                            <button type="button" class="btn btn-outline-primary btn-sm border-0 btn-editar-professor" title="Editar professor"
+                                    data-bs-toggle="modal" data-bs-target="#modalEditarProfessor"
+                                    data-url="{{ url_for('admin.editar_professor', id=professor.id) }}"
+                                    data-nome="{{ professor.nome }}" data-email="{{ professor.email }}"
+                                    data-departamento="{{ professor.departamento or '' }}">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
                             <form class="d-inline" method="POST" action="{{ url_for('admin.deletar_professor', id=professor.id) }}" onsubmit="return confirm('Tem certeza que deseja excluir este professor?');">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-outline-danger btn-sm border-0" title="Excluir Professor">
@@ -116,4 +123,65 @@
         </div>
     </div>
 </div>
+
+<!-- Modal para Editar Professor (preenchido pelo botão de lápis de cada linha) -->
+<div class="modal fade" id="modalEditarProfessor" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form method="POST" id="formEditarProfessor" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <h5 class="modal-title h6 fw-bold">Editar Professor</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-secondary">Nome Completo</label>
+                        <input type="text" name="nome" id="editarNome" class="form-control form-control-sm" required>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-secondary">E-mail (Login)</label>
+                            <input type="email" name="email" id="editarEmail" class="form-control form-control-sm" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-secondary">Nova senha</label>
+                            <input type="password" name="senha" class="form-control form-control-sm" placeholder="Deixe em branco para manter"
+                                   minlength="8" autocomplete="new-password">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-secondary">Departamento / Disciplina</label>
+                        <input type="text" name="departamento" id="editarDepartamento" class="form-control form-control-sm">
+                    </div>
+                    <div class="mb-1">
+                        <label class="form-label small fw-bold text-secondary">Trocar foto do perfil</label>
+                        <input type="file" name="foto" class="form-control form-control-sm" accept="image/*">
+                        <div class="form-text">Opcional. O rosto que libera o totem se cadastra pelo botão "Rosto".</div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary btn-sm px-4">Salvar alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // copia os dados da linha clicada para o modal de edição
+    document.querySelectorAll('.btn-editar-professor').forEach((botao) => {
+        botao.addEventListener('click', () => {
+            const form = document.getElementById('formEditarProfessor');
+            form.action = botao.dataset.url;
+            form.reset();
+            document.getElementById('editarNome').value = botao.dataset.nome;
+            document.getElementById('editarEmail').value = botao.dataset.email;
+            document.getElementById('editarDepartamento').value = botao.dataset.departamento;
+        });
+    });
+</script>
 {% endblock %}
