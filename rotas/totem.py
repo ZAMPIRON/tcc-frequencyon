@@ -1,7 +1,8 @@
 # rotas do totem da entrada
 # a parte pesada (reconhecimento) fica em face_service.py,
 # aqui so tem a ponte entre o navegador do totem (tablet) e o servidor.
-# o totem so funciona depois que um professor olha pra camera dele (vale ate o fim do dia)
+# o totem e criado pela coordenacao (com a sala), ativado no tablet com um codigo
+# e liberado todo dia por um professor da sala olhando pra camera
 import hashlib
 import os
 import secrets
@@ -12,7 +13,7 @@ from datetime import datetime, time as dtime, timedelta
 from functools import wraps
 
 import cv2
-from flask import Blueprint, Response, current_app, jsonify, redirect, render_template, request, session, url_for
+from flask import Blueprint, Response, current_app, jsonify, redirect, render_template, request, url_for
 
 from database import db, Admin, Aluno, Dispositivo, Professor, agora_local, hoje_local
 from .comum import pasta_uploads, pegar_totem
@@ -24,17 +25,44 @@ MAX_FOTO_BYTES = 600 * 1024
 
 
 # ---------------------------------------------------------------------
-# liberacao do tablet: quando o professor chega, olha pra camera do totem
-# (ou digita e-mail e senha) e ele fica liberado ate o fim do dia. o aparelho guarda um token num
-# cookie e o banco guarda so o hash dele
+# ativacao: a coordenacao cria o totem no painel (nome + sala) e recebe um
+# codigo. o tablet digita o codigo uma vez e ganha um token guardado num
+# cookie; o banco guarda so o hash dele.
+# liberacao: todo dia um professor da sala olha pra camera (ou digita e-mail
+# e senha) e o totem fica liberado ate o fim do dia.
 # ---------------------------------------------------------------------
 TENTATIVAS_LIBERAR = 10
 JANELA_LIBERAR = 15 * 60
 _erros_liberar = {}                 # ip -> (quantidade, primeira_tentativa)
+_erros_ativacao = {}                # ip -> (quantidade, primeira_tentativa)
+ALFABETO_CODIGO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"   # sem 0/O e 1/I, que se confundem
 
 
 def _hash(token):
     return hashlib.sha256(token.encode()).hexdigest()
+
+
+def gerar_codigo_ativacao(disp):
+    # codigo de 8 letras que o tablet digita para virar este totem (vale 24 h, uma vez so)
+    codigo = "".join(secrets.choice(ALFABETO_CODIGO) for _ in range(8))
+    disp.codigo_hash = _hash(codigo)
+    disp.codigo_ate = agora_local() + timedelta(hours=24)
+    return f"{codigo[:4]} {codigo[4:]}"
+
+
+def _limite(registro, ip):
+    # True se o ip errou demais nos ultimos 15 minutos
+    agora = time.time()
+    n, desde = registro.get(ip, (0, agora))
+    if agora - desde > JANELA_LIBERAR:
+        n, desde = 0, agora
+    registro[ip] = (n, desde)
+    return n >= TENTATIVAS_LIBERAR
+
+
+def _errou(registro, ip):
+    n, desde = registro.get(ip, (0, time.time()))
+    registro[ip] = (n + 1, desde)
 
 
 def dispositivo_atual():
@@ -68,53 +96,68 @@ def requer_totem(f):
 @reconhecimento.route("/totem")
 def pagina_totem():
     disp = dispositivo_atual()
-    if not disp or not disp.liberado:
-        totem = pegar_totem()
-        totem.iniciar()
-        return render_template("totem/liberar.html", modo=totem.fonte)
+    if not disp:
+        return render_template("totem/ativar.html")
     totem = pegar_totem()
     totem.iniciar()
+    if not disp.liberado:
+        return render_template("totem/liberar.html", modo=totem.fonte, disp=disp)
     return render_template("totem/reconhecimento.html", modo=totem.fonte, nome_totem=disp.nome)
 
 
-def _liberar(pessoa, resp):
-    # libera este aparelho ate o fim do dia em nome de 'pessoa' (aparelho novo ganha um token num cookie)
-    fim_do_dia = datetime.combine(hoje_local(), dtime(23, 59, 59))
-    disp = dispositivo_atual()
-    token = None
-    if not disp:
-        token = secrets.token_urlsafe(32)
-        disp = Dispositivo(nome=f"Totem {Dispositivo.query.count() + 1}", token_hash=_hash(token))
-        db.session.add(disp)
-    disp.liberado_ate, disp.liberado_por, disp.ultimo_uso = fim_do_dia, pessoa.nome, agora_local()
+@reconhecimento.route("/totem/ativar", methods=["POST"])
+def ativar_totem():
+    # o tablet digita o codigo gerado pela coordenacao e passa a ser aquele totem
+    ip = request.remote_addr or "?"
+    if _limite(_erros_ativacao, ip):
+        return render_template("totem/ativar.html", erro="Muitas tentativas. Aguarde 15 minutos."), 429
+    codigo = (request.form.get("codigo") or "").strip().upper().replace(" ", "").replace("-", "")
+    disp = Dispositivo.query.filter_by(codigo_hash=_hash(codigo)).first() if codigo else None
+    if not disp or not disp.codigo_ate or disp.codigo_ate < agora_local():
+        _errou(_erros_ativacao, ip)
+        return render_template("totem/ativar.html", erro="Código inválido ou vencido. Peça um novo à coordenação."), 403
+    _erros_ativacao.pop(ip, None)
+
+    token = secrets.token_urlsafe(32)
+    # token novo: se outro tablet usava este totem, ele perde o acesso
+    disp.token_hash, disp.codigo_hash, disp.codigo_ate = _hash(token), None, None
+    disp.ativado_em, disp.liberado_ate = agora_local(), None
     db.session.commit()
-    print(f"[totem] {disp.nome} liberado por {pessoa.nome} até {fim_do_dia:%d/%m %H:%M}")
-    if token:
-        # cookie proprio (nao a sessao) pra continuar valendo mesmo se o navegador do tablet reiniciar
-        resp.set_cookie(COOKIE_TOTEM, token, max_age=2 * 365 * 24 * 3600, httponly=True, samesite="Strict",
-                        secure=current_app.config.get("SESSION_COOKIE_SECURE", False))
+    print(f"[totem] aparelho ativado como {disp.nome}")
+    resp = redirect(url_for("reconhecimento.pagina_totem"))
+    # cookie proprio (nao a sessao) pra continuar valendo mesmo se o navegador do tablet reiniciar
+    resp.set_cookie(COOKIE_TOTEM, token, max_age=2 * 365 * 24 * 3600, httponly=True, samesite="Strict",
+                    secure=current_app.config.get("SESSION_COOKIE_SECURE", False))
     return resp
 
 
-def _chave_bloqueado():
-    # totem bloqueado: aparelho conhecido usa a chave dele; aparelho novo ganha uma chave provisoria na sessao
-    disp = dispositivo_atual()
-    if disp:
-        return chave_do_totem(disp)
-    if pegar_totem().fonte == "camera":
-        return "camera"
-    if "totem_pre" not in session:
-        session["totem_pre"] = secrets.token_hex(8)
-    return f"pre{session['totem_pre']}"
+def _liberar(disp, pessoa):
+    # libera o aparelho ate o fim do dia em nome de 'pessoa'
+    fim_do_dia = datetime.combine(hoje_local(), dtime(23, 59, 59))
+    disp.liberado_ate, disp.liberado_por, disp.ultimo_uso = fim_do_dia, pessoa.nome, agora_local()
+    db.session.commit()
+    print(f"[totem] {disp.nome} liberado por {pessoa.nome} até {fim_do_dia:%d/%m %H:%M}")
+
+
+def _motivo_negado(pessoa, disp):
+    # None se 'pessoa' pode liberar este aparelho; senao, o texto que aparece no totem
+    if disp.pode_liberar(pessoa):
+        return None
+    if not disp.turma_id:
+        return "Este totem está sem sala. Peça à coordenação para escolher a sala dele em Totens."
+    return f"{pessoa.nome} não é professor(a) da {disp.turma.nome}."
 
 
 @reconhecimento.route("/totem/liberar/frame", methods=["POST"])
 def liberar_por_rosto():
-    # totem bloqueado: o tablet manda fotos e, quando reconhece o rosto de um professor, libera o aparelho
+    # totem bloqueado: o tablet manda fotos e, quando reconhece o rosto de um professor da sala, libera o aparelho
+    disp = dispositivo_atual()
+    if not disp:
+        return jsonify(sucesso=False, erro="totem_nao_ativado", mensagem="Este aparelho não está ativado."), 401
     jpeg = request.get_data(cache=False)
     if not jpeg or len(jpeg) > MAX_FOTO_BYTES:
         return jsonify(sucesso=False, mensagem="Imagem vazia ou grande demais."), 413
-    totem, chave = pegar_totem(), _chave_bloqueado()
+    totem, chave = pegar_totem(), chave_do_totem(disp)
     try:
         resultado = totem.receber_frame(chave, jpeg, grupo="prof")
     except ValueError:
@@ -123,34 +166,42 @@ def liberar_por_rosto():
     professor = db.session.get(Professor, pid) if pid else None
     if not professor:
         return jsonify({**resultado, "liberado": False})
-    resp = _liberar(professor, jsonify({**resultado, "liberado": True, "nome": professor.nome}))
-    if chave.startswith("pre"):
-        totem.esquecer(chave)
-        session.pop("totem_pre", None)
-    return resp
+    negado = _motivo_negado(professor, disp)
+    if negado:
+        totem.esquecer(chave)       # recomeca do zero: o proximo rosto e conferido de novo
+        return jsonify({**resultado, "liberado": False, "negado": negado})
+    _liberar(disp, professor)
+    return jsonify({**resultado, "liberado": True, "nome": professor.nome})
 
 
 @reconhecimento.route("/totem/liberar", methods=["POST"])
 def liberar_totem():
     # plano B: e-mail e senha (admin sem rosto cadastrado, camera com problema)
+    disp = dispositivo_atual()
+    if not disp:
+        return redirect(url_for("reconhecimento.pagina_totem"))
+
+    def tela(erro, status, **kw):
+        return render_template("totem/liberar.html", modo=pegar_totem().fonte, disp=disp, erro=erro, **kw), status
+
     ip = request.remote_addr or "?"
-    agora = time.time()
-    n, desde = _erros_liberar.get(ip, (0, agora))
-    if agora - desde > JANELA_LIBERAR:
-        n, desde = 0, agora
-    if n >= TENTATIVAS_LIBERAR:
-        return render_template("totem/liberar.html", modo=pegar_totem().fonte, erro="Muitas tentativas erradas. Aguarde 15 minutos."), 429
+    if _limite(_erros_liberar, ip):
+        return tela("Muitas tentativas erradas. Aguarde 15 minutos.", 429)
 
     email = (request.form.get("email") or "").strip().lower()
     senha = request.form.get("senha") or ""
-    # professor libera o totem; admin tambem pode
+    # professor da sala libera o totem; admin tambem pode
     pessoa = (Professor.query.filter(db.func.lower(Professor.email) == email).first()
               or Admin.query.filter(db.func.lower(Admin.email) == email).first())
     if not pessoa or not pessoa.check_senha(senha):
-        _erros_liberar[ip] = (n + 1, desde)
-        return render_template("totem/liberar.html", modo=pegar_totem().fonte, erro="E-mail ou senha incorretos.", email=email), 403
+        _errou(_erros_liberar, ip)
+        return tela("E-mail ou senha incorretos.", 403, email=email)
     _erros_liberar.pop(ip, None)
-    return _liberar(pessoa, redirect(url_for("reconhecimento.pagina_totem")))
+    negado = _motivo_negado(pessoa, disp)
+    if negado:
+        return tela(negado, 403)
+    _liberar(disp, pessoa)
+    return redirect(url_for("reconhecimento.pagina_totem"))
 
 
 # ---------------------------------------------------------------------

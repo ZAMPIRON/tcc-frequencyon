@@ -15,7 +15,10 @@
         <h1 class="h3 fw-bold mb-1">Frequency<span class="fo-gradient-text">ON</span></h1>
 
         {% if modo == 'tablet' %}
-        <p class="text-muted mb-3">Totem bloqueado. <strong>Professor, olhe para a câmera</strong> para liberar a presença de hoje.</p>
+        {% if disp and disp.turma %}
+        <span class="badge bg-info bg-opacity-25 text-info mb-2"><i class="bi bi-door-open me-1"></i>{{ disp.turma.nome }}</span>
+        {% endif %}
+        <p class="text-muted mb-3">Totem bloqueado. <strong>Professor{{ ' da sala' if disp and disp.turma }}, olhe para a câmera</strong> para liberar a presença de hoje.</p>
         <div class="moldura-camera fo-glass mb-3">
             <div class="video-container" id="videoBox">
                 <video id="camTablet" autoplay playsinline muted></video>
@@ -141,6 +144,11 @@
                         await esperar(1200);
                         location.reload();          // agora o servidor mostra a tela do totem
                         return;
+                    }
+                    if (d.negado) {                 // reconheceu, mas não é professor desta sala
+                        mostrarRotulo(null, d.negado);
+                        await esperar(3000);
+                        continue;
                     }
                     mostrarRotulo(d.pronto ? d.estado : 'iniciando', d.erro);
                 } catch (e) {

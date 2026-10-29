@@ -262,10 +262,21 @@ class Dispositivo(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(80), nullable=False)
     token_hash = db.Column(db.String(64), unique=True, nullable=False, index=True)
-    ativado_em = db.Column(db.DateTime, default=agora_local)
+    ativado_em = db.Column(db.DateTime)            # quando um tablet digitou o código (vazio = aguardando)
+    criado_em = db.Column(db.DateTime, default=agora_local)
+    codigo_hash = db.Column(db.String(64), index=True)   # código de ativação pendente (só o hash)
+    codigo_ate = db.Column(db.DateTime)
     ultimo_uso = db.Column(db.DateTime)
     liberado_ate = db.Column(db.DateTime)          # fim do dia em que um professor liberou o totem
     liberado_por = db.Column(db.String(120))       # nome de quem liberou
+    turma_id = db.Column(db.Integer, db.ForeignKey("turmas.id"))   # sala onde o totem fica
+    turma = db.relationship("Turma")
+
+    def pode_liberar(self, pessoa):
+        """Só o admin ou um professor da sala deste totem libera o aparelho."""
+        if isinstance(pessoa, Admin):
+            return True
+        return bool(self.turma_id and isinstance(pessoa, Professor) and pessoa.vinculo(self.turma_id))
 
     @property
     def liberado(self):
@@ -389,10 +400,12 @@ def migrar_professor_turma():
 
 
 def migrar_dispositivos():
-    """Bancos criados antes da liberação diária não têm as colunas liberado_ate / liberado_por."""
+    """Bancos criados antes da liberação diária não têm as colunas liberado_ate / liberado_por / turma_id."""
     from sqlalchemy import inspect, text
     colunas = [c["name"] for c in inspect(db.engine).get_columns("dispositivos")]
-    for nome, tipo in (("liberado_ate", "DATETIME"), ("liberado_por", "VARCHAR(120)")):
+    for nome, tipo in (("liberado_ate", "DATETIME"), ("liberado_por", "VARCHAR(120)"),
+                       ("turma_id", "INTEGER REFERENCES turmas(id)"), ("criado_em", "DATETIME"),
+                       ("codigo_hash", "VARCHAR(64)"), ("codigo_ate", "DATETIME")):
         if nome not in colunas:
             db.session.execute(text(f"ALTER TABLE dispositivos ADD COLUMN {nome} {tipo}"))
     # rosto do professor (liberação do totem pela câmera)

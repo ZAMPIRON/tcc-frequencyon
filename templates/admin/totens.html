@@ -6,20 +6,40 @@
 <div class="d-flex align-items-center justify-content-between mb-4">
     <div>
         <h1 class="h3 fw-bold mb-1">Totens de <span class="fo-gradient-text">presença</span></h1>
-        <p class="text-muted mb-0 small">Tablets autorizados a registrar a presença por reconhecimento facial</p>
+        <p class="text-muted mb-0 small">Cada totem fica numa sala e só os professores dela conseguem liberá-lo</p>
     </div>
+    <button class="btn btn-primary fw-semibold btn-sm px-3 py-2 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalTotem"
+            {{ 'disabled' if not turmas }}>
+        <i class="fa-solid fa-plus me-1"></i> Novo totem
+    </button>
 </div>
+
+{% if codigo_novo %}
+<div class="alert alert-info d-flex flex-wrap align-items-center gap-3 mb-4" role="alert">
+    <i class="fa-solid fa-key fs-3"></i>
+    <div class="flex-grow-1">
+        <div class="fw-bold">Código de ativação do "{{ codigo_novo.nome }}"{{ ' (' ~ codigo_novo.sala ~ ')' if codigo_novo.sala }}</div>
+        <div class="small">No tablet da sala, abra <strong>{{ url_for('reconhecimento.pagina_totem', _external=True) }}</strong> e digite o código.
+            Ele vale por 24 horas e só pode ser usado uma vez. Anote agora: ele não aparece de novo.</div>
+    </div>
+    <span class="fs-2 fw-bold font-monospace px-3 py-1 rounded bg-body">{{ codigo_novo.codigo }}</span>
+</div>
+{% endif %}
+
+{% if not turmas %}
+<div class="alert alert-warning small">Cadastre uma turma antes: todo totem precisa de uma sala.</div>
+{% endif %}
 
 <div class="row g-3 mb-4">
     <div class="col-lg-4">
         <div class="card h-100">
             <div class="card-body p-4">
-                <h6 class="fw-bold mb-2">Como usar um tablet como totem</h6>
+                <h6 class="fw-bold mb-2">Como funciona</h6>
                 <ol class="small text-muted ps-3 mb-0">
-                    <li class="mb-2">No tablet, abra <strong>{{ url_for('reconhecimento.pagina_totem', _external=True) }}</strong>.</li>
-                    <li class="mb-2">Quando o professor chegar, ele digita o próprio <strong>e-mail e senha</strong> no totem.</li>
-                    <li class="mb-2">O totem fica liberado até <strong>23:59 do mesmo dia</strong> e volta a bloquear sozinho à meia-noite.</li>
-                    <li>Se um tablet for perdido ou trocado, desative-o aqui.</li>
+                    <li class="mb-2">Clique em <strong>Novo totem</strong>, dê um nome e escolha a <strong>sala</strong>. Aparece um código de ativação.</li>
+                    <li class="mb-2">No tablet da sala, abra <strong>{{ url_for('reconhecimento.pagina_totem', _external=True) }}</strong> e digite o código. Isso é feito uma vez só.</li>
+                    <li class="mb-2">Todo dia, um <strong>professor daquela turma</strong> libera o totem olhando para a câmera. Ele fica liberado até as <strong>23:59</strong>.</li>
+                    <li>Para trocar o tablet, gere um <strong>código novo</strong>: quando o aparelho novo ativar, o antigo perde o acesso.</li>
                 </ol>
                 {% if modo == 'camera' %}
                 <p class="small text-warning mt-3 mb-0">
@@ -34,38 +54,93 @@
     <div class="col-lg-8">
         <div class="card h-100 overflow-hidden">
             <div class="p-3 border-bottom d-flex align-items-center justify-content-between">
-                <h6 class="fw-bold mb-0">Aparelhos</h6>
+                <h6 class="fw-bold mb-0">Totens</h6>
                 <span class="badge bg-secondary">{{ dispositivos|length }}</span>
             </div>
+            <div class="table-responsive">
             <table class="table align-middle mb-0">
                 <thead class="small">
-                    <tr><th class="ps-3">Nome</th><th>Situação hoje</th><th>Último uso</th><th class="text-end pe-3">Ações</th></tr>
+                    <tr><th class="ps-3">Nome</th><th>Sala</th><th>Situação</th><th>Último uso</th><th class="text-end pe-3">Ações</th></tr>
                 </thead>
                 <tbody class="small">
                     {% for d in dispositivos %}
                     <tr>
-                        <td class="ps-3 fw-semibold"><i class="fa-solid fa-tablet-screen-button text-muted me-2"></i>{{ d.nome }}</td>
+                        <td class="ps-3 fw-semibold text-nowrap"><i class="fa-solid fa-tablet-screen-button text-muted me-2"></i>{{ d.nome }}</td>
                         <td>
-                            {% if d.liberado %}
+                            <form method="POST" action="{{ url_for('admin.sala_totem', id=d.id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <select name="turma_id" class="form-select form-select-sm {{ '' if d.turma_id else 'border-warning' }}"
+                                        onchange="this.form.submit()" aria-label="Sala do {{ d.nome }}">
+                                    {% if not d.turma_id %}<option value="" selected>Escolha a sala</option>{% endif %}
+                                    {% for t in turmas %}
+                                    <option value="{{ t.id }}" {{ 'selected' if t.id == d.turma_id }}>{{ t.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </form>
+                        </td>
+                        <td class="text-nowrap">
+                            {% if not d.ativado_em %}
+                                <span class="badge bg-warning text-dark">Aguardando ativação</span>
+                                {% if d.codigo_ate and d.codigo_ate < agora %}<span class="text-muted ms-1">código vencido</span>{% endif %}
+                            {% elif d.liberado %}
                                 <span class="badge bg-success">Liberado</span>
                                 <span class="text-muted ms-1">por {{ d.liberado_por }}</span>
                             {% else %}
                                 <span class="badge bg-secondary">Bloqueado</span>
                             {% endif %}
                         </td>
-                        <td>{{ d.ultimo_uso.strftime('%d/%m/%Y %H:%M') if d.ultimo_uso else 'nunca' }}</td>
-                        <td class="text-end pe-3">
-                            <form class="d-inline" method="POST" action="{{ url_for('admin.remover_totem', id=d.id) }}" onsubmit="return confirm('Desativar este aparelho? Ele para de funcionar na hora e precisa ser liberado de novo.');">
+                        <td class="text-nowrap">{{ d.ultimo_uso.strftime('%d/%m/%Y %H:%M') if d.ultimo_uso else 'nunca' }}</td>
+                        <td class="text-end pe-3 text-nowrap">
+                            <form class="d-inline" method="POST" action="{{ url_for('admin.codigo_totem', id=d.id) }}"
+                                  {% if d.ativado_em %}onsubmit="return confirm('Gerar um código novo? Quando outro tablet usar esse código, o tablet atual deste totem perde o acesso.');"{% endif %}>
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button class="btn btn-outline-danger btn-sm border-0" title="Desativar"><i class="fa-solid fa-ban"></i></button>
+                                <button class="btn btn-outline-primary btn-sm border-0" title="Gerar código de ativação"><i class="fa-solid fa-key"></i></button>
+                            </form>
+                            <form class="d-inline" method="POST" action="{{ url_for('admin.remover_totem', id=d.id) }}" onsubmit="return confirm('Remover este totem? O tablet dele para de funcionar na hora.');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button class="btn btn-outline-danger btn-sm border-0" title="Remover totem"><i class="fa-solid fa-trash"></i></button>
                             </form>
                         </td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="4" class="text-center text-muted py-4">Nenhum tablet usado como totem ainda.</td></tr>
+                    <tr><td colspan="5" class="text-center text-muted py-4">Nenhum totem criado ainda. Clique em <strong>Novo totem</strong>.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: novo totem -->
+<div class="modal fade" id="modalTotem" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form method="POST" action="{{ url_for('admin.novo_totem') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <h5 class="modal-title h6 fw-bold">Novo totem</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-secondary">Nome do totem</label>
+                        <input type="text" name="nome" class="form-control form-control-sm" placeholder="Ex: Totem Sala 12" maxlength="80" required>
+                    </div>
+                    <div class="mb-1">
+                        <label class="form-label small fw-bold text-secondary">Sala (turma)</label>
+                        <select name="turma_id" class="form-select form-select-sm" required>
+                            <option value="" selected disabled>Escolha a turma</option>
+                            {% for t in turmas %}<option value="{{ t.id }}">{{ t.nome }}</option>{% endfor %}
+                        </select>
+                        <div class="form-text">Só os professores dessa turma conseguem liberar o totem.</div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary btn-sm px-4">Criar e gerar código</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

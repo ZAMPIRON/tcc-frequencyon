@@ -4,7 +4,9 @@ import os
 import uuid
 
 import cv2
-from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
+import secrets
+
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, session, url_for
 from sqlalchemy import or_
 
 from database import (db, Aluno, Dispositivo, Justificativa, Professor, ProfessorTurma, Turma,
@@ -12,6 +14,7 @@ from database import (db, Aluno, Dispositivo, Justificativa, Professor, Professo
 from .aluno import exportar_csv, render_detalhes
 from face_service import encoding_de_imagens
 from .comum import encoding_de_foto, pasta_uploads, pegar_totem, requer, salvar_foto
+from .totem import _hash, gerar_codigo_ativacao
 
 admin = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -276,17 +279,65 @@ def responder_justificativa(id, acao):
 @admin.route("/totens")
 @requer("admin")
 def totens():
-    # aparelhos que ja foram usados como totem; cada um e liberado por um professor a cada dia
+    # totens criados pela coordenacao; cada um fica numa sala e e liberado por um professor dela a cada dia
     return render_template("admin/totens.html", modo=pegar_totem().fonte,
-                           dispositivos=Dispositivo.query.order_by(Dispositivo.ativado_em.desc()).all())
+                           dispositivos=Dispositivo.query.order_by(Dispositivo.nome).all(),
+                           turmas=Turma.query.order_by(Turma.nome).all(),
+                           codigo_novo=session.pop("codigo_totem", None), agora=agora_local())
+
+
+def _mostrar_codigo(disp):
+    # o codigo aparece uma vez so na pagina (o banco guarda so o hash)
+    session["codigo_totem"] = {"nome": disp.nome, "sala": disp.turma.nome if disp.turma else "",
+                               "codigo": gerar_codigo_ativacao(disp)}
+    db.session.commit()
+
+
+@admin.route("/totens/novo", methods=["POST"])
+@requer("admin")
+def novo_totem():
+    nome = (request.form.get("nome") or "").strip()
+    turma = db.session.get(Turma, request.form.get("turma_id", type=int) or 0)
+    if not nome or not turma:
+        flash("Informe o nome do totem e a sala dele.", "danger")
+        return redirect(url_for("admin.totens"))
+    if Dispositivo.query.filter_by(nome=nome).first():
+        flash(f"Já existe um totem chamado \"{nome}\".", "danger")
+        return redirect(url_for("admin.totens"))
+    # token sorteado e descartado: nenhum aparelho entra ate digitar o codigo de ativacao
+    disp = Dispositivo(nome=nome, turma_id=turma.id, token_hash=_hash(secrets.token_urlsafe(32)))
+    db.session.add(disp)
+    db.session.flush()
+    _mostrar_codigo(disp)
+    return redirect(url_for("admin.totens"))
+
+
+@admin.route("/totens/<int:id>/codigo", methods=["POST"])
+@requer("admin")
+def codigo_totem(id):
+    # codigo novo: para ativar o primeiro tablet ou trocar o aparelho (o antigo perde o acesso ao ativar)
+    _mostrar_codigo(db.get_or_404(Dispositivo, id))
+    return redirect(url_for("admin.totens"))
+
+
+@admin.route("/totens/<int:id>/sala", methods=["POST"])
+@requer("admin")
+def sala_totem(id):
+    # define em que sala o totem fica: so os professores dessa turma conseguem libera-lo
+    disp = db.get_or_404(Dispositivo, id)
+    turma_id = request.form.get("turma_id", type=int)
+    disp.turma_id = turma_id if turma_id and db.session.get(Turma, turma_id) else None
+    db.session.commit()
+    flash(f"Sala do \"{disp.nome}\": {disp.turma.nome if disp.turma else 'nenhuma'}.", "success")
+    return redirect(url_for("admin.totens"))
 
 
 @admin.route("/totens/<int:id>/remover", methods=["POST"])
 @requer("admin")
 def remover_totem(id):
-    # o aparelho perde o acesso na hora (o token dele deixa de existir) e some da lista
+    # o totem deixa de existir: o tablet dele perde o acesso na hora
     disp = db.get_or_404(Dispositivo, id)
     db.session.delete(disp)
     db.session.commit()
-    flash(f"Totem \"{disp.nome}\" desativado.", "success")
+    flash(f"Totem \"{disp.nome}\" removido.", "success")
     return redirect(url_for("admin.totens"))
