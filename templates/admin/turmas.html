@@ -24,14 +24,20 @@
   {% endif %}
 {% endwith %}
 
+{% for sala, turmas in salas %}
+<section class="mb-4" data-busca-item>
+    <div class="d-flex align-items-center gap-2 mb-2">
+        <h2 class="h6 fw-bold mb-0"><i class="fa-solid fa-door-open text-primary me-1"></i> Sala {{ sala }}</h2>
+        <span class="badge bg-secondary bg-opacity-25 text-secondary">{{ turmas|length }} turma{{ 's' if turmas|length > 1 }}</span>
+    </div>
 <div class="row g-3">
     {% for turma in turmas %}
-    <div class="col-md-6 col-xl-4" data-busca-item>
+    <div class="col-md-6 col-xl-4">
         <div class="card border-0 shadow-sm rounded-3 h-100">
             <div class="card-body p-3 d-flex flex-column">
                 <div>
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <h6 class="fw-bold text-dark mb-0">{{ turma.nome }}</h6>
+                        <h6 class="fw-bold text-dark mb-0">{{ turma.curso }}</h6>
                         <span class="badge {% if turma.frequencia_media < 75 %}bg-danger{% else %}bg-primary{% endif %}">
                             {{ turma.frequencia_media }}%
                         </span>
@@ -49,7 +55,6 @@
                         </form>
                     </div>
                     
-                    <p class="text-muted small mb-2"><i class="fa-solid fa-graduation-cap me-1"></i> {{ turma.curso }}</p>
                     <p class="text-muted small mb-2"><i class="fa-solid fa-user-tie me-1"></i> {{ turma.nomes_professores }}</p>
                     <p class="text-muted small mb-2"><i class="fa-solid fa-calendar-days me-1"></i> {{ turma.dias_aula_nomes }}</p>
                     <p class="text-muted small mb-3"><i class="fa-solid fa-users me-1"></i> {{ turma.alunos|length }} Alunos</p>
@@ -63,10 +68,12 @@
             </div>
         </div>
     </div>
-    {% else %}
-    <div class="col-12"><p class="text-muted">Nenhuma turma cadastrada.</p></div>
     {% endfor %}
 </div>
+</section>
+{% else %}
+<p class="text-muted">Nenhuma turma cadastrada.</p>
+{% endfor %}
 
 <!-- Modal para Nova Turma -->
 <div class="modal fade" id="modalTurma" tabindex="-1">
@@ -80,12 +87,14 @@
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label small fw-bold">Nome da Turma</label>
-                        <input type="text" name="nome" class="form-control form-control-sm" required placeholder="Ex: Programação I">
+                        <label class="form-label small fw-bold">Sala</label>
+                        <input type="text" name="nome" class="form-control form-control-sm" required placeholder="Ex: C13" list="salasExistentes">
+                        <datalist id="salasExistentes">{% for sala, _ in salas %}<option value="{{ sala }}">{% endfor %}</datalist>
+                        <small class="text-muted">Use o mesmo nome para turmas que dividem a sala: elas aparecem juntas.</small>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label small fw-bold">Curso</label>
-                        <input type="text" name="curso" class="form-control form-control-sm" required placeholder="Ex: Computação">
+                        <label class="form-label small fw-bold">Curso / Turma</label>
+                        <input type="text" name="curso" class="form-control form-control-sm" required placeholder="Ex: Desenvolvimento de Sistemas 1">
                     </div>
                     <div class="mb-3">
                         <label class="form-label small fw-bold">Professores</label>
@@ -123,11 +132,11 @@
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label small fw-bold text-secondary">Nome da Turma</label>
-                        <input type="text" name="nome" id="editarTurmaNome" class="form-control form-control-sm" required>
+                        <label class="form-label small fw-bold text-secondary">Sala</label>
+                        <input type="text" name="nome" id="editarTurmaNome" class="form-control form-control-sm" required list="salasExistentes">
                     </div>
                     <div class="mb-1">
-                        <label class="form-label small fw-bold text-secondary">Curso</label>
+                        <label class="form-label small fw-bold text-secondary">Curso / Turma</label>
                         <input type="text" name="curso" id="editarTurmaCurso" class="form-control form-control-sm" required>
                         <div class="form-text">Professores, dias de aula e alunos se ajustam nos detalhes da turma.</div>
                     </div>

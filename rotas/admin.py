@@ -267,8 +267,16 @@ def turmas():
         db.session.commit()
         flash("Turma criada! Defina os dias de aula de cada professor nos detalhes da turma.", "success")
         return redirect(url_for("admin.turmas"))
-    return render_template("admin/turmas.html", turmas=Turma.query.all(),
+    return render_template("admin/turmas.html", salas=salas_com_turmas(),
                            professores=Professor.query.order_by(Professor.nome).all())
+
+
+def salas_com_turmas():
+    # [(sala, [turmas])] em ordem: a sala e o nome da turma, e varias turmas podem dividir a mesma sala
+    salas = {}
+    for t in Turma.query.order_by(Turma.nome, Turma.curso):
+        salas.setdefault(t.nome, []).append(t)
+    return list(salas.items())
 
 
 @admin.route("/turmas/<int:id>")
@@ -292,7 +300,12 @@ def editar_turma(id):
     if not nome or not curso:
         flash("Nome e curso da turma são obrigatórios.", "danger")
     else:
+        antiga = t.nome
         t.nome, t.curso = nome, curso
+        db.session.flush()
+        # a sala mudou de nome e nao sobrou turma com o nome antigo: os totens dela acompanham
+        if antiga != nome and not Turma.query.filter_by(nome=antiga).first():
+            Dispositivo.query.filter_by(sala=antiga).update({"sala": nome})
         db.session.commit()
         flash(f"Turma {t.nome} atualizada.", "success")
     return redirect(request.referrer or url_for("admin.turmas"))
@@ -385,13 +398,13 @@ def totens():
     # totens criados pela coordenacao; cada um fica numa sala e e liberado por um professor dela a cada dia
     return render_template("admin/totens.html", modo=pegar_totem().fonte,
                            dispositivos=Dispositivo.query.order_by(Dispositivo.nome).all(),
-                           turmas=Turma.query.order_by(Turma.nome).all(),
+                           salas=salas_com_turmas(),
                            codigo_novo=session.pop("codigo_totem", None), agora=agora_local())
 
 
 def _mostrar_codigo(disp):
     # o codigo aparece uma vez so na pagina (o banco guarda so o hash)
-    session["codigo_totem"] = {"nome": disp.nome, "sala": disp.turma.nome if disp.turma else "",
+    session["codigo_totem"] = {"nome": disp.nome, "sala": disp.sala or "",
                                "codigo": gerar_codigo_ativacao(disp)}
     db.session.commit()
 
@@ -400,15 +413,15 @@ def _mostrar_codigo(disp):
 @requer("admin")
 def novo_totem():
     nome = (request.form.get("nome") or "").strip()
-    turma = db.session.get(Turma, request.form.get("turma_id", type=int) or 0)
-    if not nome or not turma:
+    sala = (request.form.get("sala") or "").strip()
+    if not nome or not Turma.query.filter_by(nome=sala).first():
         flash("Informe o nome do totem e a sala dele.", "danger")
         return redirect(url_for("admin.totens"))
     if Dispositivo.query.filter_by(nome=nome).first():
         flash(f"Já existe um totem chamado \"{nome}\".", "danger")
         return redirect(url_for("admin.totens"))
     # token sorteado e descartado: nenhum aparelho entra ate digitar o codigo de ativacao
-    disp = Dispositivo(nome=nome, turma_id=turma.id, token_hash=_hash(secrets.token_urlsafe(32)))
+    disp = Dispositivo(nome=nome, sala=sala, token_hash=_hash(secrets.token_urlsafe(32)))
     db.session.add(disp)
     db.session.flush()
     _mostrar_codigo(disp)
@@ -426,12 +439,12 @@ def codigo_totem(id):
 @admin.route("/totens/<int:id>/sala", methods=["POST"])
 @requer("admin")
 def sala_totem(id):
-    # define em que sala o totem fica: so os professores dessa turma conseguem libera-lo
+    # define em que sala o totem fica: so os professores das turmas dessa sala conseguem libera-lo
     disp = db.get_or_404(Dispositivo, id)
-    turma_id = request.form.get("turma_id", type=int)
-    disp.turma_id = turma_id if turma_id and db.session.get(Turma, turma_id) else None
+    sala = (request.form.get("sala") or "").strip()
+    disp.sala = sala if Turma.query.filter_by(nome=sala).first() else None
     db.session.commit()
-    flash(f"Sala do \"{disp.nome}\": {disp.turma.nome if disp.turma else 'nenhuma'}.", "success")
+    flash(f"Sala do \"{disp.nome}\": {disp.sala or 'nenhuma'}.", "success")
     return redirect(url_for("admin.totens"))
 
 

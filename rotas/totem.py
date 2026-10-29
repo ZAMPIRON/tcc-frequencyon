@@ -143,9 +143,9 @@ def _motivo_negado(pessoa, disp):
     # None se 'pessoa' pode liberar este aparelho; senao, o texto que aparece no totem
     if disp.pode_liberar(pessoa):
         return None
-    if not disp.turma_id:
+    if not disp.turmas:
         return "Este totem está sem sala. Peça à coordenação para escolher a sala dele em Totens."
-    return f"{pessoa.nome} não é professor(a) da {disp.turma.nome}."
+    return f"{pessoa.nome} não dá aula na sala {disp.sala}."
 
 
 @reconhecimento.route("/totem/liberar/frame", methods=["POST"])

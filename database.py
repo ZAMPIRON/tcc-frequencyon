@@ -273,14 +273,19 @@ class Dispositivo(db.Model):
     ultimo_uso = db.Column(db.DateTime)
     liberado_ate = db.Column(db.DateTime)          # fim do dia em que um professor liberou o totem
     liberado_por = db.Column(db.String(120))       # nome de quem liberou
-    turma_id = db.Column(db.Integer, db.ForeignKey("turmas.id"))   # sala onde o totem fica
-    turma = db.relationship("Turma")
+    # sala onde o totem fica (ex: "C13"). A sala é o nome da turma: várias turmas podem dividir a mesma sala
+    sala = db.Column(db.String(120))
+
+    @property
+    def turmas(self):
+        """Turmas que têm aula na sala deste totem."""
+        return Turma.query.filter_by(nome=self.sala).order_by(Turma.curso).all() if self.sala else []
 
     def pode_liberar(self, pessoa):
-        """Só o admin ou um professor da sala deste totem libera o aparelho."""
+        """Só o admin ou um professor de alguma turma da sala deste totem libera o aparelho."""
         if isinstance(pessoa, Admin):
             return True
-        return bool(self.turma_id and isinstance(pessoa, Professor) and pessoa.vinculo(self.turma_id))
+        return isinstance(pessoa, Professor) and any(pessoa.vinculo(t.id) for t in self.turmas)
 
     @property
     def liberado(self):
@@ -409,9 +414,12 @@ def migrar_dispositivos():
     colunas = [c["name"] for c in inspect(db.engine).get_columns("dispositivos")]
     for nome, tipo in (("liberado_ate", "DATETIME"), ("liberado_por", "VARCHAR(120)"),
                        ("turma_id", "INTEGER REFERENCES turmas(id)"), ("criado_em", "DATETIME"),
-                       ("codigo_hash", "VARCHAR(64)"), ("codigo_ate", "DATETIME")):
+                       ("codigo_hash", "VARCHAR(64)"), ("codigo_ate", "DATETIME"), ("sala", "VARCHAR(120)")):
         if nome not in colunas:
             db.session.execute(text(f"ALTER TABLE dispositivos ADD COLUMN {nome} {tipo}"))
+    # o totem era ligado a uma turma; agora é ligado à sala (o nome da turma), que várias turmas dividem
+    db.session.execute(text("UPDATE dispositivos SET sala = (SELECT nome FROM turmas WHERE turmas.id = dispositivos.turma_id) "
+                            "WHERE sala IS NULL AND turma_id IS NOT NULL"))
     # rosto do professor (liberação do totem pela câmera)
     if "face_encoding" not in [c["name"] for c in inspect(db.engine).get_columns("professores")]:
         db.session.execute(text("ALTER TABLE professores ADD COLUMN face_encoding BLOB"))
