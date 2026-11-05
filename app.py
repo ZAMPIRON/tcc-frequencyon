@@ -4,7 +4,7 @@ import os
 import secrets
 import threading
 
-from flask import Flask, flash, jsonify, redirect, request, url_for
+from flask import Flask, abort, flash, jsonify, redirect, request, url_for
 from flask_wtf.csrf import CSRFError, CSRFProtect
 
 from email_service import carregar_env
@@ -17,6 +17,7 @@ from database import db, Admin, SENHAS_FRACAS, migrar_dispositivos, migrar_horar
 from face_service import Totem  # noqa: E402
 from rotas import registrar_rotas  # noqa: E402
 from rotas.comum import usuario_atual  # noqa: E402
+from rotas.totem import totem_ativado  # noqa: E402
 
 
 def create_app(avisar_senhas=True):
@@ -67,6 +68,18 @@ def create_app(avisar_senhas=True):
         flash("Sua sessão expirou. Recarregue a página e tente de novo.", "warning")
         return redirect(request.referrer or url_for("index"))
     app.context_processor(lambda: {"usuario": usuario_atual()})
+
+    pasta_fotos = os.path.normcase(os.path.realpath(os.path.join(app.static_folder, "uploads")))
+
+    @app.before_request
+    def proteger_fotos():
+        # foto de rosto e dado biometrico (LGPD): so abre para quem esta logado ou para um totem ativado.
+        # compara o caminho real do arquivo, entao "Uploads/", "./uploads/" ou "a/../uploads/" nao passam
+        if request.endpoint != "static":
+            return
+        arquivo = os.path.normcase(os.path.realpath(os.path.join(app.static_folder, request.view_args.get("filename", ""))))
+        if (arquivo == pasta_fotos or arquivo.startswith(pasta_fotos + os.sep)) and not (usuario_atual() or totem_ativado()):
+            abort(404)
 
     with app.app_context():
         db.create_all()

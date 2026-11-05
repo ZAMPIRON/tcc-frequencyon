@@ -77,6 +77,12 @@ def dispositivo_atual():
     return disp
 
 
+def totem_ativado():
+    # este navegador e um totem ativado? (so confere: nao mexe no ultimo uso)
+    token = request.cookies.get(COOKIE_TOTEM)
+    return bool(token) and Dispositivo.query.filter_by(token_hash=_hash(token)).first() is not None
+
+
 def chave_do_totem(disp):
     # no modo tablet cada aparelho tem as suas imagens; no modo camera todos olham a webcam do servidor
     return "camera" if pegar_totem().fonte == "camera" else f"disp{disp.id}"

@@ -4,7 +4,7 @@ from datetime import date, timedelta
 
 from flask import Blueprint, jsonify, render_template, request, session, url_for
 
-from database import (db, Admin, Aluno, Presenca, ProfessorTurma, NOMES_DIAS,
+from database import (db, Admin, AlteracaoPresenca, Aluno, Presenca, ProfessorTurma, NOMES_DIAS,
                       eh_dia_com_aula, hoje_local, ultimo_dia_com_aula)
 from .comum import requer, usuario_atual
 
@@ -222,12 +222,18 @@ def _alterar(aluno_id, barra, regra):
         return jsonify(erro=erro), 403
 
     p = Presenca.query.filter_by(aluno_id=aluno_id, data=data_requisitada, aula=barra).first()
+    anterior = p.status if p else None
     if not p:
         # aula sem registro e falta, entao comeca como falta antes de aplicar a regra
         p = Presenca(aluno_id=aluno_id, data=data_requisitada, aula=barra, status="falta")
         db.session.add(p)
 
     p.status, p.origem = regra(p.status), "professor"
+    # trilha de auditoria: quem mudou, quando e de qual status para qual (dia anterior = com senha do admin)
+    db.session.add(AlteracaoPresenca(aluno_id=aluno_id, data=data_requisitada, aula=barra,
+                                     status_anterior=anterior, status_novo=p.status,
+                                     professor_id=vinculo.professor_id, professor_nome=vinculo.professor.nome,
+                                     com_senha_admin=data_requisitada != hoje_local()))
     db.session.commit()
     return jsonify(estado=p.status, media_frequencia=aluno.turma.frequencia_media)
 

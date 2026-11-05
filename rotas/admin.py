@@ -71,13 +71,20 @@ def alunos():
 def novo_aluno():
     if request.method == "POST":
         f = request.form
-        if Aluno.query.filter_by(matricula=f["matricula"].strip()).first():
+        nome, matricula, senha = f["nome"].strip(), f["matricula"].strip(), f["senha"]
+        if not nome or not matricula:
+            flash("Nome e matrícula são obrigatórios.", "danger")
+            return redirect(url_for("admin.novo_aluno"))
+        if not senha or _senha_invalida(senha):
+            flash("A senha precisa ter pelo menos 8 caracteres e não pode ser uma senha fraca.", "danger")
+            return redirect(url_for("admin.novo_aluno"))
+        if Aluno.query.filter_by(matricula=matricula).first():
             flash("Já existe um aluno com essa matrícula.", "danger")
             return redirect(url_for("admin.novo_aluno"))
-        a = Aluno(nome=f["nome"].strip(), email=f.get("email"), matricula=f["matricula"].strip(),
+        a = Aluno(nome=nome, email=f.get("email"), matricula=matricula,
                   numero_chamada=int(f["numero_chamada"]) if f.get("numero_chamada") else None,
                   turma_id=int(f["turma_id"]) if f.get("turma_id") else None)
-        a.set_senha(f["senha"])
+        a.set_senha(senha)
         a.foto = salvar_foto(request.files.get("foto"))
         a.face_encoding = encoding_de_foto(a.foto)  # ja deixa o rosto pronto pro totem
         db.session.add(a)
@@ -182,12 +189,16 @@ def _senha_invalida(senha):
 def professores():
     if request.method == "POST":
         f = request.form
-        if Professor.query.filter_by(email=f["email"]).first():
+        email, senha = f["email"].strip(), f["senha"]
+        # o mesmo e-mail com maiusculas diferentes ainda e o mesmo e-mail
+        if Professor.query.filter(db.func.lower(Professor.email) == email.lower()).first():
             flash("Já existe um professor com esse e-mail.", "danger")
+        elif not senha or _senha_invalida(senha):
+            flash("A senha precisa ter pelo menos 8 caracteres e não pode ser uma senha fraca.", "danger")
         else:
-            p = Professor(nome=f["nome"], email=f["email"], departamento=f.get("departamento"),
+            p = Professor(nome=f["nome"], email=email, departamento=f.get("departamento"),
                           foto=salvar_foto(request.files.get("foto")))
-            p.set_senha(f["senha"])
+            p.set_senha(senha)
             db.session.add(p)
             db.session.commit()
             flash("Professor cadastrado! Agora cadastre o rosto dele: é com ele que o totem é liberado.", "success")
@@ -261,8 +272,12 @@ def deletar_professor(id):
 def turmas():
     if request.method == "POST":
         f = request.form
+        nome, curso = f["nome"].strip(), f["curso"].strip()
+        if not nome or not curso:
+            flash("Nome e curso da turma são obrigatórios.", "danger")
+            return redirect(url_for("admin.turmas"))
         modelo = db.session.get(ModeloHorario, f.get("modelo_id", type=int) or 0) or ModeloHorario.query.first()
-        turma = Turma(nome=f["nome"].strip(), curso=f["curso"].strip(), modelo=modelo)
+        turma = Turma(nome=nome, curso=curso, modelo=modelo)
         # os professores entram sem dias, o admin escolhe os dias depois nos detalhes da turma
         for pid in set(f.getlist("professor_ids", type=int)):
             if db.session.get(Professor, pid):

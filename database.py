@@ -292,6 +292,7 @@ class Aluno(UsuarioMixin, db.Model):
     turma_id = db.Column(db.Integer, db.ForeignKey("turmas.id"))
     turma = db.relationship("Turma", back_populates="alunos")
     presencas = db.relationship("Presenca", cascade="all, delete-orphan", backref="aluno")
+    alteracoes = db.relationship("AlteracaoPresenca", cascade="all, delete-orphan")
     justificativas = db.relationship("Justificativa", cascade="all, delete-orphan", backref="aluno",
                                      order_by="Justificativa.data.desc()")
 
@@ -338,6 +339,21 @@ class Presenca(db.Model):
     status = db.Column(db.String(10), nullable=False)
     origem = db.Column(db.String(10), default="totem")   # totem | professor
     registrado_em = db.Column(db.DateTime, default=agora_local)
+
+
+class AlteracaoPresenca(db.Model):
+    """Trilha de auditoria: cada mudança manual na chamada (quem, quando, de qual status para qual)."""
+    __tablename__ = "alteracoes_presenca"
+    id = db.Column(db.Integer, primary_key=True)
+    aluno_id = db.Column(db.Integer, db.ForeignKey("alunos.id"), nullable=False, index=True)
+    data = db.Column(db.Date, nullable=False)
+    aula = db.Column(db.Integer, nullable=False)
+    status_anterior = db.Column(db.String(10))       # vazio = a aula ainda não tinha registro (contava como falta)
+    status_novo = db.Column(db.String(10), nullable=False)
+    professor_id = db.Column(db.Integer)              # sem chave estrangeira: o histórico fica se o professor sair
+    professor_nome = db.Column(db.String(120), nullable=False)
+    com_senha_admin = db.Column(db.Boolean, nullable=False, default=False)   # dia anterior, liberado pelo admin
+    alterado_em = db.Column(db.DateTime, nullable=False, default=agora_local)
 
 
 class Dispositivo(db.Model):
