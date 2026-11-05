@@ -50,21 +50,6 @@
         <p class="small text-muted mt-3 mb-0">O totem volta a bloquear sozinho à meia-noite.</p>
     </div>
 
-    <script>
-        // tela cheia: o navegador só deixa depois de um toque, então tenta ao abrir e de novo a cada toque
-        function telaCheia() {
-            const el = document.documentElement;
-            if (document.fullscreenElement || document.webkitFullscreenElement) return;
-            const pedir = el.requestFullscreen || el.webkitRequestFullscreen;
-            if (!pedir) return;
-            try {
-                const p = pedir.call(el, { navigationUI: 'hide' });
-                if (p && p.catch) p.catch(() => {});
-            } catch (e) { /* sem permissão ainda: o próximo toque tenta de novo */ }
-        }
-        telaCheia();
-        document.addEventListener('pointerdown', telaCheia);
-    </script>
 
     {% if modo == 'tablet' %}
     <script>
