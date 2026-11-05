@@ -222,7 +222,7 @@
             document.getElementById('presenceMessage').innerText = mensagem;
         }
 
-        function exibirSucessoAluno(nome, matricula, fotoUrl, jaRegistrado, status) {
+        function exibirSucessoAluno(nome, matricula, fotoUrl, jaRegistrado, status, mensagem) {
             const scannerOverlay = document.getElementById('scannerOverlay');
             const videoBox = document.getElementById('videoBox');
             const iconWrapper = document.getElementById('iconWrapper');
@@ -232,8 +232,10 @@
             const rotulo = document.getElementById('rotuloCamera');
             const primeiroNome = (nome || '').split(' ')[0];
 
-            const registrou = status !== 'sem_aula' && !jaRegistrado && status !== 'falta';
-            if (status !== 'sem_aula' && !jaRegistrado) {
+            // fora_horario / sem_aula: reconheceu, mas nada foi registrado
+            const salvou = ['presente', 'atraso', 'falta'].includes(status) && !jaRegistrado;
+            const registrou = salvou && status !== 'falta';
+            if (salvou) {
                 adicionarAoHistorico(nome, matricula, fotoUrl, status);
             }
 
@@ -253,18 +255,21 @@
             if (status === 'sem_aula') {
                 definirEstado('aviso', 'Hoje não há aula', 'O reconhecimento foi feito, mas hoje não é dia de aula da turma deste aluno.', 'Nenhuma presença registrada.', 'fa-calendar-xmark');
                 FO.som('aviso');
+            } else if (status === 'fora_horario') {
+                definirEstado('aviso', `${primeiroNome}, fora do horário`, mensagem, 'Nenhuma presença registrada.', 'fa-hourglass-half');
+                FO.som('aviso');
             } else if (jaRegistrado) {
-                definirEstado('aviso', `${primeiroNome}, você já está aqui!`, 'A presença deste aluno já está salva no dia de hoje.', 'Presença já confirmada hoje.', 'fa-circle-info');
+                definirEstado('aviso', `${primeiroNome}, você já está aqui!`, mensagem || 'A presença deste aluno já está salva.', 'Presença já confirmada.', 'fa-circle-info');
                 FO.som('aviso');
             } else if (status === 'atraso') {
-                definirEstado('aviso', `Bem-vindo(a), ${primeiroNome}!`, 'Presença registrada hoje com atraso.', 'Presença confirmada com atraso!', 'fa-clock');
+                definirEstado('aviso', `Bem-vindo(a), ${primeiroNome}!`, mensagem || 'Presença registrada com atraso.', 'Presença confirmada com atraso!', 'fa-clock');
                 FO.som('ok');
                 FO.confete({ quantidade: 70, cores: ['#ffc23d', '#ff8a3d', '#ffd66b'] });
             } else if (status === 'falta') {
-                definirEstado('erro', `${primeiroNome}, registro fora do horário`, 'O reconhecimento ocorreu, mas passou do horário limite para presença.', 'Registro salvo como falta.', 'fa-circle-xmark');
+                definirEstado('erro', `${primeiroNome}, passou da tolerância`, 'Esta aula ficou como falta; as próximas aulas do bloco ficaram com presença.', 'Falta nesta aula.', 'fa-circle-xmark');
                 FO.som('erro');
             } else {
-                definirEstado('ok', `Bem-vindo(a), ${primeiroNome}!`, 'Presença registrada no dia de hoje.', 'Presença confirmada!', 'fa-circle-check');
+                definirEstado('ok', `Bem-vindo(a), ${primeiroNome}!`, mensagem || 'Presença registrada.', 'Presença confirmada!', 'fa-circle-check');
                 FO.som('ok');
                 const r = videoBox.getBoundingClientRect();
                 FO.confete({ x: r.left + r.width / 2, y: r.top + r.height / 2, quantidade: 160 });
@@ -370,7 +375,7 @@
             .then(data => {
                 if (data && data.reconhecido) {
                     const dados = data.dados;
-                    exibirSucessoAluno(dados.nome, dados.matricula, dados.foto, dados.ja_registrado, dados.status);
+                    exibirSucessoAluno(dados.nome, dados.matricula, dados.foto, dados.ja_registrado, dados.status, dados.mensagem);
                 }
             })
             .catch(() => {});
@@ -463,7 +468,7 @@
                     const d = await res.json();
                     if (d.evento) {
                         const e = d.evento;
-                        exibirSucessoAluno(e.nome, e.matricula, e.foto, e.ja_registrado, e.status);
+                        exibirSucessoAluno(e.nome, e.matricula, e.foto, e.ja_registrado, e.status, e.mensagem);
                     }
                     desenharCaixa(tela, d);
                     const estado = d.pronto ? d.estado : 'iniciando';

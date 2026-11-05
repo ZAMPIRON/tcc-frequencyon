@@ -148,6 +148,7 @@
                     </div>
                 </div>
             </div>
+            <div class="mt-3">{% with turma=turma_selecionada %}{% include 'componentes/grade_turma.html' %}{% endwith %}</div>
             {% elif turma_selecionada %}
             <div class="alert alert-warning small">
                 O administrador ainda não definiu seus dias de aula nesta turma. A chamada fica disponível assim que os dias forem cadastrados.
@@ -163,7 +164,7 @@
                     <span class="text-muted fw-normal ms-1">{{ data_exibicao }}</span>
                     {% if pode_editar %}<span class="badge bg-success ms-2 fs-6"><span class="spinner-grow spinner-grow-sm me-1 ponto-ao-vivo"></span>Hoje • ao vivo</span>{% else %}<span class="badge bg-secondary ms-2 fs-6">Somente consulta</span>{% endif %}
                 </h5>
-                <small class="text-muted">{% if pode_editar %}Clique nas barras para alterar falta/presença. Botão direito nas 2 primeiras marca atraso.{% else %}Escolha um dia no calendário. Dias anteriores ficam só para consulta; alterar exige senha de administrador.{% endif %}</small>
+                <small class="text-muted">{% if pode_editar %}Clique nas barras para alterar falta/presença. Botão direito marca atraso. O espaço entre as barras separa os períodos (manhã e tarde).{% else %}Escolha um dia no calendário. Dias anteriores ficam só para consulta; alterar exige senha de administrador.{% endif %}</small>
             </div>
 
             <div class="card-body p-0">
@@ -173,7 +174,7 @@
                             <tr>
                                 <th class="ps-4">Nome</th>
                                 <th class="d-none d-sm-table-cell">Matrícula</th>
-                                <th>Status (10 Aulas)</th>
+                                <th>Status ({{ grade|length }} aulas)</th>
                                 <th class="text-center">{{ mes_nome }}</th>
                             </tr>
                         </thead>
@@ -191,9 +192,10 @@
                                     <div class="bar-container">
                                         {% for estado in aluno.status %}
                                             <div class="bar {{ 'on' if estado == 'presente' else ('late' if estado == 'atraso' else 'off') }} {{ 'bar-bloqueada' if not pode_editar else '' }}"
+                                                 {% if loop.index0 in inicios_bloco and not loop.first %}style="margin-left: 8px"{% endif %}
                                                  data-aluno="{{ aluno.id }}"
                                                  data-barra="{{ loop.index0 }}"
-                                                 title="Aula {{ loop.index }}: {{ estado|capitalize }}{% if pode_editar %} (alterável){% else %} (senha de administrador para alterar){% endif %}"
+                                                 title="{{ grade[loop.index0].rotulo }}: {{ estado|capitalize }}{% if pode_editar %} (alterável){% else %} (senha de administrador para alterar){% endif %}"
                                                  onclick="registrarClique(this)" oncontextmenu="registrarAtraso(event, this)"></div>
                                         {% endfor %}
                                     </div>
@@ -328,10 +330,6 @@
             event.preventDefault();
 
             const barraIndice = parseInt(elemento.getAttribute('data-barra'));
-            if (barraIndice > 1) {
-                FO.toast('Atraso só pode ser marcado nas aulas 1 e 2.', 'warning');
-                return;
-            }
 
             const alunoId = elemento.getAttribute('data-aluno');
             enviarAlteracao(

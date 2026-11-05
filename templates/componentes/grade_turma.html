@@ -1,0 +1,22 @@
+{# como funciona o dia da turma: um bloco de aulas por periodo e ate que horas passar no totem.
+   espera `turma`; opcional: `estilo_card` (classe do cartao) #}
+<div class="{{ estilo_card or 'card border-0 shadow-sm' }}">
+    <div class="{{ '' if estilo_card else 'card-body' }}">
+        <h2 class="h6 fw-bold mb-1">Como funciona o dia</h2>
+        <p class="small text-muted mb-2">
+            {{ turma.modelo.nome if turma.modelo else 'Sem horário definido' }}.
+            Passe em qualquer totem uma vez por período: de manhã e de novo depois do almoço.
+        </p>
+        {% for b in turma.blocos %}
+            <div class="d-flex justify-content-between align-items-center gap-2 py-2 border-bottom small">
+                <div>
+                    <strong>{{ b.nome_periodo }}</strong>
+                    <span class="text-muted">· {{ b.inicio.strftime('%H:%M') }}–{{ b.fim.strftime('%H:%M') }} · {{ b.nome_aulas }}</span>
+                </div>
+                <span class="badge bg-primary-subtle text-primary">passe até {{ b.inicio.strftime('%H:%M') }}</span>
+            </div>
+        {% else %}
+            <p class="small text-muted mb-0">A coordenação ainda não definiu o horário desta turma.</p>
+        {% endfor %}
+    </div>
+</div>

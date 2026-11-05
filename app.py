@@ -13,7 +13,7 @@ from email_service import carregar_env
 # porque os horarios das aulas sao lidos das variaveis na hora do import
 carregar_env(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
-from database import db, Admin, SENHAS_FRACAS, migrar_dispositivos, migrar_professor_turma  # noqa: E402
+from database import db, Admin, SENHAS_FRACAS, migrar_dispositivos, migrar_horarios, migrar_professor_turma  # noqa: E402
 from face_service import Totem  # noqa: E402
 from rotas import registrar_rotas  # noqa: E402
 from rotas.comum import usuario_atual  # noqa: E402
@@ -70,6 +70,7 @@ def create_app(avisar_senhas=True):
 
     with app.app_context():
         db.create_all()
+        migrar_horarios()           # antes de tudo: cria as colunas que as consultas de Turma já usam
         migrar_dispositivos()       # antes: cria colunas que as consultas de Professor já usam
         migrar_professor_turma()
         # banco novo: cria um admin pra conseguir entrar a primeira vez.

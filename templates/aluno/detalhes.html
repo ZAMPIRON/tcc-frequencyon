@@ -107,6 +107,8 @@
                 </div>
             </div>
 
+            {% if aluno.turma %}{% with turma=aluno.turma, estilo_card='card-fo fo-glass p-4' %}{% include 'componentes/grade_turma.html' %}{% endwith %}{% endif %}
+
             <!-- frequência geral -->
             <div class="card-fo fo-glass p-4">
                 {% set nivel_freq = 'bom' if frequencia >= 75 else ('medio' if frequencia >= 50 else 'ruim') %}

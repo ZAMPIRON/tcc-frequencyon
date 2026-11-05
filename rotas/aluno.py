@@ -6,7 +6,7 @@ from datetime import date
 
 from flask import Blueprint, Response, flash, redirect, render_template, request, url_for
 
-from database import (db, Aluno, Justificativa, Presenca, AULAS_POR_DIA, NOMES_DIAS,
+from database import (db, Aluno, Justificativa, Presenca, NOMES_DIAS,
                       agora_local, eh_dia_com_aula, hoje_local)
 from email_service import enviar_justificativa
 from .comum import requer, usuario_atual
@@ -20,10 +20,11 @@ def historico_aluno(aluno):
     hoje = hoje_local()
     turma = aluno.turma
     dias_aula = turma.dias_aula if turma else ()
+    n_aulas = turma.aulas_por_dia if turma else 0
     linhas, justificaveis = [], []
     presentes = atrasos = total = 0
 
-    if dias_aula:
+    if dias_aula and n_aulas:
         # dias em que teve chamada na turma (mesmo criterio do Aluno.frequencia)
         datas = {d for (d,) in db.session.query(Presenca.data).join(Aluno)
                  .filter(Aluno.turma_id == turma.id).distinct()
@@ -37,10 +38,10 @@ def historico_aluno(aluno):
         pendente_hoje = eh_dia_com_aula(hoje, dias_aula) and hoje not in datas
         for d in sorted(datas | ({hoje} if pendente_hoje else set()), reverse=True):
             sem_chamada = d not in datas
-            st = (["pendente"] * AULAS_POR_DIA if sem_chamada else
-                  [mapa.get(d, {}).get(i, "falta") for i in range(AULAS_POR_DIA)])
+            st = (["pendente"] * n_aulas if sem_chamada else
+                  [mapa.get(d, {}).get(i, "falta") for i in range(n_aulas)])
             if not sem_chamada:
-                total += AULAS_POR_DIA
+                total += n_aulas
                 presentes += st.count("presente")
                 atrasos += st.count("atraso")
             faltas_dia = st.count("falta")
@@ -68,6 +69,7 @@ def historico_aluno(aluno):
         "pct_atraso": pct_atraso,
         "pct_falta": pct_falta,
         "frequencia": aluno.frequencia,
+        "n_aulas": n_aulas,
     }
 
 
@@ -88,7 +90,7 @@ def exportar_csv(aluno):
     w.writerow(["Frequência", f"{dados['frequencia']}%", "Presenças", f"{dados['pct_presenca']}%",
                 "Faltas", f"{dados['pct_falta']}%", "Atrasos", f"{dados['pct_atraso']}%"])
     w.writerow([])
-    w.writerow(["Data", "Dia", "Professor(es)"] + [f"Aula {i + 1}" for i in range(AULAS_POR_DIA)]
+    w.writerow(["Data", "Dia", "Professor(es)"] + [f"Aula {i + 1}" for i in range(dados["n_aulas"])]
                + ["Faltas", "Atrasos", "Justificativa"])
     for l in dados["linhas"]:
         j = l["justificativa"]

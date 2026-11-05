@@ -1,0 +1,144 @@
+{% extends 'admin/base.html' %}
+
+{% block title %}Horários - FrequencyOn{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h1 class="h3 fw-bold mb-1">Horários <span class="fo-gradient-text">das turmas</span></h1>
+        <p class="text-muted mb-0 small">Cada turma usa um horário (ex: CAI com 4 aulas de 60 min, técnico com 10 de 45)</p>
+    </div>
+    <button class="btn btn-primary fw-semibold btn-sm px-3 py-2 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalHorario">
+        <i class="fa-solid fa-plus me-1"></i> Novo horário
+    </button>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for category, message in messages %}
+    <div class="alert alert-{{ category }} alert-dismissible fade show small" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endfor %}
+{% endwith %}
+
+<div class="card border-0 shadow-sm rounded-3 mb-4">
+    <div class="card-body small text-muted">
+        <strong class="text-dark">Como o totem usa o horário:</strong>
+        o aluno passa em <strong>qualquer totem</strong> uma vez por <strong>período</strong> (manhã, tarde ou noite), e a presença vai para as aulas daquele período.
+        Por isso ele passa de novo depois do almoço: quem não voltar fica com falta nas aulas da tarde. Trocar de sala não muda nada.
+        O totem abre o registro {{ antecedencia }} min antes do bloco. Até {{ tol_presente }} min depois do início da aula conta presença, até {{ tol_atraso }} min conta atraso, e depois disso é falta naquela aula, com presença nas aulas seguintes.
+    </div>
+</div>
+
+{% for m in modelos %}
+<div class="card border-0 shadow-sm rounded-3 mb-4">
+    <form method="POST" action="{{ url_for('admin.salvar_horario', id=m.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="p-3 border-bottom d-flex align-items-center justify-content-between gap-2 flex-wrap">
+            <div class="d-flex align-items-center gap-2 flex-grow-1">
+                <input type="text" name="nome" value="{{ m.nome }}" class="form-control form-control-sm fw-bold" style="max-width: 320px" required aria-label="Nome do horário">
+                <span class="text-muted small text-nowrap">{{ m.resumo }}</span>
+            </div>
+            <span class="badge bg-secondary">{{ m.turmas|length }} turma(s){% if m.turmas %}: {{ m.turmas|map(attribute='curso')|join(', ') }}{% endif %}</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead class="table-light small">
+                    <tr><th>Aula</th><th>Início</th><th>Fim</th><th>Período</th><th></th></tr>
+                </thead>
+                <tbody class="small" id="aulas{{ m.id }}">
+                    {% for a in m.aulas %}
+                    <tr>
+                        <td class="fw-bold numero-aula">{{ loop.index }}</td>
+                        <td><input type="time" name="inicio" value="{{ a.inicio.strftime('%H:%M') }}" class="form-control form-control-sm" required></td>
+                        <td><input type="time" name="fim" value="{{ a.fim.strftime('%H:%M') }}" class="form-control form-control-sm" required></td>
+                        <td>
+                            <select name="periodo" class="form-select form-select-sm">
+                                {% for chave, nome in periodos.items() %}<option value="{{ chave }}" {{ 'selected' if chave == a.periodo }}>{{ nome }}</option>{% endfor %}
+                            </select>
+                        </td>
+                        <td class="text-end"><button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="removerAula(this)" title="Remover aula"><i class="fa-solid fa-trash"></i></button></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="p-3 d-flex align-items-center justify-content-between gap-2 flex-wrap">
+            <button type="button" class="btn btn-outline-primary btn-sm" onclick="adicionarAula('aulas{{ m.id }}')"><i class="fa-solid fa-plus me-1"></i> Aula</button>
+            <div class="d-flex gap-2">
+                <button type="submit" formaction="{{ url_for('admin.remover_horario', id=m.id) }}" formnovalidate class="btn btn-outline-danger btn-sm"
+                        onclick="return confirm('Remover este horário?');" {% if m.turmas %}disabled title="Em uso por turmas"{% endif %}>Remover</button>
+                <button type="submit" class="btn btn-primary btn-sm">Salvar horário</button>
+            </div>
+        </div>
+    </form>
+</div>
+{% else %}
+<div class="alert alert-info small">Nenhum horário cadastrado. Crie um em <strong>Novo horário</strong>.</div>
+{% endfor %}
+
+<!-- Modal: novo horário -->
+<div class="modal fade" id="modalHorario" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('admin.novo_horario') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-header">
+                    <h5 class="modal-title h6 fw-bold">Novo horário</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Nome</label>
+                        <input type="text" name="nome" class="form-control form-control-sm" required placeholder="Ex: CAI tarde">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Começar a partir de</label>
+                        <select name="copiar_de" class="form-select form-select-sm">
+                            <option value="">Horário em branco</option>
+                            {% for m in modelos %}<option value="{{ m.id }}">{{ m.nome }}</option>{% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Criar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // numera as aulas de novo depois de adicionar ou remover uma linha
+    function renumerar(corpo) {
+        corpo.querySelectorAll('.numero-aula').forEach((td, i) => td.innerText = i + 1);
+    }
+
+    function adicionarAula(id) {
+        const corpo = document.getElementById(id);
+        const ultima = corpo.lastElementChild;
+        const nova = ultima.cloneNode(true);
+        // a aula nova começa quando a anterior termina
+        const fimAnterior = ultima.querySelector('[name=fim]').value;
+        nova.querySelector('[name=inicio]').value = fimAnterior;
+        nova.querySelector('[name=fim]').value = '';
+        corpo.appendChild(nova);
+        renumerar(corpo);
+        nova.querySelector('[name=fim]').focus();
+    }
+
+    function removerAula(botao) {
+        const corpo = botao.closest('tbody');
+        if (corpo.children.length === 1) {
+            FO.toast('O horário precisa de pelo menos uma aula.', 'warning');
+            return;
+        }
+        botao.closest('tr').remove();
+        renumerar(corpo);
+    }
+</script>
+{% endblock %}

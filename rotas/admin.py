@@ -2,6 +2,7 @@
 # os relatorios e a planilha ficam em relatorios.py pra esse arquivo nao crescer demais
 import os
 import uuid
+from datetime import time
 
 import cv2
 import secrets
@@ -9,8 +10,10 @@ import secrets
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, session, url_for
 from sqlalchemy import or_
 
-from database import (db, Aluno, Dispositivo, Justificativa, Professor, ProfessorTurma, Turma,
-                      DIAS_SELECIONAVEIS, SENHAS_FRACAS, NOMES_DIAS, agora_local, dias_de_formulario)
+from database import (db, Aluno, AulaHorario, Dispositivo, Justificativa, ModeloHorario, Professor,
+                      ProfessorTurma, Turma, ANTECEDENCIA_TOTEM, DIAS_SELECIONAVEIS, PERIODOS, SENHAS_FRACAS,
+                      NOMES_DIAS, TOLERANCIA_ATRASO, TOLERANCIA_PRESENTE,
+                      agora_local, dias_de_formulario)
 from .aluno import exportar_csv, render_detalhes
 from face_service import encoding_de_imagens
 from .comum import encoding_de_foto, pasta_uploads, pegar_totem, requer, salvar_foto
@@ -258,7 +261,8 @@ def deletar_professor(id):
 def turmas():
     if request.method == "POST":
         f = request.form
-        turma = Turma(nome=f["nome"], curso=f["curso"])
+        modelo = db.session.get(ModeloHorario, f.get("modelo_id", type=int) or 0) or ModeloHorario.query.first()
+        turma = Turma(nome=f["nome"].strip(), curso=f["curso"].strip(), modelo=modelo)
         # os professores entram sem dias, o admin escolhe os dias depois nos detalhes da turma
         for pid in set(f.getlist("professor_ids", type=int)):
             if db.session.get(Professor, pid):
@@ -268,7 +272,8 @@ def turmas():
         flash("Turma criada! Defina os dias de aula de cada professor nos detalhes da turma.", "success")
         return redirect(url_for("admin.turmas"))
     return render_template("admin/turmas.html", salas=salas_com_turmas(),
-                           professores=Professor.query.order_by(Professor.nome).all())
+                           professores=Professor.query.order_by(Professor.nome).all(),
+                           modelos=ModeloHorario.query.order_by(ModeloHorario.nome).all())
 
 
 def salas_com_turmas():
@@ -285,6 +290,7 @@ def detalhes_turma(id):
     turma = db.get_or_404(Turma, id)
     vinculados = {v.professor_id for v in turma.vinculos}
     return render_template("admin/detalhes_turma.html", turma=turma,
+                           modelos=ModeloHorario.query.order_by(ModeloHorario.nome).all(),
                            alunos_sem_turma=Aluno.query.filter_by(turma_id=None).all(),
                            professores_disponiveis=[p for p in Professor.query.order_by(Professor.nome)
                                                     if p.id not in vinculados],
@@ -300,12 +306,7 @@ def editar_turma(id):
     if not nome or not curso:
         flash("Nome e curso da turma são obrigatórios.", "danger")
     else:
-        antiga = t.nome
         t.nome, t.curso = nome, curso
-        db.session.flush()
-        # a sala mudou de nome e nao sobrou turma com o nome antigo: os totens dela acompanham
-        if antiga != nome and not Turma.query.filter_by(nome=antiga).first():
-            Dispositivo.query.filter_by(sala=antiga).update({"sala": nome})
         db.session.commit()
         flash(f"Turma {t.nome} atualizada.", "success")
     return redirect(request.referrer or url_for("admin.turmas"))
@@ -339,6 +340,100 @@ def desvincular_aluno(aluno_id):
     turma_id, aluno.turma_id = aluno.turma_id, None
     db.session.commit()
     return redirect(url_for("admin.detalhes_turma", id=turma_id) if turma_id else url_for("admin.turmas"))
+
+
+@admin.route("/turmas/<int:id>/horario", methods=["POST"])
+@requer("admin")
+def horario_turma(id):
+    # troca o modelo de horario da turma (CAI, tecnico...)
+    t = db.get_or_404(Turma, id)
+    modelo = db.get_or_404(ModeloHorario, request.form.get("modelo_id", type=int) or 0)
+    if modelo.id != t.modelo_id:
+        t.modelo = modelo
+        db.session.commit()
+        flash(f"Horário da turma: {modelo.nome}.", "success")
+    return redirect(url_for("admin.detalhes_turma", id=id))
+
+
+# ---------- modelos de horario (CAI, tecnico...) ----------
+
+@admin.route("/horarios")
+@requer("admin")
+def horarios():
+    return render_template("admin/horarios.html", periodos=PERIODOS,
+                           modelos=ModeloHorario.query.order_by(ModeloHorario.nome).all(),
+                           antecedencia=ANTECEDENCIA_TOTEM, tol_presente=TOLERANCIA_PRESENTE,
+                           tol_atraso=TOLERANCIA_ATRASO)
+
+
+def _aulas_do_formulario():
+    # le as linhas da tabela (inicio[], fim[], periodo[]) e devolve ([AulaHorario], erro)
+    f = request.form
+    aulas = []
+    for n, (ini, fim, per) in enumerate(zip(f.getlist("inicio"), f.getlist("fim"), f.getlist("periodo")), 1):
+        if not ini and not fim:
+            continue                        # linha em branco
+        try:
+            ini, fim = time.fromisoformat(ini), time.fromisoformat(fim)
+        except ValueError:
+            return None, f"Aula {n}: preencha o início e o fim."
+        if fim <= ini:
+            return None, f"Aula {n}: o fim precisa ser depois do início."
+        aulas.append(AulaHorario(inicio=ini, fim=fim, periodo=per if per in PERIODOS else "manha"))
+    if not aulas:
+        return None, "O horário precisa de pelo menos uma aula."
+    aulas.sort(key=lambda a: a.inicio)
+    for antes, depois in zip(aulas, aulas[1:]):
+        if depois.inicio < antes.fim:
+            return None, f"As aulas das {antes.inicio:%H:%M} e das {depois.inicio:%H:%M} se sobrepõem."
+    return aulas, None
+
+
+@admin.route("/horarios/novo", methods=["POST"])
+@requer("admin")
+def novo_horario():
+    # cria um modelo copiando as aulas de outro (ou com uma aula so, para editar depois)
+    nome = (request.form.get("nome") or "").strip()
+    if not nome or ModeloHorario.query.filter_by(nome=nome).first():
+        flash("Informe um nome que ainda não exista.", "danger")
+        return redirect(url_for("admin.horarios"))
+    base = db.session.get(ModeloHorario, request.form.get("copiar_de", type=int) or 0)
+    aulas = ([AulaHorario(inicio=a.inicio, fim=a.fim, periodo=a.periodo) for a in base.aulas] if base
+             else [AulaHorario(inicio=time(7, 0), fim=time(7, 45), periodo="manha")])
+    db.session.add(ModeloHorario(nome=nome, aulas=aulas))
+    db.session.commit()
+    flash(f"Horário \"{nome}\" criado. Ajuste as aulas e salve.", "success")
+    return redirect(url_for("admin.horarios"))
+
+
+@admin.route("/horarios/<int:id>", methods=["POST"])
+@requer("admin")
+def salvar_horario(id):
+    m = db.get_or_404(ModeloHorario, id)
+    nome = (request.form.get("nome") or "").strip()
+    aulas, erro = _aulas_do_formulario()
+    if not nome or ModeloHorario.query.filter(ModeloHorario.nome == nome, ModeloHorario.id != id).first():
+        erro = "Informe um nome que ainda não exista."
+    if erro:
+        flash(f"{m.nome}: {erro}", "danger")
+        return redirect(url_for("admin.horarios"))
+    m.nome, m.aulas = nome, aulas
+    db.session.commit()
+    flash(f"Horário \"{m.nome}\" salvo.", "success")
+    return redirect(url_for("admin.horarios"))
+
+
+@admin.route("/horarios/<int:id>/remover", methods=["POST"])
+@requer("admin")
+def remover_horario(id):
+    m = db.get_or_404(ModeloHorario, id)
+    if m.turmas:
+        flash(f"\"{m.nome}\" está em uso por {len(m.turmas)} turma(s). Troque o horário delas antes.", "danger")
+    else:
+        db.session.delete(m)
+        db.session.commit()
+        flash(f"Horário \"{m.nome}\" removido.", "success")
+    return redirect(url_for("admin.horarios"))
 
 
 # ---------- professor <-> turma ----------
@@ -395,17 +490,15 @@ def responder_justificativa(id, acao):
 @admin.route("/totens")
 @requer("admin")
 def totens():
-    # totens criados pela coordenacao; cada um fica numa sala e e liberado por um professor dela a cada dia
+    # totens criados pela coordenacao; qualquer um registra qualquer aluno e e liberado por um professor a cada dia
     return render_template("admin/totens.html", modo=pegar_totem().fonte,
                            dispositivos=Dispositivo.query.order_by(Dispositivo.nome).all(),
-                           salas=salas_com_turmas(),
                            codigo_novo=session.pop("codigo_totem", None), agora=agora_local())
 
 
 def _mostrar_codigo(disp):
     # o codigo aparece uma vez so na pagina (o banco guarda so o hash)
-    session["codigo_totem"] = {"nome": disp.nome, "sala": disp.sala or "",
-                               "codigo": gerar_codigo_ativacao(disp)}
+    session["codigo_totem"] = {"nome": disp.nome, "codigo": gerar_codigo_ativacao(disp)}
     db.session.commit()
 
 
@@ -413,15 +506,14 @@ def _mostrar_codigo(disp):
 @requer("admin")
 def novo_totem():
     nome = (request.form.get("nome") or "").strip()
-    sala = (request.form.get("sala") or "").strip()
-    if not nome or not Turma.query.filter_by(nome=sala).first():
-        flash("Informe o nome do totem e a sala dele.", "danger")
+    if not nome:
+        flash("Informe o nome do totem (ex: Totem C13).", "danger")
         return redirect(url_for("admin.totens"))
     if Dispositivo.query.filter_by(nome=nome).first():
         flash(f"Já existe um totem chamado \"{nome}\".", "danger")
         return redirect(url_for("admin.totens"))
     # token sorteado e descartado: nenhum aparelho entra ate digitar o codigo de ativacao
-    disp = Dispositivo(nome=nome, sala=sala, token_hash=_hash(secrets.token_urlsafe(32)))
+    disp = Dispositivo(nome=nome, token_hash=_hash(secrets.token_urlsafe(32)))
     db.session.add(disp)
     db.session.flush()
     _mostrar_codigo(disp)
@@ -433,18 +525,6 @@ def novo_totem():
 def codigo_totem(id):
     # codigo novo: para ativar o primeiro tablet ou trocar o aparelho (o antigo perde o acesso ao ativar)
     _mostrar_codigo(db.get_or_404(Dispositivo, id))
-    return redirect(url_for("admin.totens"))
-
-
-@admin.route("/totens/<int:id>/sala", methods=["POST"])
-@requer("admin")
-def sala_totem(id):
-    # define em que sala o totem fica: so os professores das turmas dessa sala conseguem libera-lo
-    disp = db.get_or_404(Dispositivo, id)
-    sala = (request.form.get("sala") or "").strip()
-    disp.sala = sala if Turma.query.filter_by(nome=sala).first() else None
-    db.session.commit()
-    flash(f"Sala do \"{disp.nome}\": {disp.sala or 'nenhuma'}.", "success")
     return redirect(url_for("admin.totens"))
 
 

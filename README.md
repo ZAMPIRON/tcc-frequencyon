@@ -31,7 +31,7 @@ FrequencyON fixes both ends of that problem:
 | User | What they get |
 |---|---|
 | **Students** | A personal page with their attendance rate, a lesson-by-lesson history, CSV export and online absence justification. |
-| **Teachers** | One-click roll call for 10 lessons a day, a monthly calendar colour-coded by class attendance, and automatic check-ins from the totem. |
+| **Teachers** | One-click roll call for every lesson of the class's schedule, a monthly calendar colour-coded by class attendance, and automatic check-ins from the totem. |
 | **School administrators** | Institution-wide KPIs, reports by course and teacher, a dropout-risk list, and control over classes, teachers and timetables. |
 
 ## Product tour
@@ -42,14 +42,16 @@ FrequencyON fixes both ends of that problem:
 - **Liveness check**: attendance is only recorded after the face shows **natural micro-movement** (eyes/mouth), so a printed photo is not accepted — no need to blink.
 - Live camera feed in the browser with on-screen feedback: confetti and a sound on success, distinct states for *late*, *outside the allowed time* and *no class today*.
 - **Self-enrolment**: a student types their student ID **and password** in front of the totem and the system captures and stores their face encoding. Five wrong passwords lock that student ID for 15 minutes.
-- Lessons that have already happened when the student arrives are marked absent; the current and upcoming lessons are marked present. The first lesson is *present* up to `07:05` and *late* up to `07:10` (both configurable).
-- Check-ins only count on the class's scheduled weekdays, and each student is registered once per day.
+- **Schedules per class** (*Admin → Horários*): e.g. CAI with 4 lessons of 60 min, technical courses with 10 lessons of 45 min, each lesson with a start, an end and a period (morning/afternoon/evening). Each class picks a schedule.
+- **Universal totems**: any totem registers any student, in their own class, no matter which room the class is in today (rooms change too often to keep them in the system). Any teacher can unlock a totem.
+- The student checks in **once per period** (morning, afternoon, evening): again after lunch. A student who leaves at lunch and doesn't come back is absent for the afternoon lessons. Check-in opens 30 min before the period. Lessons of the period that already ended are absent; a lesson is *present* until its start and *late* up to 5 min after (configurable), later is absent for that lesson only.
+- Check-ins only count on the class's scheduled weekdays.
 
 ### Teacher workspace
 ![Teacher attendance view](docs/screenshots/teacher-attendance.png)
 
 - Month calendar: class days are clickable and colour-coded by that day's attendance (≥ 75%, 50–74%, < 50%, no roll call yet).
-- Ten attendance bars per student: click to toggle present/absent, right-click on the first two lessons to mark late.
+- One attendance bar per lesson, grouped by period: click to toggle present/absent, right-click to mark late.
 - Today's roll call is editable. Past days are read-only unless an administrator's password is entered.
 - Per-student monthly attendance at a glance.
 
@@ -64,7 +66,7 @@ FrequencyON fixes both ends of that problem:
 
 ### Student page
 - Attendance ring with *Regular / Attention / Critical* status.
-- History of every school day with all 10 lessons, filterable by absences or late arrivals.
+- History of every school day with all lessons of the day, filterable by absences or late arrivals.
 - **Export to CSV** (Excel-friendly).
 - **Justify an absence** online and follow its status.
 
@@ -87,10 +89,10 @@ flowchart LR
 
 1. The totem service reads frames from the camera on a background thread, finds faces with dlib's HOG detector and turns each face into a 128-dimension encoding.
 2. The encoding is compared with every enrolled student. A match needs a distance ≤ **0.50** on **2 consecutive frames**. The same student isn't processed again for **8 seconds**.
-3. A match writes one record per lesson (`present` / `late` / `absent`) for that student and day, then pushes an event that the totem page picks up (polled every second).
+3. A match writes one record per lesson of the current period (`present` / `late` / `absent`) for that student and day, then pushes an event that the totem page picks up (polled every second).
 4. Teachers, students and administrators read the same records, so every screen shows the same numbers.
 
-**Attendance rate** = lessons attended (present + late) ÷ (school days with a roll call in the class × 10 lessons).
+**Attendance rate** = lessons attended (present + late) ÷ (school days with a roll call in the class × lessons in the class's schedule).
 
 ## Tech stack
 
@@ -181,9 +183,9 @@ All settings are environment variables:
 | `HTTPS` | `1` | `0` turns HTTPS off and serves plain HTTP on `PORTA` (only for local testing). |
 | `PORTA_HTTPS` / `PORTA` | `5443` / `5000` | HTTPS port, and the HTTP port that redirects to it. |
 | `SSL_CERT` / `SSL_KEY` | *(local CA)* | Paths to a real certificate and key, instead of the generated ones. |
-| `HORARIO_PRESENTE` | `07:05` | Check-ins up to this time are *present* for lesson 1. |
-| `HORARIO_ATRASO` | `07:10` | Check-ins up to this time are *late* for lesson 1. |
-| `HORARIOS_AULAS` | `07:00,07:50,…,14:30` | Start time of each of the 10 daily lessons (comma-separated). |
+| `TOLERANCIA_PRESENTE` | `0` | Minutes after a lesson starts that still count as *present*. |
+| `TOLERANCIA_ATRASO` | `5` | Minutes after a lesson starts that count as *late*; later is an absence for that lesson only. |
+| `ANTECEDENCIA_TOTEM` | `30` | Minutes before a block of lessons when the kiosk starts accepting check-ins. |
 | `FREQUENCYON_DATA` | *(empty)* | Freezes "today" to a date (`YYYY-MM-DD`), for testing. |
 | `EMAIL_JUSTIFICATIVAS` | *(empty)* | Address that receives an e-mail for every absence justification. |
 | `SMTP_SERVIDOR` / `SMTP_PORTA` | `smtp.gmail.com` / `465` | SMTP server used to send e-mails (465 = SSL, 587 = STARTTLS). |

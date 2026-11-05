@@ -3,7 +3,7 @@ import os
 import secrets
 
 from app import create_app  # Importe a instância do seu app Flask (ajuste o nome se necessário)
-from database import db, Admin, Professor, Turma, Aluno, Presenca, ProfessorTurma, Justificativa
+from database import db, Admin, ModeloHorario, Professor, Turma, Aluno, Presenca, ProfessorTurma, Justificativa
 
 
 
@@ -41,7 +41,9 @@ def popular_banco():
         db.session.commit()
 
         print("Criando Turma...")
-        turma = Turma(nome="Dev 2", curso="Análise de Desenvolvimento de Sistemas")
+        # horario tecnico (10 aulas de 45 min), criado pelo create_app
+        tecnico = ModeloHorario.query.filter(ModeloHorario.nome.like("Técnico%")).first() or ModeloHorario.query.first()
+        turma = Turma(nome="Dev 2", curso="Análise de Desenvolvimento de Sistemas", modelo=tecnico)
         db.session.add(turma)
         # Vincula o professor à turma com os dias de aula dele (1 = terça, 3 = quinta)
         turma.vinculos.append(ProfessorTurma(professor=prof, dias="1,3"))

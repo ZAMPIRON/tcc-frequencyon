@@ -477,7 +477,7 @@ class Totem:
             aluno = db.session.get(Aluno, aluno_id)
             if not aluno:
                 return
-            status, ja = registrar_presenca_totem(aluno)
+            status, ja, info = registrar_presenca_totem(aluno)
             if frame is not None:
                 self._atualizar_foto(aluno, frame, caixa)
             agora = agora_local()
@@ -487,10 +487,11 @@ class Totem:
                 "foto": aluno.foto,
                 "status": status,
                 "ja_registrado": ja,
+                "mensagem": info.get("mensagem", ""),
                 "data": hoje_local().strftime("%d/%m/%Y"),
                 "hora": agora.strftime("%H:%M:%S"),
             })
-            print(f"[totem] {aluno.nome} -> {status}{' (já registrado hoje)' if ja else ''}")
+            print(f"[totem] {aluno.nome} -> {status}{' (já registrado)' if ja else ''} {info.get('mensagem', '')}")
 
     def _atualizar_foto(self, aluno, frame, caixa):
         """Troca a foto do aluno pelo rosto que a câmera acabou de ver (só a imagem de exibição)."""

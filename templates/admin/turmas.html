@@ -97,6 +97,13 @@
                         <input type="text" name="curso" class="form-control form-control-sm" required placeholder="Ex: Desenvolvimento de Sistemas 1">
                     </div>
                     <div class="mb-3">
+                        <label class="form-label small fw-bold">Horário</label>
+                        <select name="modelo_id" class="form-select form-select-sm" required>
+                            {% for m in modelos %}<option value="{{ m.id }}">{{ m.nome }} — {{ m.resumo }}</option>{% endfor %}
+                        </select>
+                        <small class="text-muted">Os horários ficam em <a href="{{ url_for('admin.horarios') }}">Horários</a>.</small>
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label small fw-bold">Professores</label>
                         <div class="border rounded-2 p-2 lista-rolavel">
                             {% for prof in professores %}

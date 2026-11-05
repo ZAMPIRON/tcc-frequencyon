@@ -1,8 +1,8 @@
 # rotas do totem da entrada
 # a parte pesada (reconhecimento) fica em face_service.py,
 # aqui so tem a ponte entre o navegador do totem (tablet) e o servidor.
-# o totem e criado pela coordenacao (com a sala), ativado no tablet com um codigo
-# e liberado todo dia por um professor da sala olhando pra camera
+# o totem e criado pela coordenacao, ativado no tablet com um codigo e liberado
+# todo dia por um professor olhando pra camera. qualquer totem registra qualquer aluno
 import hashlib
 import os
 import secrets
@@ -25,10 +25,10 @@ MAX_FOTO_BYTES = 600 * 1024
 
 
 # ---------------------------------------------------------------------
-# ativacao: a coordenacao cria o totem no painel (nome + sala) e recebe um
+# ativacao: a coordenacao cria o totem no painel (so o nome) e recebe um
 # codigo. o tablet digita o codigo uma vez e ganha um token guardado num
 # cookie; o banco guarda so o hash dele.
-# liberacao: todo dia um professor da sala olha pra camera (ou digita e-mail
+# liberacao: todo dia um professor olha pra camera (ou digita e-mail
 # e senha) e o totem fica liberado ate o fim do dia.
 # ---------------------------------------------------------------------
 TENTATIVAS_LIBERAR = 10
@@ -143,14 +143,12 @@ def _motivo_negado(pessoa, disp):
     # None se 'pessoa' pode liberar este aparelho; senao, o texto que aparece no totem
     if disp.pode_liberar(pessoa):
         return None
-    if not disp.turmas:
-        return "Este totem está sem sala. Peça à coordenação para escolher a sala dele em Totens."
-    return f"{pessoa.nome} não dá aula na sala {disp.sala}."
+    return f"{pessoa.nome} não pode liberar o totem."
 
 
 @reconhecimento.route("/totem/liberar/frame", methods=["POST"])
 def liberar_por_rosto():
-    # totem bloqueado: o tablet manda fotos e, quando reconhece o rosto de um professor da sala, libera o aparelho
+    # totem bloqueado: o tablet manda fotos e, quando reconhece o rosto de um professor, libera o aparelho
     disp = dispositivo_atual()
     if not disp:
         return jsonify(sucesso=False, erro="totem_nao_ativado", mensagem="Este aparelho não está ativado."), 401
@@ -190,7 +188,7 @@ def liberar_totem():
 
     email = (request.form.get("email") or "").strip().lower()
     senha = request.form.get("senha") or ""
-    # professor da sala libera o totem; admin tambem pode
+    # qualquer professor libera o totem; admin tambem pode
     pessoa = (Professor.query.filter(db.func.lower(Professor.email) == email).first()
               or Admin.query.filter(db.func.lower(Admin.email) == email).first())
     if not pessoa or not pessoa.check_senha(senha):
