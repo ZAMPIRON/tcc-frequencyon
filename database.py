@@ -3,7 +3,8 @@ import os
 from datetime import date, datetime, time, timedelta, timezone
 
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import func
+from sqlalchemy import case, event, func
+from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -76,10 +77,14 @@ def dias_de_formulario(valores):
     return tuple(sorted(dias))
 
 
-# Tolerância do totem, em minutos depois do início de cada aula (mude aqui ou por variável de ambiente)
+# Tolerância do totem, em minutos depois do início de cada aula: valores iniciais de cada horário novo
+# (cada horário pode ter os seus, editados em Admin → Horários)
 TOLERANCIA_PRESENTE = int(os.getenv("TOLERANCIA_PRESENTE", "0"))   # até aqui = presente
 TOLERANCIA_ATRASO = int(os.getenv("TOLERANCIA_ATRASO", "5"))       # até aqui = atraso; depois = falta nessa aula
 ANTECEDENCIA_TOTEM = int(os.getenv("ANTECEDENCIA_TOTEM", "30"))    # o totem aceita o aluno até 30 min antes do bloco
+# frequência mínima da instituição e a partir de quando o aluno é avisado de que está chegando perto dela (RF20)
+FREQUENCIA_MINIMA = 75
+ALERTA_FREQUENCIA = int(os.getenv("ALERTA_FREQUENCIA", "80"))
 
 PERIODOS = {"manha": "Manhã", "tarde": "Tarde", "noite": "Noite"}
 
@@ -151,6 +156,9 @@ class ModeloHorario(db.Model):
     aulas = db.relationship("AulaHorario", back_populates="modelo", order_by="AulaHorario.inicio",
                             cascade="all, delete-orphan")
     turmas = db.relationship("Turma", back_populates="modelo")
+    tolerancia_presente = db.Column(db.Integer, nullable=False, default=TOLERANCIA_PRESENTE)  # min após o início: presente
+    tolerancia_atraso = db.Column(db.Integer, nullable=False, default=TOLERANCIA_ATRASO)      # até aqui: atraso
+    antecedencia = db.Column(db.Integer, nullable=False, default=ANTECEDENCIA_TOTEM)          # o totem abre antes do período
 
     @property
     def resumo(self):
@@ -253,7 +261,10 @@ class Turma(db.Model):
 
     @property
     def frequencia_media(self):
-        v = [a.frequencia for a in self.alunos]
+        return self.frequencia_media_periodo()
+
+    def frequencia_media_periodo(self, inicio=None, fim=None):
+        v = [a.frequencia_periodo(inicio, fim) for a in self.alunos]
         return round(sum(v) / len(v), 1) if v else 0
 
 
@@ -279,6 +290,38 @@ class ProfessorTurma(db.Model):
         return ", ".join(NOMES_DIAS[d] for d in self.dias_semana) or "Nenhum dia definido"
 
 
+# RNF09 (escala): quantos dias tiveram chamada numa turma e a mesma conta para todos os alunos dela.
+# guardamos o resultado e jogamos fora sempre que alguma presenca entra ou sai do banco
+_cache_dias = {"geracao": 0, "valores": {}}
+
+
+@event.listens_for(Session, "after_flush")
+def _presencas_mudaram(sessao, _contexto):
+    if any(isinstance(o, Presenca) for o in list(sessao.new) + list(sessao.deleted)):
+        _cache_dias["geracao"] += 1
+
+
+@event.listens_for(Session, "do_orm_execute")
+def _comando_direto(estado):
+    if estado.is_insert or estado.is_delete or estado.is_update:     # insert/delete em massa (ex.: cascata, importacao)
+        _cache_dias["geracao"] += 1
+
+
+def dias_com_chamada(turma_id, dias_aula, inicio=None, fim=None):
+    """Quantos dias de aula da turma (entre inicio e fim) têm pelo menos um lançamento de presença/falta."""
+    chave = (_cache_dias["geracao"], turma_id, tuple(dias_aula), inicio, fim)
+    valores = _cache_dias["valores"]
+    if chave not in valores:
+        if len(valores) > 2000:
+            valores.clear()
+        periodo = ([Presenca.data >= inicio] if inicio else []) + ([Presenca.data <= fim] if fim else [])
+        valores[chave] = (db.session.query(func.count(func.distinct(Presenca.data)))
+                          .join(Aluno, Presenca.aluno_id == Aluno.id)
+                          .filter(Aluno.turma_id == turma_id, filtro_dias_aula(Presenca.data, dias_aula), *periodo)
+                          .scalar())
+    return valores[chave]
+
+
 class Aluno(UsuarioMixin, db.Model):
     __tablename__ = "alunos"
     id = db.Column(db.Integer, primary_key=True)
@@ -295,10 +338,14 @@ class Aluno(UsuarioMixin, db.Model):
     alteracoes = db.relationship("AlteracaoPresenca", cascade="all, delete-orphan")
     justificativas = db.relationship("Justificativa", cascade="all, delete-orphan", backref="aluno",
                                      order_by="Justificativa.data.desc()")
+    alerta_enviado_em = db.Column(db.DateTime)   # último aviso de frequência baixa (não repete toda hora)
 
     @property
     def frequencia(self):
-        """% de aulas presentes/atraso nos dias em que houve chamada na turma."""
+        return self.frequencia_periodo()
+
+    def frequencia_periodo(self, inicio=None, fim=None):
+        """% de aulas presentes/atraso nos dias em que houve chamada na turma (opcional: só entre inicio e fim)."""
         if not self.turma_id:
             return 0
 
@@ -308,11 +355,8 @@ class Aluno(UsuarioMixin, db.Model):
 
         # Um dia entra no cálculo quando existe pelo menos um lançamento
         # de presença/falta para algum aluno da mesma turma.
-        dias = (db.session.query(func.count(func.distinct(Presenca.data)))
-                .join(Aluno, Presenca.aluno_id == Aluno.id)
-                .filter(Aluno.turma_id == self.turma_id,
-                        filtro_dias_aula(Presenca.data, dias_aula))
-                .scalar())
+        periodo = ([Presenca.data >= inicio] if inicio else []) + ([Presenca.data <= fim] if fim else [])
+        dias = dias_com_chamada(self.turma_id, dias_aula, inicio, fim)
 
         if not dias:
             return 0
@@ -322,7 +366,7 @@ class Aluno(UsuarioMixin, db.Model):
                   Presenca.aluno_id == self.id,
                   Presenca.status.in_(("presente", "atraso")),
                   Presenca.aula < n_aulas,     # aulas de um horário antigo mais longo não contam
-                  filtro_dias_aula(Presenca.data, dias_aula)
+                  filtro_dias_aula(Presenca.data, dias_aula), *periodo
               )
               .scalar())
 
@@ -354,6 +398,17 @@ class AlteracaoPresenca(db.Model):
     professor_nome = db.Column(db.String(120), nullable=False)
     com_senha_admin = db.Column(db.Boolean, nullable=False, default=False)   # dia anterior, liberado pelo admin
     alterado_em = db.Column(db.DateTime, nullable=False, default=agora_local)
+
+
+class AuditoriaPainel(db.Model):
+    """Trilha de auditoria do painel: cada alteração feita por um usuário (quem, quando, o quê)."""
+    __tablename__ = "auditoria_painel"
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_tipo = db.Column(db.String(10), nullable=False)    # admin | professor
+    usuario_nome = db.Column(db.String(120), nullable=False)
+    acao = db.Column(db.String(80), nullable=False)
+    detalhe = db.Column(db.String(500), nullable=False, default="")
+    quando = db.Column(db.DateTime, nullable=False, default=agora_local, index=True)
 
 
 class Dispositivo(db.Model):
@@ -392,22 +447,22 @@ class Justificativa(db.Model):
     respondida_em = db.Column(db.DateTime)
 
 
-def _status_na_aula(aula, hoje, agora):
-    """presente | atraso | falta para quem chega agora, olhando o horário dessa aula."""
+def _status_na_aula(aula, hoje, agora, modelo):
+    """presente | atraso | falta para quem chega agora, olhando o horário dessa aula e as tolerâncias do horário."""
     inicio = datetime.combine(hoje, aula.inicio)
     if agora >= datetime.combine(hoje, aula.fim):
         return "falta"                      # aula do bloco que já acabou
-    if agora <= inicio + timedelta(minutes=TOLERANCIA_PRESENTE):
+    if agora <= inicio + timedelta(minutes=modelo.tolerancia_presente):
         return "presente"
-    if agora <= inicio + timedelta(minutes=TOLERANCIA_ATRASO):
+    if agora <= inicio + timedelta(minutes=modelo.tolerancia_atraso):
         return "atraso"
     return "falta"                          # passou da tolerância: falta nessa aula, presença nas próximas
 
 
 def blocos_abertos(turma, agora):
-    """Blocos da turma abertos agora: abrem ANTECEDENCIA_TOTEM minutos antes da primeira aula
+    """Blocos da turma abertos agora: abrem a antecedência do horário da turma antes da primeira aula
     e fecham no fim da última."""
-    hoje, antes = agora.date(), timedelta(minutes=ANTECEDENCIA_TOTEM)
+    hoje, antes = agora.date(), timedelta(minutes=turma.modelo.antecedencia)
     return [b for b in turma.blocos
             if datetime.combine(hoje, b.inicio) - antes <= agora < datetime.combine(hoje, b.fim)]
 
@@ -432,7 +487,7 @@ def registrar_presenca_totem(aluno, agora=None):
         proximo = next((b for b in turma.blocos if datetime.combine(hoje, b.inicio) > agora), None)
         if not proximo:
             return "fora_horario", False, {"mensagem": "As aulas da sua turma já acabaram hoje."}
-        abre = datetime.combine(hoje, proximo.inicio) - timedelta(minutes=ANTECEDENCIA_TOTEM)
+        abre = datetime.combine(hoje, proximo.inicio) - timedelta(minutes=turma.modelo.antecedencia)
         return "fora_horario", False, {"mensagem": f"O registro da {proximo.nome_periodo.lower()} abre às {abre:%H:%M}."}
 
     def ja_passou(bloco):
@@ -454,7 +509,7 @@ def registrar_presenca_totem(aluno, agora=None):
         if aula.numero in existentes:       # o professor já lançou essa aula: não mexe
             continue
         db.session.add(Presenca(aluno_id=aluno.id, data=hoje, aula=aula.numero,
-                                status=_status_na_aula(aula, hoje, agora), origem="totem", registrado_em=agora))
+                                status=_status_na_aula(aula, hoje, agora, turma.modelo), origem="totem", registrado_em=agora))
     try:
         db.session.commit()
     except IntegrityError:                  # o mesmo aluno passou em dois totens ao mesmo tempo
@@ -505,6 +560,13 @@ def migrar_horarios():
     colunas = [c["name"] for c in inspect(db.engine).get_columns("turmas")]
     if "modelo_id" not in colunas:
         db.session.execute(text("ALTER TABLE turmas ADD COLUMN modelo_id INTEGER REFERENCES modelos_horario(id)"))
+    colunas = [c["name"] for c in inspect(db.engine).get_columns("modelos_horario")]
+    for nome, valor in (("tolerancia_presente", TOLERANCIA_PRESENTE), ("tolerancia_atraso", TOLERANCIA_ATRASO),
+                        ("antecedencia", ANTECEDENCIA_TOTEM)):
+        if nome not in colunas:
+            db.session.execute(text(f"ALTER TABLE modelos_horario ADD COLUMN {nome} INTEGER NOT NULL DEFAULT {int(valor)}"))
+    if "alerta_enviado_em" not in [c["name"] for c in inspect(db.engine).get_columns("alunos")]:
+        db.session.execute(text("ALTER TABLE alunos ADD COLUMN alerta_enviado_em DATETIME"))
     db.session.commit()
     if not ModeloHorario.query.first():
         for nome, aulas in MODELOS_PADRAO:

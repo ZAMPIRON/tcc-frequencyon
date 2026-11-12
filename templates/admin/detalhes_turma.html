@@ -6,7 +6,7 @@
 <!-- Cabeçalho com Navegação e Botões de Ação -->
 <div class="d-flex align-items-center justify-content-between mb-4">
     <div class="d-flex align-items-center gap-3">
-        <a href="{{ url_for('admin.turmas') }}" class="btn btn-outline-secondary btn-sm rounded-circle p-2 d-flex align-items-center justify-content-center quadrado-36">
+        <a href="{{ url_for('admin.turmas') }}" aria-label="Voltar para as turmas" class="btn btn-outline-secondary btn-sm rounded-circle p-2 d-flex align-items-center justify-content-center quadrado-36">
             <i class="fa-solid fa-arrow-left"></i>
         </a>
         <div>
@@ -30,7 +30,7 @@
     {% for category, message in messages %}
       <div class="alert alert-{{ category }} alert-dismissible fade show small" role="alert">
         {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <button type="button" class="btn-close" aria-label="Fechar" data-bs-dismiss="alert"></button>
       </div>
     {% endfor %}
   {% endif %}
@@ -265,12 +265,12 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-header">
                     <h5 class="modal-title h6 fw-bold">Vincular Professor à Turma</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" aria-label="Fechar" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label small fw-bold">Professor</label>
-                        <select name="professor_id" class="form-select form-select-sm" required>
+                        <select aria-label="Professor" name="professor_id" class="form-select form-select-sm" required>
                             <option value="">Selecione...</option>
                             {% for prof in professores_disponiveis %}
                             <option value="{{ prof.id }}">{{ prof.nome }}</option>
@@ -302,14 +302,14 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-header">
                     <h5 class="modal-title h6 fw-bold">Adicionar Aluno à Turma</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" aria-label="Fechar" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <p class="text-muted small mb-3">Selecione um aluno que atualmente não está vinculado a nenhuma turma:</p>
                     
                     <div class="mb-3">
                         <label class="form-label small fw-bold">Aluno</label>
-                        <select name="aluno_id" class="form-select form-select-sm" required>
+                        <select aria-label="Aluno" name="aluno_id" class="form-select form-select-sm" required>
                             <option value="">Selecione um aluno...</option>
                             {% for aluno in alunos_sem_turma %}
                             <option value="{{ aluno.id }}">{{ aluno.nome }} (Matrícula: {{ aluno.matricula }})</option>

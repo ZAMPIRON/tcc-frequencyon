@@ -9,3 +9,4 @@ dlib-bin
 face_recognition_models
 setuptools<81
 face_recognition
+reportlab

@@ -7,12 +7,11 @@ from datetime import time
 import cv2
 import secrets
 
-from flask import Blueprint, flash, jsonify, redirect, render_template, request, session, url_for
+from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, session, url_for
 from sqlalchemy import or_
 
 from database import (db, Aluno, AulaHorario, Dispositivo, Justificativa, ModeloHorario, Professor,
-                      ProfessorTurma, Turma, ANTECEDENCIA_TOTEM, DIAS_SELECIONAVEIS, PERIODOS, SENHAS_FRACAS,
-                      NOMES_DIAS, TOLERANCIA_ATRASO, TOLERANCIA_PRESENTE,
+                      ProfessorTurma, Turma, ALERTA_FREQUENCIA, DIAS_SELECIONAVEIS, PERIODOS, SENHAS_FRACAS, NOMES_DIAS,
                       agora_local, dias_de_formulario)
 from .aluno import exportar_csv, render_detalhes
 from face_service import encoding_de_imagens
@@ -50,7 +49,40 @@ def risco_evasao():
     # todo mundo abaixo de 75%, do pior pro melhor
     # quem ainda nao tem nenhum registro fica de fora
     em_risco = [a for a in Aluno.query.all() if a.presencas and a.frequencia < 75]
-    return render_template("admin/risco_evasao.html", alunos=sorted(em_risco, key=lambda a: a.frequencia))
+    from email_service import smtp_configurado
+    return render_template("admin/risco_evasao.html", alunos=sorted(em_risco, key=lambda a: a.frequencia),
+                           alerta=ALERTA_FREQUENCIA, smtp=smtp_configurado())
+
+
+@admin.route("/alertas", methods=["POST"])
+@requer("admin")
+def enviar_alertas():
+    # RF20: manda agora o aviso de frequencia baixa (o servidor tambem manda sozinho a cada 6 h)
+    from email_service import smtp_configurado
+    from tarefas import verificar_alertas
+    if not smtp_configurado():
+        flash("E-mail não configurado (SMTP_USUARIO e SMTP_SENHA no .env). Os alunos continuam vendo o aviso no portal.", "warning")
+        return redirect(url_for("admin.risco_evasao"))
+    enviados, sem_email = verificar_alertas(current_app._get_current_object())
+    msg = f"{len(enviados)} aviso(s) enviado(s)."
+    if sem_email:
+        msg += f" Sem e-mail cadastrado: {', '.join(sem_email)}."
+    flash(msg if enviados or sem_email else "Ninguém para avisar: quem está abaixo de "
+          f"{ALERTA_FREQUENCIA}% já recebeu o aviso nos últimos 7 dias.", "success")
+    return redirect(url_for("admin.risco_evasao"))
+
+
+@admin.route("/backup", methods=["POST"])
+@requer("admin")
+def fazer_backup_agora():
+    # RNF10: copia o banco agora (o servidor tambem faz uma copia sozinho todo dia)
+    from tarefas import fazer_backup
+    destino = fazer_backup(current_app._get_current_object())
+    if destino:
+        flash(f"Backup feito: {os.path.basename(destino)} (pasta instance/backups).", "success")
+    else:
+        flash("O backup automático só funciona com o banco SQLite.", "warning")
+    return redirect(request.referrer or url_for("admin.relatorios"))
 
 
 # ---------- alunos ----------
@@ -376,9 +408,20 @@ def horario_turma(id):
 @requer("admin")
 def horarios():
     return render_template("admin/horarios.html", periodos=PERIODOS,
-                           modelos=ModeloHorario.query.order_by(ModeloHorario.nome).all(),
-                           antecedencia=ANTECEDENCIA_TOTEM, tol_presente=TOLERANCIA_PRESENTE,
-                           tol_atraso=TOLERANCIA_ATRASO)
+                           modelos=ModeloHorario.query.order_by(ModeloHorario.nome).all())
+
+
+def _tolerancias_do_formulario():
+    # tolerancias do horario em minutos: (presente, atraso, antecedencia) ou o texto do erro
+    try:
+        presente, atraso, antes = (int(request.form.get(c, "")) for c in ("tolerancia_presente", "tolerancia_atraso", "antecedencia"))
+    except ValueError:
+        return None, "Preencha as tolerâncias em minutos."
+    if not (0 <= presente <= atraso <= 60):
+        return None, "A tolerância de presença precisa ficar entre 0 e a de atraso, e a de atraso até 60 min."
+    if not 0 <= antes <= 120:
+        return None, "O totem pode abrir de 0 a 120 min antes do período."
+    return (presente, atraso, antes), None
 
 
 def _aulas_do_formulario():
@@ -415,7 +458,11 @@ def novo_horario():
     base = db.session.get(ModeloHorario, request.form.get("copiar_de", type=int) or 0)
     aulas = ([AulaHorario(inicio=a.inicio, fim=a.fim, periodo=a.periodo) for a in base.aulas] if base
              else [AulaHorario(inicio=time(7, 0), fim=time(7, 45), periodo="manha")])
-    db.session.add(ModeloHorario(nome=nome, aulas=aulas))
+    novo = ModeloHorario(nome=nome, aulas=aulas)
+    if base:   # a copia leva tambem as tolerancias
+        novo.tolerancia_presente, novo.tolerancia_atraso, novo.antecedencia = \
+            base.tolerancia_presente, base.tolerancia_atraso, base.antecedencia
+    db.session.add(novo)
     db.session.commit()
     flash(f"Horário \"{nome}\" criado. Ajuste as aulas e salve.", "success")
     return redirect(url_for("admin.horarios"))
@@ -427,12 +474,15 @@ def salvar_horario(id):
     m = db.get_or_404(ModeloHorario, id)
     nome = (request.form.get("nome") or "").strip()
     aulas, erro = _aulas_do_formulario()
+    tolerancias, erro_tol = _tolerancias_do_formulario()
+    erro = erro or erro_tol
     if not nome or ModeloHorario.query.filter(ModeloHorario.nome == nome, ModeloHorario.id != id).first():
         erro = "Informe um nome que ainda não exista."
     if erro:
         flash(f"{m.nome}: {erro}", "danger")
         return redirect(url_for("admin.horarios"))
     m.nome, m.aulas = nome, aulas
+    m.tolerancia_presente, m.tolerancia_atraso, m.antecedencia = tolerancias
     db.session.commit()
     flash(f"Horário \"{m.nome}\" salvo.", "success")
     return redirect(url_for("admin.horarios"))
@@ -506,8 +556,10 @@ def responder_justificativa(id, acao):
 @requer("admin")
 def totens():
     # totens criados pela coordenacao; qualquer um registra qualquer aluno e e liberado por um professor a cada dia
+    from tarefas import totens_sem_sinal
     return render_template("admin/totens.html", modo=pegar_totem().fonte,
                            dispositivos=Dispositivo.query.order_by(Dispositivo.nome).all(),
+                           sem_sinal={d.id: m for d, m in totens_sem_sinal()},
                            codigo_novo=session.pop("codigo_totem", None), agora=agora_local())
 
 

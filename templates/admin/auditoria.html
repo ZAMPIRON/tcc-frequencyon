@@ -1,0 +1,58 @@
+{% extends 'admin/base.html' %}
+
+{% block title %}Auditoria - FrequencyOn{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h1 class="h3 fw-bold mb-1">Trilha de <span class="fo-gradient-text">auditoria</span></h1>
+    <p class="text-muted mb-0 small">Quem alterou o quê e quando: no painel da coordenação e na chamada dos professores (as 300 mais recentes de cada)</p>
+</div>
+
+<div class="card border-0 shadow-sm rounded-3 mb-4">
+    <div class="p-3 border-bottom"><h2 class="h6 fw-bold mb-0">Alterações na chamada</h2></div>
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead class="table-light small">
+                <tr><th scope="col">Quando</th><th scope="col">Professor</th><th scope="col">Aluno</th><th scope="col">Dia e aula</th><th scope="col">Mudança</th><th scope="col">Senha do admin</th></tr>
+            </thead>
+            <tbody class="small">
+                {% for c in chamada %}
+                <tr>
+                    <td class="text-nowrap">{{ c.alterado_em.strftime('%d/%m/%Y %H:%M') }}</td>
+                    <td>{{ c.professor_nome }}</td>
+                    <td>{{ alunos[c.aluno_id].nome if c.aluno_id in alunos else '-' }}</td>
+                    <td class="text-nowrap">{{ c.data.strftime('%d/%m/%Y') }} · aula {{ c.aula + 1 }}</td>
+                    <td>{{ c.status_anterior or 'sem registro' }} → {{ c.status_novo }}</td>
+                    <td>{{ 'Sim' if c.com_senha_admin else 'Não' }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center text-muted py-3">Nenhuma alteração manual na chamada.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm rounded-3">
+    <div class="p-3 border-bottom"><h2 class="h6 fw-bold mb-0">Alterações no painel</h2></div>
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead class="table-light small">
+                <tr><th scope="col">Quando</th><th scope="col">Quem</th><th scope="col">Ação</th><th scope="col">Detalhe</th></tr>
+            </thead>
+            <tbody class="small">
+                {% for a in painel %}
+                <tr>
+                    <td class="text-nowrap">{{ a.quando.strftime('%d/%m/%Y %H:%M') }}</td>
+                    <td>{{ a.usuario_nome }} <span class="text-muted">({{ a.usuario_tipo }})</span></td>
+                    <td>{{ a.acao }}</td>
+                    <td class="text-muted">{{ a.detalhe or '-' }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" class="text-center text-muted py-3">Nenhuma alteração registrada ainda.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

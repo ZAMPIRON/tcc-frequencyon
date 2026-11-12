@@ -6,7 +6,7 @@ from datetime import date
 
 from flask import Blueprint, Response, flash, redirect, render_template, request, url_for
 
-from database import (db, Aluno, Justificativa, Presenca, NOMES_DIAS,
+from database import (db, Aluno, Justificativa, Presenca, ALERTA_FREQUENCIA, NOMES_DIAS,
                       agora_local, eh_dia_com_aula, hoje_local)
 from email_service import enviar_justificativa
 from .comum import requer, usuario_atual
@@ -70,6 +70,7 @@ def historico_aluno(aluno):
         "pct_falta": pct_falta,
         "frequencia": aluno.frequencia,
         "n_aulas": n_aulas,
+        "alerta_frequencia": ALERTA_FREQUENCIA,
     }
 
 

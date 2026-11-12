@@ -6,6 +6,8 @@
 #   relatorios.py -> relatorios da coordenacao e a planilha do excel
 #   professor.py  -> chamada do professor e calendario
 #   aluno.py      -> pagina do aluno, csv e justificativa de falta
+#   auditoria.py  -> trilha de auditoria do painel e a tela que mostra o historico
+#   api.py        -> api rest de leitura para outros sistemas e a rota de saude (monitoramento)
 
 from . import login
 from .admin import admin
@@ -13,6 +15,8 @@ from .aluno import area_aluno
 from .professor import professor
 from .totem import reconhecimento
 from . import relatorios  # noqa: F401  so precisa importar pra rota entrar no blueprint do admin
+from . import auditoria  # noqa: F401  idem
+from .api import api
 
 
 def registrar_rotas(app):
@@ -21,4 +25,5 @@ def registrar_rotas(app):
     app.register_blueprint(professor)
     app.register_blueprint(area_aluno)
     app.register_blueprint(reconhecimento)
+    app.register_blueprint(api)
     login.registrar(app)

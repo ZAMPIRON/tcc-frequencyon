@@ -93,7 +93,7 @@
                 <div class="card-body">
                     <form method="GET" action="{{ url_for('professor.chamada') }}">
                         <label class="form-label small fw-bold mb-1">Turma</label>
-                        <select name="turma_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                        <select aria-label="Turma" name="turma_id" class="form-select form-select-sm" onchange="this.form.submit()">
                             {% for turma in turmas %}
                                 <option value="{{ turma.id }}" {% if turma_selecionada and turma.id == turma_selecionada.id %}selected{% endif %}>
                                     {{ turma.nome }} - {{ turma.curso }}

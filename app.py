@@ -148,6 +148,8 @@ def _redirecionar_para_https(porta_http, porta_https):
 
 if __name__ == "__main__":
     app = create_app()
+    from tarefas import iniciar_tarefas
+    iniciar_tarefas(app)            # backup diario, alertas de frequencia e aviso de totem sem sinal
     porta = int(os.getenv("PORTA", "5000"))
     # debug fica desligado porque o reloader abriria a camera duas vezes
     if not app.config["USAR_HTTPS"]:

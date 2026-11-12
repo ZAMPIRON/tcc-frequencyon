@@ -427,6 +427,95 @@
             } catch (e) { /* sem suporte: configure a tela para não desligar no próprio tablet */ }
         }
 
+        // ---------- fila offline (RF13): sem conexão, as fotos ficam no tablet e vão quando a rede voltar ----------
+        // só guarda quando a imagem muda (alguém na frente da câmera), no máximo 3 por segundo e 3000 no total
+        const FILA_MAX = 3000;
+        let filaBanco = null, offline = false, sincronizando = false, ultimaGuardada = 0, miniAnterior = null;
+        const mini = document.createElement('canvas');
+        mini.width = 32; mini.height = 24;
+
+        function abrirFila() {
+            if (filaBanco) return Promise.resolve(filaBanco);
+            return new Promise((ok, erro) => {
+                const req = indexedDB.open('frequencyon-totem', 1);
+                req.onupgradeneeded = () => req.result.createObjectStore('fotos', { keyPath: 'id', autoIncrement: true });
+                req.onsuccess = () => { filaBanco = req.result; ok(filaBanco); };
+                req.onerror = () => erro(req.error);
+            });
+        }
+        async function naFila(modo, acao) {
+            const banco = await abrirFila();
+            return new Promise((ok, erro) => {
+                const t = banco.transaction('fotos', modo);
+                const pedido = acao(t.objectStore('fotos'));
+                t.oncomplete = () => ok(pedido ? pedido.result : undefined);
+                t.onerror = () => erro(t.error);
+            });
+        }
+        const contarFila = () => naFila('readonly', (s) => s.count()).catch(() => 0);
+        const lerFila = (n) => naFila('readonly', (s) => s.getAll(null, n)).catch(() => []);
+        const apagarDaFila = (ids) => naFila('readwrite', (s) => { ids.forEach((id) => s.delete(id)); return null; });
+
+        function mudouImagem(captura) {
+            // compara uma miniatura 32x24 em tons de cinza com a anterior
+            const ctx = mini.getContext('2d');
+            ctx.drawImage(captura, 0, 0, 32, 24);
+            const px = ctx.getImageData(0, 0, 32, 24).data;
+            const cinza = new Uint8Array(32 * 24);
+            for (let i = 0; i < cinza.length; i++) cinza[i] = (px[i * 4] + px[i * 4 + 1] + px[i * 4 + 2]) / 3;
+            let soma = 0;
+            if (miniAnterior) for (let i = 0; i < cinza.length; i++) soma += Math.abs(cinza[i] - miniAnterior[i]);
+            const mudou = !miniAnterior || soma / cinza.length > 4;
+            miniAnterior = cinza;
+            return mudou;
+        }
+
+        async function guardarSeMudou(captura, foto) {
+            if (performance.now() - ultimaGuardada < 330 || !mudouImagem(captura)) return;
+            ultimaGuardada = performance.now();
+            try {
+                if (await contarFila() >= FILA_MAX) {
+                    const velhas = await lerFila(1);
+                    if (velhas.length) await apagarDaFila([velhas[0].id]);
+                }
+                await naFila('readwrite', (s) => s.add({ foto: foto, momento: Date.now() }));
+            } catch (e) { /* sem espaço no tablet: segue sem guardar */ }
+        }
+
+        async function sincronizar() {
+            // envia a fila em blocos de 10; o servidor reconhece e registra com a hora de cada foto
+            if (sincronizando) return;
+            sincronizando = true;
+            let registradas = 0;
+            try {
+                while (!offline) {
+                    const itens = await lerFila(10);
+                    if (!itens.length) break;
+                    mostrarRotulo(null, `Enviando fotos guardadas sem internet (${await contarFila()} restantes)...`);
+                    const dados = new FormData();
+                    itens.forEach((i) => { dados.append('fotos', i.foto, 'foto.jpg'); dados.append('momentos', i.momento); });
+                    dados.append('agora', Date.now());
+                    const res = await fetch('/api/totem/offline', {
+                        method: 'POST', headers: { 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content }, body: dados,
+                    });
+                    if (res.status === 401) { location.reload(); return; }
+                    if (res.status === 503) { await esperar(5000); continue; }   // reconhecimento ocupado: tenta de novo
+                    if (!res.ok) break;
+                    const d = await res.json();
+                    await apagarDaFila(itens.map((i) => i.id));
+                    (d.registros || []).forEach((r) => {
+                        if (!r.ja_registrado && ['presente', 'atraso', 'falta'].includes(r.status)) {
+                            adicionarAoHistorico(r.nome, r.matricula, null, r.status);
+                            registradas++;
+                        }
+                    });
+                }
+            } catch (e) { /* a rede caiu de novo: o que sobrou fica na fila */ }
+            sincronizando = false;
+            if (registradas) mostrarRotulo(null, `${registradas} presença(s) registrada(s) com as fotos guardadas sem internet`);
+            estadoMostrado = null;
+        }
+
         async function iniciarCameraTablet() {
             const video = document.getElementById('camTablet');
             const tela = document.getElementById('sobreposicao');
@@ -447,8 +536,9 @@
 
             const captura = document.createElement('canvas');
             const csrf = document.querySelector('meta[name="csrf-token"]').content;
-            let ultimoEnvio = 0;
+            let ultimoEnvio = 0, ultimaTentativa = 0;
             mostrarRotulo('iniciando');
+            sincronizar();                       // fotos que ficaram de uma queda anterior
             while (true) {
                 await esperar(Math.max(0, 80 - (performance.now() - ultimoEnvio)));   // até ~12 fotos por segundo
                 ultimoEnvio = performance.now();
@@ -458,13 +548,23 @@
                 captura.height = Math.round(640 * video.videoHeight / video.videoWidth);
                 captura.getContext('2d').drawImage(video, 0, 0, captura.width, captura.height);
                 const foto = await new Promise((r) => captura.toBlob(r, 'image/jpeg', 0.7));
+                if (offline && performance.now() - ultimaTentativa < 3000) {
+                    await guardarSeMudou(captura, foto);   // sem conexão: guarda e só testa a rede a cada 3 s
+                    continue;
+                }
+                ultimaTentativa = performance.now();
                 try {
+                    const limite = new AbortController();
+                    const relogio = setTimeout(() => limite.abort(), 4000);
                     const res = await fetch('/api/totem/frame', {
                         method: 'POST',
                         headers: { 'Content-Type': 'image/jpeg', 'X-CSRFToken': csrf },
                         body: foto,
+                        signal: limite.signal,
                     });
+                    clearTimeout(relogio);
                     if (res.status === 401 || res.status === 400) { location.reload(); return; }   // desativado ou sessão vencida
+                    if (offline) { offline = false; estadoMostrado = null; sincronizar(); }       // a rede voltou
                     const d = await res.json();
                     if (d.evento) {
                         const e = d.evento;
@@ -478,9 +578,10 @@
                         estadoMostrado = estado;
                     }
                 } catch (e) {
-                    mostrarRotulo(null, 'Sem conexão com o servidor');
+                    offline = true;
+                    await guardarSeMudou(captura, foto);
+                    mostrarRotulo(null, `Sem conexão: as fotos ficam guardadas no tablet e são enviadas quando a rede voltar (${await contarFila()})`);
                     estadoMostrado = null;
-                    await esperar(1500);
                 }
             }
         }

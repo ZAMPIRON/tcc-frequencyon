@@ -2,6 +2,8 @@
 # hoje ele edita a vontade, dias anteriores so com a senha de um admin, dia futuro nunca
 from datetime import date, timedelta
 
+from sqlalchemy import case, func
+
 from flask import Blueprint, jsonify, render_template, request, session, url_for
 
 from database import (db, Admin, AlteracaoPresenca, Aluno, Presenca, ProfessorTurma, NOMES_DIAS,
@@ -102,23 +104,24 @@ def chamada():
     if turma and dias_prof and n_aulas:
         ids = [a.id for a in turma.alunos]
         inicio_mes, fim_mes = data_selecionada.replace(day=1), _fim_do_mes(data_selecionada)
-        registros = Presenca.query.filter(
-            Presenca.aluno_id.in_(ids),
-            Presenca.data.between(inicio_mes, fim_mes)
-        ).all() if ids else []
-
-        # numa passada so: a chamada do dia escolhido e os totais do mes
-        # (contando so os dias em que esse professor da aula)
+        # totais do mes somados no banco (contando so os dias em que esse professor da aula)
+        ok = func.sum(case((Presenca.status.in_(("presente", "atraso")), 1), else_=0))
+        somas = (db.session.query(Presenca.aluno_id, Presenca.data, ok)
+                 .join(Aluno, Presenca.aluno_id == Aluno.id)
+                 .filter(Aluno.turma_id == turma.id, Presenca.data.between(inicio_mes, fim_mes), Presenca.aula < n_aulas)
+                 .group_by(Presenca.aluno_id, Presenca.data).all()) if ids else []
         mapa, ok_mes, ok_dia, dias_com_chamada = {}, {}, {}, set()
-        for r in registros:
-            if not eh_dia_com_aula(r.data, dias_prof) or r.aula >= n_aulas:
+        for aid, data_, n_ok in somas:
+            if not eh_dia_com_aula(data_, dias_prof):
                 continue
-            dias_com_chamada.add(r.data)
-            presente = r.status in ("presente", "atraso")
-            ok_mes[r.aluno_id] = ok_mes.get(r.aluno_id, 0) + presente
-            ok_dia[r.data] = ok_dia.get(r.data, 0) + presente
-            if r.data == data_selecionada:
-                mapa.setdefault(r.aluno_id, {})[r.aula] = r.status
+            dias_com_chamada.add(data_)
+            ok_mes[aid] = ok_mes.get(aid, 0) + n_ok
+            ok_dia[data_] = ok_dia.get(data_, 0) + n_ok
+        # a chamada do dia escolhido, aula por aula
+        for r in (Presenca.query.join(Aluno, Presenca.aluno_id == Aluno.id)
+                  .filter(Aluno.turma_id == turma.id, Presenca.data == data_selecionada, Presenca.aula < n_aulas)
+                  if ids and eh_dia_com_aula(data_selecionada, dias_prof) else []):
+            mapa.setdefault(r.aluno_id, {})[r.aula] = r.status
 
         aulas_por_dia_turma = len(ids) * n_aulas
         taxa_por_dia = {d: round(100 * ok_dia.get(d, 0) / aulas_por_dia_turma)

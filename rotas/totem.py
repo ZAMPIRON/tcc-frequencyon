@@ -15,13 +15,15 @@ from functools import wraps
 import cv2
 from flask import Blueprint, Response, current_app, jsonify, redirect, render_template, request, url_for
 
-from database import db, Admin, Aluno, Dispositivo, Professor, agora_local, hoje_local
+from database import (db, Admin, Aluno, AuditoriaPainel, Dispositivo, Professor, FUSO_HORARIO, agora_local, hoje_local,
+                      registrar_presenca_totem)
 from .comum import pasta_uploads, pegar_totem
 
 reconhecimento = Blueprint("reconhecimento", __name__)
 
 COOKIE_TOTEM = "totem_token"
 MAX_FOTO_BYTES = 600 * 1024
+MAX_LOTE_OFFLINE = 20               # fotos por envio da fila offline
 
 
 # ---------------------------------------------------------------------
@@ -141,6 +143,8 @@ def _liberar(disp, pessoa):
     # libera o aparelho ate o fim do dia em nome de 'pessoa'
     fim_do_dia = datetime.combine(hoje_local(), dtime(23, 59, 59))
     disp.liberado_ate, disp.liberado_por, disp.ultimo_uso = fim_do_dia, pessoa.nome, agora_local()
+    db.session.add(AuditoriaPainel(usuario_tipo="admin" if isinstance(pessoa, Admin) else "professor",
+                                   usuario_nome=pessoa.nome, acao="Liberou o totem", detalhe=disp.nome))
     db.session.commit()
     print(f"[totem] {disp.nome} liberado por {pessoa.nome} até {fim_do_dia:%d/%m %H:%M}")
 
@@ -225,6 +229,47 @@ def api_frame(disp):
         return jsonify({**resultado, "evento": totem.proximo_evento(chave)})
     except ValueError:
         return jsonify(sucesso=False, mensagem="Imagem inválida."), 400
+
+
+@reconhecimento.route("/api/totem/offline", methods=["POST"])
+@requer_totem
+def api_offline(disp):
+    # fila offline (RF13): fotos que o tablet guardou sem internet, cada uma com a hora em que foi tirada.
+    # o relogio do tablet pode estar errado, entao a hora e corrigida pela diferenca entre os dois relogios
+    fotos = request.files.getlist("fotos")
+    try:
+        momentos = [float(m) for m in request.form.getlist("momentos")]
+        ajuste = time.time() - float(request.form["agora"]) / 1000
+    except (KeyError, ValueError):
+        return jsonify(sucesso=False, mensagem="Lote inválido."), 400
+    if not fotos or len(fotos) != len(momentos) or len(fotos) > MAX_LOTE_OFFLINE:
+        return jsonify(sucesso=False, mensagem="Lote inválido."), 400
+    agora, hoje = agora_local(), hoje_local()
+    itens, quando = [], {}
+    for foto, momento in sorted(zip(fotos, momentos), key=lambda x: x[1]):
+        jpeg = foto.read(MAX_FOTO_BYTES + 1)
+        segundos = momento / 1000 + ajuste
+        hora = datetime.fromtimestamp(segundos, FUSO_HORARIO).replace(tzinfo=None)
+        # so foto de hoje, ja tirada e de no maximo 12 h atras (foto velha ou do futuro e descartada)
+        if not jpeg or len(jpeg) > MAX_FOTO_BYTES or hora.date() != hoje or hora > agora + timedelta(seconds=5) \
+                or agora - hora > timedelta(hours=12):
+            continue
+        itens.append((segundos, jpeg))
+        quando[segundos] = min(hora, agora)
+    if not itens:
+        return jsonify(sucesso=True, processadas=0, registros=[])
+    eventos = pegar_totem().processar_lote(f"offline{disp.id}", itens)
+    if eventos is None:
+        return jsonify(sucesso=False, mensagem="O reconhecimento está ocupado. O tablet tenta de novo."), 503
+    registros = []
+    for aluno_id, segundos in eventos:
+        aluno = db.session.get(Aluno, aluno_id)
+        if aluno:
+            status, ja, info = registrar_presenca_totem(aluno, quando[segundos])
+            registros.append({"nome": aluno.nome, "matricula": aluno.matricula, "status": status, "ja_registrado": ja,
+                              "hora": quando[segundos].strftime("%H:%M:%S"), "mensagem": info.get("mensagem", "")})
+            print(f"[totem] offline: {aluno.nome} às {quando[segundos]:%H:%M:%S} -> {status}")
+    return jsonify(sucesso=True, processadas=len(itens), registros=registros)
 
 
 @reconhecimento.route("/video_feed")

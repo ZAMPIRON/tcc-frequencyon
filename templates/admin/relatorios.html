@@ -7,18 +7,35 @@
 <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-4 gap-3">
     <div>
         <h1 class="h3 fw-bold mb-1">Relatórios <span class="fo-gradient-text">Administrativos</span></h1>
-        <p class="text-muted mb-0 small">Dados unificados de frequência do campus</p>
+        <p class="text-muted mb-0 small">Dados unificados de frequência do campus · {{ rotulo_periodo }}</p>
     </div>
-    <div class="d-flex align-items-center gap-2">
-        <div class="input-group input-group-sm w-auto">
-            <span class="input-group-text bg-white text-muted border-end-0"><i class="fa-regular fa-calendar"></i></span>
-            <input type="text" class="form-control border-start-0 largura-max-150" value="Últimos 6 meses" readonly>
-        </div>
-        <a href="{{ url_for('admin.exportar_relatorio') }}" class="btn btn-primary btn-sm px-3 d-flex align-items-center gap-2 text-nowrap">
+    {% set filtro = {'inicio': inicio.isoformat() if inicio else None, 'fim': fim.isoformat() if fim else None} %}
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+        <form method="GET" action="{{ url_for('admin.relatorios') }}" class="d-flex align-items-center gap-2 flex-wrap" aria-label="Filtrar por período">
+            <label class="small text-muted" for="filtroInicio">De</label>
+            <input type="date" name="inicio" id="filtroInicio" value="{{ filtro.inicio or '' }}" class="form-control form-control-sm w-auto">
+            <label class="small text-muted" for="filtroFim">até</label>
+            <input type="date" name="fim" id="filtroFim" value="{{ filtro.fim or '' }}" class="form-control form-control-sm w-auto">
+            <button type="submit" class="btn btn-outline-primary btn-sm">Filtrar</button>
+            {% if inicio or fim %}<a href="{{ url_for('admin.relatorios') }}" class="btn btn-link btn-sm">Limpar</a>{% endif %}
+        </form>
+        <a href="{{ url_for('admin.exportar_relatorio', **filtro) }}" class="btn btn-primary btn-sm px-3 d-flex align-items-center gap-2 text-nowrap">
             <i class="fa-solid fa-file-excel"></i> Exportar Excel
+        </a>
+        <a href="{{ url_for('admin.exportar_relatorio_pdf', **filtro) }}" class="btn btn-outline-danger btn-sm px-3 d-flex align-items-center gap-2 text-nowrap">
+            <i class="fa-solid fa-file-pdf"></i> Exportar PDF
         </a>
     </div>
 </div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for category, message in messages %}
+    <div class="alert alert-{{ category }} alert-dismissible fade show small" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+    </div>
+  {% endfor %}
+{% endwith %}
 
 <!-- Cards de Métricas Principais Dinâmicos -->
 <div class="row g-3 mb-4">
@@ -114,20 +131,31 @@
                 </div>
                 <div class="col-md-8">
                     <div class="progress progress-fina">
-                        <div class="progress-bar {% if prof.media >= 90 %}bg-success{% elif prof.media >= 75 %}bg-primary{% else %}bg-danger{% endif %} largura-dinamica" 
+                        <div class="progress-bar {% if media_prof[prof] >= 90 %}bg-success{% elif media_prof[prof] >= 75 %}bg-primary{% else %}bg-danger{% endif %} largura-dinamica" 
                              role="progressbar" 
-                             style="--largura: {{ prof.media }}%">
+                             style="--largura: {{ media_prof[prof] }}%">
                         </div>
                     </div>
                 </div>
-                <div class="col-md-1 text-end fw-bold {% if prof.media >= 90 %}text-success{% elif prof.media >= 75 %}text-primary{% else %}text-danger{% endif %} small">
-                    {{ prof.media }}%
+                <div class="col-md-1 text-end fw-bold {% if media_prof[prof] >= 90 %}text-success{% elif media_prof[prof] >= 75 %}text-primary{% else %}text-danger{% endif %} small">
+                    {{ media_prof[prof] }}%
                 </div>
             </div>
             {% else %}
             <p class="text-muted small mb-0">Nenhum dado de professor vinculado a turmas e alunos encontrado.</p>
             {% endfor %}
         </div>
+    </div>
+</div>
+<div class="card border-0 shadow-sm rounded-3 mt-4">
+    <div class="card-body small d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div><b>Backup do banco:</b>
+            {% if backup_em %}último em {{ backup_em.strftime('%d/%m/%Y %H:%M') }} · {{ backups }} cópia(s) guardada(s) em instance/backups
+            {% else %}nenhum backup ainda{% endif %}. O servidor faz uma cópia sozinho todo dia.</div>
+        <form method="POST" action="{{ url_for('admin.fazer_backup_agora') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-primary btn-sm"><i class="fa-solid fa-database me-1" aria-hidden="true"></i> Fazer backup agora</button>
+        </form>
     </div>
 </div>
 {% endblock %}

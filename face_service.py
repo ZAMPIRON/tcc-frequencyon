@@ -138,8 +138,9 @@ def processo_reconhecimento(entrada, saida, prova_de_vida=True, ampliar=1):
     novo, faltam confirmações, ou chegou a hora de reverificar. Cada totem (chave) tem a sua trilha.
     grupo: "aluno" (totem liberado, registra presença) ou "prof" (totem bloqueado, professor libera).
     Mensagens: ("frame", chave, fid, rgb, grupo) | ("rostos", {grupo: (ids, encs)}) | ("cadastro", pedido, [rgb])
-               ("esquecer", chave) | ("fim",)
+               ("lote", pedido, chave, [(momento, rgb)]) | ("esquecer", chave) | ("fim",)
     Resposta:  ("deteccao", chave, fid, caixa, pessoa_id, estado, novo_evento, grupo)
+               ("lote", pedido, [(aluno_id, momento)]) com quem foi reconhecido (com prova de vida) nas fotos do lote
     estado: sem_rosto | longe | verificando | desconhecido | pisque | ok
     """
     import face_recognition as fr
@@ -154,6 +155,70 @@ def processo_reconhecimento(entrada, saida, prova_de_vida=True, ampliar=1):
         dist = np.linalg.norm(encs - enc, axis=1)
         i = int(np.argmin(dist))
         return (ids[i] if dist[i] <= TOLERANCIA else None), float(dist[i])
+
+    def processar(chave, rgb, grupo, agora):
+        """Um quadro de um totem -> (caixa, pessoa_id, estado, novo_evento). agora = hora do quadro (segundos):
+        a de agora para o totem ao vivo, a da foto para a fila offline."""
+        locs = fr.face_locations(rgb, ampliar, model="hog")
+        if not locs:
+            trilhas.pop(chave, None)
+            return None, None, "sem_rosto", False
+
+        caixa = max(locs, key=lambda c: (c[2] - c[0]) * (c[1] - c[3]))
+        trilha = trilhas.get(chave)
+        # rosto novo, outro grupo, outro lugar na imagem ou mais de 5 s sem ver ninguem: comeca de novo
+        if (trilha is None or trilha["grupo"] != grupo or _iou(caixa, trilha["caixa"]) < MESMO_ROSTO_IOU
+                or abs(agora - trilha.get("t_visto", agora)) > 5):
+            trilha = trilhas[chave] = _nova_trilha(grupo)
+        trilha["caixa"], trilha["t_visto"] = caixa, agora
+
+        perto = (caixa[2] - caixa[0]) >= ROSTO_MINIMO
+        if not perto:
+            return caixa, None, "longe", False
+
+        # prova de vida passiva: mede olhos e boca em todo frame até ver o rosto se mexer
+        if prova_de_vida and not trilha["vivo"]:
+            marcos = fr.face_landmarks(rgb, [caixa])
+            if marcos and "left_eye" in marcos[0] and "top_lip" in marcos[0]:
+                atualizar_vivo(trilha, marcos[0])
+
+        if trilha["confirmado"]:
+            precisa = agora - trilha["t_enc"] >= REVERIFICAR
+        elif trilha["seq"] > 0:
+            precisa = True                                  # falta confirmar
+        else:
+            precisa = agora - trilha["t_enc"] >= TENTAR_DE_NOVO
+
+        if precisa:
+            aluno_id, dist = identificar(fr.face_encodings(rgb, [caixa])[0], grupo)
+            trilha["t_enc"] = agora
+            if trilha["confirmado"]:
+                if aluno_id != trilha["aluno_id"]:          # trocou a pessoa na frente da câmera
+                    trilha.update(_nova_trilha(grupo), caixa=caixa, t_enc=agora, t_visto=agora,
+                                  aluno_id=aluno_id, seq=1 if aluno_id else 0)
+            elif aluno_id is None:
+                trilha.update(aluno_id=None, seq=0)
+            elif aluno_id == trilha["aluno_id"]:
+                trilha["seq"] += 1
+            else:
+                trilha.update(aluno_id=aluno_id, seq=1)
+            if trilha["aluno_id"] and (trilha["seq"] >= CONFIRMACOES or dist <= CONFIRMA_DIRETO):
+                trilha["confirmado"] = True
+
+        novo_evento = False
+        if trilha["confirmado"] and not trilha["registrado"]:
+            if trilha["vivo"] or not prova_de_vida:
+                trilha["registrado"] = novo_evento = True
+                estado = "ok"
+            else:
+                estado = "pisque"
+        elif trilha["registrado"]:
+            estado = "ok"
+        elif trilha["t_enc"] and trilha["aluno_id"] is None:
+            estado = "desconhecido"
+        else:
+            estado = "verificando"
+        return caixa, trilha["aluno_id"], estado, novo_evento
 
     while True:
         msg = entrada.get()
@@ -179,73 +244,24 @@ def processo_reconhecimento(entrada, saida, prova_de_vida=True, ampliar=1):
                 saida.put(("cadastro", pedido, media))
                 continue
 
+            if tipo == "lote":
+                # fila offline do tablet: fotos antigas em ordem, cada uma com a hora em que foi tirada
+                _, pedido, chave, quadros = msg
+                eventos = []
+                for momento, rgb in quadros:
+                    _, pessoa_id, _, novo_evento = processar(chave, rgb, "aluno", momento)
+                    if novo_evento:
+                        eventos.append((pessoa_id, momento))
+                saida.put(("lote", pedido, eventos))
+                continue
+
             _, chave, fid, rgb, grupo = msg
-            locs = fr.face_locations(rgb, ampliar, model="hog")
-            if not locs:
-                trilhas.pop(chave, None)
-                saida.put(("deteccao", chave, fid, None, None, "sem_rosto", False, grupo))
-                continue
-
-            caixa = max(locs, key=lambda c: (c[2] - c[0]) * (c[1] - c[3]))
-            agora = time.time()
-            trilha = trilhas.get(chave)
-            if trilha is None or trilha["grupo"] != grupo or _iou(caixa, trilha["caixa"]) < MESMO_ROSTO_IOU:
-                trilha = trilhas[chave] = _nova_trilha(grupo)
-            trilha["caixa"] = caixa
-
-            perto = (caixa[2] - caixa[0]) >= ROSTO_MINIMO
-            if not perto:
-                saida.put(("deteccao", chave, fid, caixa, None, "longe", False, grupo))
-                continue
-
-            # prova de vida passiva: mede olhos e boca em todo frame até ver o rosto se mexer
-            if prova_de_vida and not trilha["vivo"]:
-                marcos = fr.face_landmarks(rgb, [caixa])
-                if marcos and "left_eye" in marcos[0] and "top_lip" in marcos[0]:
-                    atualizar_vivo(trilha, marcos[0])
-
-            if trilha["confirmado"]:
-                precisa = agora - trilha["t_enc"] >= REVERIFICAR
-            elif trilha["seq"] > 0:
-                precisa = True                                  # falta confirmar
-            else:
-                precisa = agora - trilha["t_enc"] >= TENTAR_DE_NOVO
-
-            if precisa:
-                aluno_id, dist = identificar(fr.face_encodings(rgb, [caixa])[0], grupo)
-                trilha["t_enc"] = agora
-                if trilha["confirmado"]:
-                    if aluno_id != trilha["aluno_id"]:          # trocou a pessoa na frente da câmera
-                        trilha.update(_nova_trilha(grupo), caixa=caixa, t_enc=agora,
-                                      aluno_id=aluno_id, seq=1 if aluno_id else 0)
-                elif aluno_id is None:
-                    trilha.update(aluno_id=None, seq=0)
-                elif aluno_id == trilha["aluno_id"]:
-                    trilha["seq"] += 1
-                else:
-                    trilha.update(aluno_id=aluno_id, seq=1)
-                if trilha["aluno_id"] and (trilha["seq"] >= CONFIRMACOES or dist <= CONFIRMA_DIRETO):
-                    trilha["confirmado"] = True
-
-            novo_evento = False
-            if trilha["confirmado"] and not trilha["registrado"]:
-                if trilha["vivo"] or not prova_de_vida:
-                    trilha["registrado"] = novo_evento = True
-                    estado = "ok"
-                else:
-                    estado = "pisque"
-            elif trilha["registrado"]:
-                estado = "ok"
-            elif trilha["t_enc"] and trilha["aluno_id"] is None:
-                estado = "desconhecido"
-            else:
-                estado = "verificando"
-
-            saida.put(("deteccao", chave, fid, caixa, trilha["aluno_id"], estado, novo_evento, grupo))
+            caixa, pessoa_id, estado, novo_evento = processar(chave, rgb, grupo, time.time())
+            saida.put(("deteccao", chave, fid, caixa, pessoa_id, estado, novo_evento, grupo))
         except Exception as e:                    # uma falha não pode matar o processo
             print(f"[reconhecimento] erro: {e}")
-            if tipo == "cadastro":
-                saida.put(("cadastro", msg[1], None))
+            if tipo in ("cadastro", "lote"):
+                saida.put((tipo, msg[1], None))
 
 
 # =====================================================================
@@ -444,7 +460,7 @@ class Totem:
             except queue.Empty:
                 continue
             try:
-                if msg[0] == "cadastro":
+                if msg[0] in ("cadastro", "lote"):
                     _, pedido, enc = msg
                     if pedido in self._cadastros:
                         self._cadastros[pedido][1] = enc
@@ -564,6 +580,34 @@ class Totem:
             if ok:
                 yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + jpg.tobytes() + b"\r\n")
             time.sleep(0.05)                # ~20 fps é de sobra
+
+    def processar_lote(self, chave, itens):
+        """Fila offline do tablet: [(momento, jpeg)] em ordem -> [(aluno_id, momento)] de quem foi reconhecido,
+        ou None se o reconhecimento estiver ocupado. momento = hora da foto em segundos, usada nas regras de tempo."""
+        if not self.rodando:
+            return None
+        quadros = []
+        for momento, jpeg in itens:
+            frame = cv2.imdecode(np.frombuffer(jpeg, np.uint8), cv2.IMREAD_COLOR)
+            if frame is None:
+                continue
+            if max(frame.shape[:2]) > 960:
+                f = 960 / max(frame.shape[:2])
+                frame = cv2.resize(frame, (0, 0), fx=f, fy=f)
+            pequeno = frame if self.escala == 1.0 else cv2.resize(frame, (0, 0), fx=self.escala, fy=self.escala)
+            quadros.append((momento, cv2.cvtColor(pequeno, cv2.COLOR_BGR2RGB)))
+        pedido = uuid.uuid4().hex
+        pronto = threading.Event()
+        self._cadastros[pedido] = [pronto, None]
+        try:
+            self._entrada.put(("lote", pedido, chave, quadros), timeout=10)
+            if not pronto.wait(timeout=120):
+                return None
+            return self._cadastros[pedido][1]
+        except queue.Full:
+            return None
+        finally:
+            self._cadastros.pop(pedido, None)
 
     def capturar_encoding(self, chave, tentativas=5):
         """Junta até 'tentativas' frames recentes desse totem e devolve (encoding_médio, frame) ou (None, motivo)."""

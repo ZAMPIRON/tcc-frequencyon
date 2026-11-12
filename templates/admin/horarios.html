@@ -17,7 +17,7 @@
   {% for category, message in messages %}
     <div class="alert alert-{{ category }} alert-dismissible fade show small" role="alert">
         {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <button type="button" class="btn-close" aria-label="Fechar" data-bs-dismiss="alert"></button>
     </div>
   {% endfor %}
 {% endwith %}
@@ -27,7 +27,7 @@
         <strong class="text-dark">Como o totem usa o horário:</strong>
         o aluno passa em <strong>qualquer totem</strong> uma vez por <strong>período</strong> (manhã, tarde ou noite), e a presença vai para as aulas daquele período.
         Por isso ele passa de novo depois do almoço: quem não voltar fica com falta nas aulas da tarde. Trocar de sala não muda nada.
-        O totem abre o registro {{ antecedencia }} min antes do bloco. Até {{ tol_presente }} min depois do início da aula conta presença, até {{ tol_atraso }} min conta atraso, e depois disso é falta naquela aula, com presença nas aulas seguintes.
+        Cada horário define quando o totem abre o registro (minutos antes do período) e as tolerâncias: até a tolerância de presença conta presença, até a de atraso conta atraso, e depois disso é falta naquela aula, com presença nas aulas seguintes.
     </div>
 </div>
 
@@ -42,6 +42,14 @@
             </div>
             <span class="badge bg-secondary">{{ m.turmas|length }} turma(s){% if m.turmas %}: {{ m.turmas|map(attribute='curso')|join(', ') }}{% endif %}</span>
         </div>
+        <div class="px-3 pt-3 d-flex flex-wrap gap-3 small">
+            <label class="d-flex align-items-center gap-2" for="tp{{ m.id }}">Presença até
+                <input type="number" name="tolerancia_presente" id="tp{{ m.id }}" value="{{ m.tolerancia_presente }}" min="0" max="60" class="form-control form-control-sm" style="width: 80px" required> min após o início</label>
+            <label class="d-flex align-items-center gap-2" for="ta{{ m.id }}">Atraso até
+                <input type="number" name="tolerancia_atraso" id="ta{{ m.id }}" value="{{ m.tolerancia_atraso }}" min="0" max="60" class="form-control form-control-sm" style="width: 80px" required> min</label>
+            <label class="d-flex align-items-center gap-2" for="an{{ m.id }}">Totem abre
+                <input type="number" name="antecedencia" id="an{{ m.id }}" value="{{ m.antecedencia }}" min="0" max="120" class="form-control form-control-sm" style="width: 80px" required> min antes do período</label>
+        </div>
         <div class="table-responsive">
             <table class="table align-middle mb-0">
                 <thead class="table-light small">
@@ -51,10 +59,10 @@
                     {% for a in m.aulas %}
                     <tr>
                         <td class="fw-bold numero-aula">{{ loop.index }}</td>
-                        <td><input type="time" name="inicio" value="{{ a.inicio.strftime('%H:%M') }}" class="form-control form-control-sm" required></td>
-                        <td><input type="time" name="fim" value="{{ a.fim.strftime('%H:%M') }}" class="form-control form-control-sm" required></td>
+                        <td><input type="time" name="inicio" aria-label="Início da aula" value="{{ a.inicio.strftime('%H:%M') }}" class="form-control form-control-sm" required></td>
+                        <td><input type="time" name="fim" aria-label="Fim da aula" value="{{ a.fim.strftime('%H:%M') }}" class="form-control form-control-sm" required></td>
                         <td>
-                            <select name="periodo" class="form-select form-select-sm">
+                            <select name="periodo" aria-label="Período da aula" class="form-select form-select-sm">
                                 {% for chave, nome in periodos.items() %}<option value="{{ chave }}" {{ 'selected' if chave == a.periodo }}>{{ nome }}</option>{% endfor %}
                             </select>
                         </td>
@@ -86,16 +94,16 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-header">
                     <h5 class="modal-title h6 fw-bold">Novo horário</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" aria-label="Fechar" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label small fw-bold">Nome</label>
-                        <input type="text" name="nome" class="form-control form-control-sm" required placeholder="Ex: CAI tarde">
+                        <input aria-label="Nome" type="text" name="nome" class="form-control form-control-sm" required placeholder="Ex: CAI tarde">
                     </div>
                     <div class="mb-3">
                         <label class="form-label small fw-bold">Começar a partir de</label>
-                        <select name="copiar_de" class="form-select form-select-sm">
+                        <select aria-label="Começar a partir de" name="copiar_de" class="form-select form-select-sm">
                             <option value="">Horário em branco</option>
                             {% for m in modelos %}<option value="{{ m.id }}">{{ m.nome }}</option>{% endfor %}
                         </select>

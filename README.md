@@ -46,6 +46,15 @@ FrequencyON fixes both ends of that problem:
 - **Universal totems**: any totem registers any student, in their own class, no matter which room the class is in today (rooms change too often to keep them in the system). Any teacher can unlock a totem.
 - The student checks in **once per period** (morning, afternoon, evening): again after lunch. A student who leaves at lunch and doesn't come back is absent for the afternoon lessons. Check-in opens 30 min before the period. Lessons of the period that already ended are absent; a lesson is *present* until its start and *late* up to 5 min after (configurable), later is absent for that lesson only.
 - Check-ins only count on the class's scheduled weekdays.
+- **Offline queue**: if the network drops, the kiosk keeps the camera frames (only when something moves) in the tablet's browser and sends them when the connection returns; the server recognizes them with the time each photo was taken.
+
+### Operations
+- **Reports by period** (any date range) exported to Excel and **PDF**.
+- **Attendance alerts**: students close to the 75% minimum see a warning in their portal and get an e-mail.
+- **Daily database backup** to `instance/backups` (plus a button in *Relatórios*).
+- **Audit trail** (*Admin → Auditoria*): every change in the admin panel and every manual change in a roll call, with who and when.
+- **REST API** (read-only, token) for school management systems: `/api/v1/turmas`, `/api/v1/alunos`, `/api/v1/frequencia?inicio=&fim=`, `/api/v1/alunos/<id>/presencas`.
+- **Health check** `/api/v1/saude` for monitoring tools (HTTP 503 when the database, the recognition or a kiosk is down) and an e-mail when an unlocked kiosk stops sending images during class.
 
 ### Teacher workspace
 ![Teacher attendance view](docs/screenshots/teacher-attendance.png)
@@ -183,9 +192,11 @@ All settings are environment variables:
 | `HTTPS` | `1` | `0` turns HTTPS off and serves plain HTTP on `PORTA` (only for local testing). |
 | `PORTA_HTTPS` / `PORTA` | `5443` / `5000` | HTTPS port, and the HTTP port that redirects to it. |
 | `SSL_CERT` / `SSL_KEY` | *(local CA)* | Paths to a real certificate and key, instead of the generated ones. |
-| `TOLERANCIA_PRESENTE` | `0` | Minutes after a lesson starts that still count as *present*. |
-| `TOLERANCIA_ATRASO` | `5` | Minutes after a lesson starts that count as *late*; later is an absence for that lesson only. |
-| `ANTECEDENCIA_TOTEM` | `30` | Minutes before a block of lessons when the kiosk starts accepting check-ins. |
+| `TOLERANCIA_PRESENTE` / `TOLERANCIA_ATRASO` / `ANTECEDENCIA_TOTEM` | `0` / `5` / `30` | Starting values for a new schedule (minutes for *present*, *late*, and how early the kiosk opens). Each schedule edits its own in *Admin → Horários*. |
+| `ALERTA_FREQUENCIA` | `80` | Students below this attendance see a warning in their portal and get an e-mail (at most once a week). |
+| `FREQUENCYON_API_TOKEN` | *(empty)* | Token for the read-only REST API (`/api/v1/...`, header `Authorization: Bearer <token>`). Empty = API off. |
+| `TOTEM_SEM_SINAL` | `10` | Minutes without images before an unlocked kiosk counts as offline (e-mail to `EMAIL_JUSTIFICATIVAS`). |
+| `BACKUPS_GUARDADOS` | `30` | How many daily database backups to keep in `instance/backups`. |
 | `FREQUENCYON_DATA` | *(empty)* | Freezes "today" to a date (`YYYY-MM-DD`), for testing. |
 | `EMAIL_JUSTIFICATIVAS` | *(empty)* | Address that receives an e-mail for every absence justification. |
 | `SMTP_SERVIDOR` / `SMTP_PORTA` | `smtp.gmail.com` / `465` | SMTP server used to send e-mails (465 = SSL, 587 = STARTTLS). |
