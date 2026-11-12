@@ -20,8 +20,8 @@
 <div class="card border-0 shadow-sm rounded-3 mb-4">
     <div class="card-body small d-flex flex-wrap align-items-center justify-content-between gap-2">
         <div>
-            <b>Alertas de frequência:</b> quem está abaixo de {{ alerta }}% vê um aviso no portal e recebe um e-mail
-            (no máximo um por semana; o servidor confere a cada 6 h).
+            <b>Alertas de frequência:</b> quem está abaixo de {{ alerta }}% vê um aviso no portal e recebe um e-mail; os professores da turma
+            e os administradores recebem um resumo (no máximo um aviso por aluno por semana; o servidor confere a cada 6 h).
             {% if not smtp %}<span class="text-warning-emphasis">E-mail não configurado: por enquanto só o aviso no portal.</span>{% endif %}
         </div>
         <form method="POST" action="{{ url_for('admin.enviar_alertas') }}">

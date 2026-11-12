@@ -63,10 +63,12 @@ def enviar_alertas():
     if not smtp_configurado():
         flash("E-mail não configurado (SMTP_USUARIO e SMTP_SENHA no .env). Os alunos continuam vendo o aviso no portal.", "warning")
         return redirect(url_for("admin.risco_evasao"))
-    enviados, sem_email = verificar_alertas(current_app._get_current_object())
-    msg = f"{len(enviados)} aviso(s) enviado(s)."
+    enviados, sem_email, equipe = verificar_alertas(current_app._get_current_object())
+    msg = f"{len(enviados)} aluno(s) avisado(s) por e-mail."
     if sem_email:
-        msg += f" Sem e-mail cadastrado: {', '.join(sem_email)}."
+        msg += f" Aluno(s) sem e-mail cadastrado: {', '.join(sem_email)}."
+    if equipe:
+        msg += f" Resumo enviado para: {', '.join(equipe)}."
     flash(msg if enviados or sem_email else "Ninguém para avisar: quem está abaixo de "
           f"{ALERTA_FREQUENCIA}% já recebeu o aviso nos últimos 7 dias.", "success")
     return redirect(url_for("admin.risco_evasao"))

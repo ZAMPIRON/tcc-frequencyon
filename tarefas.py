@@ -7,9 +7,9 @@ import threading
 import time
 from datetime import datetime, timedelta
 
-from database import (db, Aluno, Dispositivo, Turma, ALERTA_FREQUENCIA, agora_local, blocos_abertos,
+from database import (db, Admin, Aluno, Dispositivo, Turma, ALERTA_FREQUENCIA, agora_local, blocos_abertos,
                       eh_dia_com_aula)
-from email_service import enviar_alerta_frequencia, enviar_aviso_totem, smtp_configurado
+from email_service import enviar_alerta_frequencia, enviar_aviso_totem, enviar_resumo_frequencia, smtp_configurado
 
 TOTEM_SEM_SINAL = int(os.getenv("TOTEM_SEM_SINAL", "10"))      # minutos sem imagens = totem sem sinal
 BACKUPS_GUARDADOS = int(os.getenv("BACKUPS_GUARDADOS", "30"))
@@ -32,21 +32,32 @@ def alunos_para_alertar(agora=None):
 
 
 def verificar_alertas(app, agora=None):
-    """Manda o e-mail de aviso para quem está perto do limite de faltas. Devolve (enviados, sem_email)."""
+    """Avisa por e-mail quem está perto do limite de faltas: o próprio aluno, os professores da turma dele
+    e os admins (estes dois recebem um resumo só). Devolve (alunos avisados, alunos sem e-mail, equipe avisada)."""
     with app.app_context():
         agora = agora or agora_local()
-        enviados, sem_email = [], []
+        enviados, sem_email, equipe = [], [], []
         if not smtp_configurado():
-            return enviados, sem_email
-        for aluno, freq in alunos_para_alertar(agora):
-            if not aluno.email:
+            return enviados, sem_email, equipe
+        lista = alunos_para_alertar(agora)
+        por_pessoa = {}        # email do professor/admin -> (nome, [(aluno, freq)])
+        for aluno, freq in lista:
+            if aluno.email:
+                enviar_alerta_frequencia(aluno, freq)
+                enviados.append(aluno.nome)
+            else:
                 sem_email.append(aluno.nome)
-                continue
-            enviar_alerta_frequencia(aluno, freq)
-            aluno.alerta_enviado_em = agora
-            enviados.append(aluno.nome)
+            aluno.alerta_enviado_em = agora      # mesmo sem e-mail do aluno, a equipe já foi avisada
+            for prof in (aluno.turma.professores if aluno.turma else []):
+                por_pessoa.setdefault(prof.email, (prof.nome, []))[1].append((aluno, freq))
+        for adm in (Admin.query.all() if lista else []):     # admin recebe todos (sem repetir se também for professor)
+            ja = por_pessoa.setdefault(adm.email, (adm.nome, []))[1]
+            ja.extend((a, f) for a, f in lista if all(a is not b for b, _ in ja))
+        for email, (nome, alunos) in por_pessoa.items():
+            if enviar_resumo_frequencia(nome, email, alunos):
+                equipe.append(nome)
         db.session.commit()
-        return enviados, sem_email
+        return enviados, sem_email, equipe
 
 
 # ---------- RNF10: backup ----------
