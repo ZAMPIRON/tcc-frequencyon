@@ -320,17 +320,9 @@ def turmas():
         db.session.commit()
         flash("Turma criada! Defina os dias de aula de cada professor nos detalhes da turma.", "success")
         return redirect(url_for("admin.turmas"))
-    return render_template("admin/turmas.html", salas=salas_com_turmas(),
+    return render_template("admin/turmas.html", turmas=Turma.query.order_by(Turma.nome, Turma.curso).all(),
                            professores=Professor.query.order_by(Professor.nome).all(),
                            modelos=ModeloHorario.query.order_by(ModeloHorario.nome).all())
-
-
-def salas_com_turmas():
-    # [(sala, [turmas])] em ordem: a sala e o nome da turma, e varias turmas podem dividir a mesma sala
-    salas = {}
-    for t in Turma.query.order_by(Turma.nome, Turma.curso):
-        salas.setdefault(t.nome, []).append(t)
-    return list(salas.items())
 
 
 @admin.route("/turmas/<int:id>")

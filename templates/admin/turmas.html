@@ -6,7 +6,7 @@
 <div class="d-flex align-items-center justify-content-between mb-4">
     <div>
         <h1 class="h3 fw-bold mb-1">Turmas <span class="fo-gradient-text">Ativas</span></h1>
-        <p class="text-muted mb-0 small">Salas de aula e disciplinas integradas</p>
+        <p class="text-muted mb-0 small">Turmas e cursos cadastrados</p>
     </div>
     <button class="btn btn-primary fw-semibold btn-sm px-3 py-2 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalTurma">
         <i class="fa-solid fa-plus me-1"></i> Nova Turma
@@ -24,20 +24,17 @@
   {% endif %}
 {% endwith %}
 
-{% for sala, turmas in salas %}
-<section class="mb-4" data-busca-item>
-    <div class="d-flex align-items-center gap-2 mb-2">
-        <h2 class="h6 fw-bold mb-0"><i class="fa-solid fa-door-open text-primary me-1"></i> Sala {{ sala }}</h2>
-        <span class="badge bg-secondary bg-opacity-25 text-secondary">{{ turmas|length }} turma{{ 's' if turmas|length > 1 }}</span>
-    </div>
 <div class="row g-3">
     {% for turma in turmas %}
-    <div class="col-md-6 col-xl-4">
+    <div class="col-md-6 col-xl-4" data-busca-item>
         <div class="card border-0 shadow-sm rounded-3 h-100">
             <div class="card-body p-3 d-flex flex-column">
                 <div>
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <h6 class="fw-bold text-dark mb-0">{{ turma.curso }}</h6>
+                        <div>
+                            <h6 class="fw-bold text-dark mb-0">{{ turma.nome }}</h6>
+                            <small class="text-muted">{{ turma.curso }}</small>
+                        </div>
                         <span class="badge {% if turma.frequencia_media < 75 %}bg-danger{% else %}bg-primary{% endif %}">
                             {{ turma.frequencia_media }}%
                         </span>
@@ -68,12 +65,10 @@
             </div>
         </div>
     </div>
+    {% else %}
+    <p class="text-muted">Nenhuma turma cadastrada.</p>
     {% endfor %}
 </div>
-</section>
-{% else %}
-<p class="text-muted">Nenhuma turma cadastrada.</p>
-{% endfor %}
 
 <!-- Modal para Nova Turma -->
 <div class="modal fade" id="modalTurma" tabindex="-1">
@@ -87,10 +82,8 @@
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label small fw-bold">Sala</label>
-                        <input aria-label="Sala" type="text" name="nome" class="form-control form-control-sm" required placeholder="Ex: C13" list="salasExistentes">
-                        <datalist id="salasExistentes">{% for sala, _ in salas %}<option value="{{ sala }}">{% endfor %}</datalist>
-                        <small class="text-muted">Use o mesmo nome para turmas que dividem a sala: elas aparecem juntas.</small>
+                        <label class="form-label small fw-bold">Nome da turma</label>
+                        <input aria-label="Nome da turma" type="text" name="nome" class="form-control form-control-sm" required placeholder="Ex: DS1 2026">
                     </div>
                     <div class="mb-3">
                         <label class="form-label small fw-bold">Curso / Turma</label>
@@ -139,8 +132,8 @@
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label small fw-bold text-secondary">Sala</label>
-                        <input aria-label="Sala" type="text" name="nome" id="editarTurmaNome" class="form-control form-control-sm" required list="salasExistentes">
+                        <label class="form-label small fw-bold text-secondary">Nome da turma</label>
+                        <input aria-label="Nome da turma" type="text" name="nome" id="editarTurmaNome" class="form-control form-control-sm" required>
                     </div>
                     <div class="mb-1">
                         <label class="form-label small fw-bold text-secondary">Curso / Turma</label>
