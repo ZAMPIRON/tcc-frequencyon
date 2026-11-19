@@ -3,7 +3,7 @@
     "short_name": "Totem",
     "start_url": "/totem",
     "scope": "/",
-    "display": "fullscreen",
+    "display": "standalone",
     "orientation": "any",
     "background_color": "#0b1020",
     "theme_color": "#0b1020",

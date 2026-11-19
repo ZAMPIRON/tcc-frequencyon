@@ -136,3 +136,4 @@ body { min-height: 100vh; }
 
 /* ---------- liberação do totem pelo professor ---------- */
 .ativar-card { width: 100%; max-width: 440px; }
+.codigo-input { letter-spacing: .3em; text-transform: uppercase; font-family: var(--bs-font-monospace); }

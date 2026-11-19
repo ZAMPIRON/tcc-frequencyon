@@ -2,9 +2,11 @@
 # hoje ele edita a vontade, dias anteriores so com a senha de um admin, dia futuro nunca
 from datetime import date, timedelta
 
+from sqlalchemy import case, func
+
 from flask import Blueprint, jsonify, render_template, request, session, url_for
 
-from database import (db, Admin, Aluno, Presenca, ProfessorTurma, AULAS_POR_DIA, NOMES_DIAS,
+from database import (db, Admin, AlteracaoPresenca, Aluno, Presenca, ProfessorTurma, NOMES_DIAS,
                       eh_dia_com_aula, hoje_local, ultimo_dia_com_aula)
 from .comum import requer, usuario_atual
 
@@ -98,36 +100,38 @@ def chamada():
     alunos, presentes, faltas = [], 0, 0
     calendario = None
 
-    if turma and dias_prof:
+    n_aulas = turma.aulas_por_dia if turma else 0
+    if turma and dias_prof and n_aulas:
         ids = [a.id for a in turma.alunos]
         inicio_mes, fim_mes = data_selecionada.replace(day=1), _fim_do_mes(data_selecionada)
-        registros = Presenca.query.filter(
-            Presenca.aluno_id.in_(ids),
-            Presenca.data.between(inicio_mes, fim_mes)
-        ).all() if ids else []
-
-        # numa passada so: a chamada do dia escolhido e os totais do mes
-        # (contando so os dias em que esse professor da aula)
+        # totais do mes somados no banco (contando so os dias em que esse professor da aula)
+        ok = func.sum(case((Presenca.status.in_(("presente", "atraso")), 1), else_=0))
+        somas = (db.session.query(Presenca.aluno_id, Presenca.data, ok)
+                 .join(Aluno, Presenca.aluno_id == Aluno.id)
+                 .filter(Aluno.turma_id == turma.id, Presenca.data.between(inicio_mes, fim_mes), Presenca.aula < n_aulas)
+                 .group_by(Presenca.aluno_id, Presenca.data).all()) if ids else []
         mapa, ok_mes, ok_dia, dias_com_chamada = {}, {}, {}, set()
-        for r in registros:
-            if not eh_dia_com_aula(r.data, dias_prof):
+        for aid, data_, n_ok in somas:
+            if not eh_dia_com_aula(data_, dias_prof):
                 continue
-            dias_com_chamada.add(r.data)
-            presente = r.status in ("presente", "atraso")
-            ok_mes[r.aluno_id] = ok_mes.get(r.aluno_id, 0) + presente
-            ok_dia[r.data] = ok_dia.get(r.data, 0) + presente
-            if r.data == data_selecionada:
-                mapa.setdefault(r.aluno_id, {})[r.aula] = r.status
+            dias_com_chamada.add(data_)
+            ok_mes[aid] = ok_mes.get(aid, 0) + n_ok
+            ok_dia[data_] = ok_dia.get(data_, 0) + n_ok
+        # a chamada do dia escolhido, aula por aula
+        for r in (Presenca.query.join(Aluno, Presenca.aluno_id == Aluno.id)
+                  .filter(Aluno.turma_id == turma.id, Presenca.data == data_selecionada, Presenca.aula < n_aulas)
+                  if ids and eh_dia_com_aula(data_selecionada, dias_prof) else []):
+            mapa.setdefault(r.aluno_id, {})[r.aula] = r.status
 
-        aulas_por_dia_turma = len(ids) * AULAS_POR_DIA
+        aulas_por_dia_turma = len(ids) * n_aulas
         taxa_por_dia = {d: round(100 * ok_dia.get(d, 0) / aulas_por_dia_turma)
                         for d in dias_com_chamada}
         calendario = _calendario_mes(data_selecionada, hoje, dias_prof, turma, taxa_por_dia)
-        total_aulas_mes = len(dias_com_chamada) * AULAS_POR_DIA
+        total_aulas_mes = len(dias_com_chamada) * n_aulas
 
         # aula sem registro conta como falta
         for a in sorted(turma.alunos, key=lambda x: (x.numero_chamada or 999, x.nome)):
-            st = [mapa.get(a.id, {}).get(i, "falta") for i in range(AULAS_POR_DIA)]
+            st = [mapa.get(a.id, {}).get(i, "falta") for i in range(n_aulas)]
             tem_presenca = any(s in ("presente", "atraso") for s in st)
             faltou_dia = all(s == "falta" for s in st)
             presentes += int(tem_presenca)
@@ -162,6 +166,8 @@ def chamada():
         dias_prof=dias_prof,
         dias_prof_nomes=vinculo.dias_nomes if vinculo else "",
         calendario=calendario,
+        grade=turma.grade if turma else [],
+        inicios_bloco={b.aulas[0].numero for b in turma.blocos} if turma else set(),
     )
 
 
@@ -205,11 +211,10 @@ def _pode_alterar_data(data_requisitada, senha_admin, dias):
 def _alterar(aluno_id, barra, regra):
     # parte comum do toggle e do atraso
     # regra recebe o status atual e devolve o novo
-    if barra < 0 or barra >= AULAS_POR_DIA:
-        return jsonify(erro="Aula inválida."), 400
-
     # o professor so mexe em aluno das turmas dele
     aluno = db.get_or_404(Aluno, aluno_id)
+    if barra < 0 or not aluno.turma or barra >= aluno.turma.aulas_por_dia:
+        return jsonify(erro="Aula inválida."), 400
     vinculo = db.session.get(ProfessorTurma, (session["uid"], aluno.turma_id)) if aluno.turma_id else None
     if not vinculo:
         return jsonify(erro="Aluno não pertence às suas turmas."), 403
@@ -220,12 +225,18 @@ def _alterar(aluno_id, barra, regra):
         return jsonify(erro=erro), 403
 
     p = Presenca.query.filter_by(aluno_id=aluno_id, data=data_requisitada, aula=barra).first()
+    anterior = p.status if p else None
     if not p:
         # aula sem registro e falta, entao comeca como falta antes de aplicar a regra
         p = Presenca(aluno_id=aluno_id, data=data_requisitada, aula=barra, status="falta")
         db.session.add(p)
 
     p.status, p.origem = regra(p.status), "professor"
+    # trilha de auditoria: quem mudou, quando e de qual status para qual (dia anterior = com senha do admin)
+    db.session.add(AlteracaoPresenca(aluno_id=aluno_id, data=data_requisitada, aula=barra,
+                                     status_anterior=anterior, status_novo=p.status,
+                                     professor_id=vinculo.professor_id, professor_nome=vinculo.professor.nome,
+                                     com_senha_admin=data_requisitada != hoje_local()))
     db.session.commit()
     return jsonify(estado=p.status, media_frequencia=aluno.turma.frequencia_media)
 
@@ -240,7 +251,5 @@ def toggle(aluno_id, barra):
 @professor.route("/atraso/<int:aluno_id>/<int:barra>", methods=["POST"])
 @requer("professor")
 def atraso(aluno_id, barra):
-    # botao direito: presente <-> atraso, so nas duas primeiras aulas
-    if barra > 1:
-        return jsonify(erro="Atraso só pode ser marcado nas aulas 1 e 2."), 400
+    # botao direito: presente <-> atraso (qualquer aula: depois do almoco ou da troca de sala tambem chega atrasado)
     return _alterar(aluno_id, barra, lambda s: "presente" if s == "atraso" else "atraso")

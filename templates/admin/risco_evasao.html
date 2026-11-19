@@ -8,6 +8,29 @@
     <p class="text-muted mb-0 small">Estudantes com frequência escolar abaixo do limite regulamentar (75%)</p>
 </div>
 
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for category, message in messages %}
+    <div class="alert alert-{{ category }} alert-dismissible fade show small" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+    </div>
+  {% endfor %}
+{% endwith %}
+
+<div class="card border-0 shadow-sm rounded-3 mb-4">
+    <div class="card-body small d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div>
+            <b>Alertas de frequência:</b> quem está abaixo de {{ alerta }}% vê um aviso no portal e recebe um e-mail; os professores da turma
+            e os administradores recebem um resumo (no máximo um aviso por aluno por semana; o servidor confere a cada 6 h).
+            {% if not smtp %}<span class="text-warning-emphasis">E-mail não configurado: por enquanto só o aviso no portal.</span>{% endif %}
+        </div>
+        <form method="POST" action="{{ url_for('admin.enviar_alertas') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-primary btn-sm"><i class="fa-solid fa-paper-plane me-1" aria-hidden="true"></i> Enviar avisos agora</button>
+        </form>
+    </div>
+</div>
+
 <div class="card border-0 shadow-sm rounded-3">
     <div class="card-body p-0">
         <table class="table table-hover align-middle mb-0">

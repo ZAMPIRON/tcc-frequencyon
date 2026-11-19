@@ -6,7 +6,7 @@
 <!-- Cabeçalho com Navegação e Botões de Ação -->
 <div class="d-flex align-items-center justify-content-between mb-4">
     <div class="d-flex align-items-center gap-3">
-        <a href="{{ url_for('admin.turmas') }}" class="btn btn-outline-secondary btn-sm rounded-circle p-2 d-flex align-items-center justify-content-center quadrado-36">
+        <a href="{{ url_for('admin.turmas') }}" aria-label="Voltar para as turmas" class="btn btn-outline-secondary btn-sm rounded-circle p-2 d-flex align-items-center justify-content-center quadrado-36">
             <i class="fa-solid fa-arrow-left"></i>
         </a>
         <div>
@@ -30,7 +30,7 @@
     {% for category, message in messages %}
       <div class="alert alert-{{ category }} alert-dismissible fade show small" role="alert">
         {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <button type="button" class="btn-close" aria-label="Fechar" data-bs-dismiss="alert"></button>
       </div>
     {% endfor %}
   {% endif %}
@@ -84,6 +84,51 @@
                 </div>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- Horário da turma: modelo (CAI, técnico...) -->
+<div class="row g-3 mb-4">
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm rounded-3 h-100">
+            <div class="card-body p-0">
+                <div class="p-3 border-bottom d-flex align-items-center justify-content-between gap-2 flex-wrap">
+                    <h6 class="fw-bold text-dark mb-0">Como funciona a aula</h6>
+                    <form method="POST" action="{{ url_for('admin.horario_turma', id=turma.id) }}" class="d-flex align-items-center gap-2">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <label class="small text-muted" for="modeloTurma">Horário</label>
+                        <select name="modelo_id" id="modeloTurma" class="form-select form-select-sm" onchange="this.form.submit()">
+                            {% if not turma.modelo %}<option value="" selected>Escolha...</option>{% endif %}
+                            {% for m in modelos %}<option value="{{ m.id }}" {{ 'selected' if m.id == turma.modelo_id }}>{{ m.nome }}</option>{% endfor %}
+                        </select>
+                    </form>
+                </div>
+                {% if turma.grade %}
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead class="table-light small">
+                            <tr><th>Aula</th><th>Horário</th><th>Período</th></tr>
+                        </thead>
+                        <tbody class="small">
+                            {% for a in turma.grade %}
+                            <tr>
+                                <td class="fw-bold">{{ a.numero + 1 }}</td>
+                                <td>{{ a.inicio.strftime('%H:%M') }}–{{ a.fim.strftime('%H:%M') }}</td>
+                                <td>{{ a.nome_periodo }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-muted small p-3 mb-0">Os horários são editados em <a href="{{ url_for('admin.horarios') }}">Horários</a> e valem para todas as turmas que usam o mesmo modelo.</p>
+                {% else %}
+                <p class="text-muted small p-3 mb-0">Escolha um horário para a turma. Os horários ficam em <a href="{{ url_for('admin.horarios') }}">Horários</a>.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        {% include 'componentes/grade_turma.html' %}
     </div>
 </div>
 
@@ -220,12 +265,12 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-header">
                     <h5 class="modal-title h6 fw-bold">Vincular Professor à Turma</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" aria-label="Fechar" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label small fw-bold">Professor</label>
-                        <select name="professor_id" class="form-select form-select-sm" required>
+                        <select aria-label="Professor" name="professor_id" class="form-select form-select-sm" required>
                             <option value="">Selecione...</option>
                             {% for prof in professores_disponiveis %}
                             <option value="{{ prof.id }}">{{ prof.nome }}</option>
@@ -257,14 +302,14 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-header">
                     <h5 class="modal-title h6 fw-bold">Adicionar Aluno à Turma</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" aria-label="Fechar" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <p class="text-muted small mb-3">Selecione um aluno que atualmente não está vinculado a nenhuma turma:</p>
                     
                     <div class="mb-3">
                         <label class="form-label small fw-bold">Aluno</label>
-                        <select name="aluno_id" class="form-select form-select-sm" required>
+                        <select aria-label="Aluno" name="aluno_id" class="form-select form-select-sm" required>
                             <option value="">Selecione um aluno...</option>
                             {% for aluno in alunos_sem_turma %}
                             <option value="{{ aluno.id }}">{{ aluno.nome }} (Matrícula: {{ aluno.matricula }})</option>

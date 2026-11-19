@@ -4,7 +4,7 @@ import os
 import secrets
 import threading
 
-from flask import Flask, flash, jsonify, redirect, request, url_for
+from flask import Flask, abort, flash, jsonify, redirect, request, url_for
 from flask_wtf.csrf import CSRFError, CSRFProtect
 
 from email_service import carregar_env
@@ -13,10 +13,11 @@ from email_service import carregar_env
 # porque os horarios das aulas sao lidos das variaveis na hora do import
 carregar_env(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
-from database import db, Admin, migrar_dispositivos, migrar_professor_turma  # noqa: E402
+from database import db, Admin, SENHAS_FRACAS, migrar_dispositivos, migrar_horarios, migrar_professor_turma  # noqa: E402
 from face_service import Totem  # noqa: E402
 from rotas import registrar_rotas  # noqa: E402
 from rotas.comum import usuario_atual  # noqa: E402
+from rotas.totem import totem_ativado  # noqa: E402
 
 
 def create_app(avisar_senhas=True):
@@ -68,8 +69,21 @@ def create_app(avisar_senhas=True):
         return redirect(request.referrer or url_for("index"))
     app.context_processor(lambda: {"usuario": usuario_atual()})
 
+    pasta_fotos = os.path.normcase(os.path.realpath(os.path.join(app.static_folder, "uploads")))
+
+    @app.before_request
+    def proteger_fotos():
+        # foto de rosto e dado biometrico (LGPD): so abre para quem esta logado ou para um totem ativado.
+        # compara o caminho real do arquivo, entao "Uploads/", "./uploads/" ou "a/../uploads/" nao passam
+        if request.endpoint != "static":
+            return
+        arquivo = os.path.normcase(os.path.realpath(os.path.join(app.static_folder, request.view_args.get("filename", ""))))
+        if (arquivo == pasta_fotos or arquivo.startswith(pasta_fotos + os.sep)) and not (usuario_atual() or totem_ativado()):
+            abort(404)
+
     with app.app_context():
         db.create_all()
+        migrar_horarios()           # antes de tudo: cria as colunas que as consultas de Turma já usam
         migrar_dispositivos()       # antes: cria colunas que as consultas de Professor já usam
         migrar_professor_turma()
         # banco novo: cria um admin pra conseguir entrar a primeira vez.
@@ -100,7 +114,6 @@ def _chave_secreta(pasta):
         return f.read().strip()
 
 
-SENHAS_FRACAS = ("admin123", "prof123", "123", "1234", "123456", "senha", "admin")
 
 
 def _avisar_senhas_fracas(app):
@@ -135,6 +148,8 @@ def _redirecionar_para_https(porta_http, porta_https):
 
 if __name__ == "__main__":
     app = create_app()
+    from tarefas import iniciar_tarefas
+    iniciar_tarefas(app)            # backup diario, alertas de frequencia e aviso de totem sem sinal
     porta = int(os.getenv("PORTA", "5000"))
     # debug fica desligado porque o reloader abriria a camera duas vezes
     if not app.config["USAR_HTTPS"]:

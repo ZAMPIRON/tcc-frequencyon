@@ -15,6 +15,9 @@
         <h1 class="h3 fw-bold mb-1">Frequency<span class="fo-gradient-text">ON</span></h1>
 
         {% if modo == 'tablet' %}
+        {% if disp %}
+        <span class="badge bg-info bg-opacity-25 text-info mb-2"><i class="bi bi-tablet me-1"></i>{{ disp.nome }}</span>
+        {% endif %}
         <p class="text-muted mb-3">Totem bloqueado. <strong>Professor, olhe para a câmera</strong> para liberar a presença de hoje.</p>
         <div class="moldura-camera fo-glass mb-3">
             <div class="video-container" id="videoBox">
@@ -47,21 +50,6 @@
         <p class="small text-muted mt-3 mb-0">O totem volta a bloquear sozinho à meia-noite.</p>
     </div>
 
-    <script>
-        // tela cheia: o navegador só deixa depois de um toque, então tenta ao abrir e de novo a cada toque
-        function telaCheia() {
-            const el = document.documentElement;
-            if (document.fullscreenElement || document.webkitFullscreenElement) return;
-            const pedir = el.requestFullscreen || el.webkitRequestFullscreen;
-            if (!pedir) return;
-            try {
-                const p = pedir.call(el, { navigationUI: 'hide' });
-                if (p && p.catch) p.catch(() => {});
-            } catch (e) { /* sem permissão ainda: o próximo toque tenta de novo */ }
-        }
-        telaCheia();
-        document.addEventListener('pointerdown', telaCheia);
-    </script>
 
     {% if modo == 'tablet' %}
     <script>
@@ -141,6 +129,11 @@
                         await esperar(1200);
                         location.reload();          // agora o servidor mostra a tela do totem
                         return;
+                    }
+                    if (d.negado) {                 // reconheceu, mas a pessoa não pode liberar
+                        mostrarRotulo(null, d.negado);
+                        await esperar(3000);
+                        continue;
                     }
                     mostrarRotulo(d.pronto ? d.estado : 'iniciando', d.erro);
                 } catch (e) {

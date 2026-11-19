@@ -80,6 +80,15 @@
       {% endfor %}
     {% endwith %}
 
+    {% if total_aulas and frequencia < alerta_frequencia %}
+    <!-- RF20: aviso de frequência perto do mínimo -->
+    <div class="alert {{ 'alert-danger' if frequencia < 75 else 'alert-warning' }} d-flex align-items-center gap-2" role="alert">
+        <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+        <div><b>{{ 'Sua frequência está abaixo do mínimo' if visao == 'aluno' else 'Frequência abaixo do mínimo' if frequencia < 75 else 'Frequência perto do mínimo' }}: {{ frequencia }}%.</b>
+            O mínimo exigido é 75%.{% if visao == 'aluno' %} Se alguma falta tiver motivo, envie uma justificativa.{% endif %}</div>
+    </div>
+    {% endif %}
+
     <div class="row g-4">
         <!-- ============ COLUNA ESQUERDA ============ -->
         <div class="col-12 col-lg-4 d-flex flex-column gap-4">
@@ -106,6 +115,8 @@
                     </div>
                 </div>
             </div>
+
+            {% if aluno.turma %}{% with turma=aluno.turma, estilo_card='card-fo fo-glass p-4' %}{% include 'componentes/grade_turma.html' %}{% endwith %}{% endif %}
 
             <!-- frequência geral -->
             <div class="card-fo fo-glass p-4">
