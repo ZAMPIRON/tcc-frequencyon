@@ -107,24 +107,28 @@ Cada turma tem um curso, um **modelo de horário** (*Admin → Horários*) e um 
 #### Horários
 Modelos de grade por turma, por exemplo CAI com 4 aulas de 60 min ou cursos técnicos com 10 aulas de 45 min. Cada aula tem início, fim e período (manhã, tarde, noite). Cada modelo define também a tolerância de *presente*, de *atraso* e com quanta antecedência o totem abre.
 
+![Horários](docs/manual/17-admin-horarios.png)
+
 #### Relatórios
 Tendência mensal de frequência, frequência por curso e por professor, com qualquer intervalo de datas e exportação em **Excel** e **PDF**. Também há um botão para fazer **backup do banco** na hora.
 
-![Relatórios](docs/manual/17-admin-relatorios.png)
+![Relatórios](docs/manual/18-admin-relatorios.png)
 
 #### Risco de evasão
 Todos os alunos abaixo de 75% de frequência em uma lista. Daqui a coordenação pode **enviar os alertas por e-mail** aos alunos com frequência baixa.
 
-![Risco de evasão](docs/manual/18-admin-risco-de-evasao.png)
+![Risco de evasão](docs/manual/19-admin-risco-de-evasao.png)
 
 #### Totens
-Cadastro dos tablets autorizados. Ao criar um totem, o sistema gera um **código de ativação de 8 letras** (válido por 24 h e de uso único), que é digitado uma vez no tablet. A tabela mostra se cada aparelho está liberado hoje, por quem, e o último uso. Um tablet perdido ou trocado pode ser desativado a qualquer momento.
+Cadastro dos tablets autorizados. Ao criar um totem, o sistema gera um **código de ativação de 8 letras** (válido por 24 h e de uso único), que é digitado uma vez no tablet. A tabela mostra se cada aparelho está aguardando ativação, liberado hoje (e por quem) ou bloqueado, o último uso e um aviso de **sem sinal** quando um totem liberado para de enviar imagens. O botão da chave gera um código novo (para trocar o tablet). Um tablet perdido ou trocado pode ser desativado a qualquer momento.
 
-![Totens](docs/manual/19-admin-totens.png)
+![Totens](docs/manual/20-admin-totens.png)
 
 #### Justificativas e auditoria
 - As justificativas enviadas pelos alunos aparecem no painel para **aceitar ou recusar**; a coordenação recebe um e-mail a cada nova justificativa.
-- *Admin → Auditoria* mostra toda alteração feita no painel e toda mudança manual na chamada, com quem fez e quando.
+- *Admin → Auditoria* mostra toda alteração feita no painel e toda mudança manual na chamada, com quem fez, quando e se foi usada a senha do administrador.
+
+![Auditoria](docs/manual/21-admin-auditoria.png)
 
 ### 3.3 Professor
 
@@ -132,13 +136,13 @@ Cadastro dos tablets autorizados. Ao criar um totem, o sistema gera um **código
 - Uma barra por aula, agrupada por período: **clique** alterna presente/falta, **botão direito** marca atraso.
 - Os alunos que passaram pelo totem já aparecem com presença lançada.
 
-![Chamada do dia](docs/manual/20-professor-chamada-do-dia.png)
+![Chamada do dia](docs/manual/22-professor-chamada-do-dia.png)
 
 A chamada de **hoje** pode ser editada livremente. Dias anteriores ficam **somente leitura**; para alterar, é preciso informar a senha de um administrador.
 
 | Dia anterior (somente leitura) | Alterar dia anterior |
 |---|---|
-| ![Dia anterior](docs/manual/21-professor-dia-anterior.png) | ![Alterar dia anterior](docs/manual/22-professor-alterar-dia-anterior.png) |
+| ![Dia anterior](docs/manual/23-professor-dia-anterior.png) | ![Alterar dia anterior](docs/manual/24-professor-alterar-dia-anterior.png) |
 
 ### 3.4 Aluno
 
@@ -147,30 +151,33 @@ A chamada de **hoje** pode ser editada livremente. Dias anteriores ficam **somen
 - **Exportar em CSV** (abre no Excel).
 - Aviso no portal quando a frequência se aproxima do mínimo.
 
-![Minha frequência](docs/manual/23-aluno-minha-frequencia.png)
+![Minha frequência](docs/manual/25-aluno-minha-frequencia.png)
 
 Para **justificar uma falta**, o aluno escolhe o dia, escreve o motivo e acompanha a situação (pendente, aceita, recusada).
 
-![Justificar falta](docs/manual/24-aluno-justificar-falta.png)
+![Justificar falta](docs/manual/26-aluno-justificar-falta.png)
 
 ### 3.5 Totem
 
 O totem é a página `/totem` aberta em modo quiosque num tablet. A câmera é a do próprio tablet; ele envia algumas imagens por segundo ao servidor, que faz o reconhecimento.
 
 1. **Ativação (uma vez)**: no tablet, digite o código gerado em *Admin → Totens*.
+
+![Ativar totem](docs/manual/27-totem-ativar.png)
+
 2. **Liberação (todo dia)**: o totem começa bloqueado. Quando um professor chega, ele olha para a câmera (se tiver o rosto cadastrado) ou digita e-mail e senha. O totem fica liberado até **23:59** e se bloqueia sozinho à meia-noite. Qualquer professor libera qualquer totem.
 
-![Totem bloqueado](docs/manual/25-totem-bloqueado.png)
+![Totem bloqueado](docs/manual/28-totem-bloqueado.png)
 
 3. **Registro**: o aluno se posiciona no centro da câmera. O sistema confere a **prova de vida** (pequenos movimentos naturais de olhos e boca, para recusar foto impressa) e registra a presença, com confete e som de confirmação. Há estados próprios para *atrasado*, *fora do horário* e *hoje não tem aula*.
 
 | Aguardando aluno | Verificando prova de vida | Presença confirmada |
 |---|---|---|
-| ![Aguardando aluno](docs/manual/26-totem-aguardando-aluno.png) | ![Verificando](docs/manual/27-totem-pisque-os-olhos.png) | ![Presença confirmada](docs/manual/28-totem-presenca-confirmada.png) |
+| ![Aguardando aluno](docs/manual/29-totem-aguardando-aluno.png) | ![Verificando](docs/manual/30-totem-verificando.png) | ![Presença confirmada](docs/manual/31-totem-presenca-confirmada.png) |
 
 4. **Primeiro acesso / cadastrar face**: o aluno digita a matrícula **e a senha** no totem e o sistema captura e grava o rosto dele. Cinco senhas erradas bloqueiam aquela matrícula por 15 minutos.
 
-![Cadastrar rosto](docs/manual/29-totem-cadastrar-rosto.png)
+![Cadastrar rosto](docs/manual/32-totem-cadastrar-rosto.png)
 
 **Totens universais**: qualquer totem registra qualquer aluno, na turma dele, independente da sala em que a turma está hoje (as salas mudam demais para manter no sistema).
 
@@ -183,7 +190,9 @@ O sistema envia e-mails (quando o SMTP está configurado) para:
 - aluno com frequência baixa (no máximo uma vez por semana por aluno) e resumo para a coordenação;
 - totem liberado que parou de enviar imagens durante a aula.
 
-![E-mail de justificativa](docs/manual/30-email-de-justificativa.png)
+| Justificativa de falta | Alerta de frequência baixa |
+|---|---|
+| ![E-mail de justificativa](docs/manual/33-email-de-justificativa.png) | ![E-mail de alerta de frequência](docs/manual/34-email-alerta-de-frequencia.png) |
 
 ---
 
@@ -392,13 +401,13 @@ O FrequencyON trata **dados biométricos de alunos, muitos deles menores de idad
 - Banco, fotos e chave secreta **não** vão para o Git (`instance/`, `static/uploads/` e `.env` estão no `.gitignore`).
 - Tráfego criptografado com HTTPS (TLS 1.3); o HTTP só redireciona. Todos os formulários e `POST` em JavaScript têm proteção CSRF (Flask-WTF). Cookies de sessão `Secure`, `HttpOnly` e `SameSite=Lax`.
 - Prova de vida passiva contra foto impressa.
+- As fotos de `static/uploads/` só abrem para usuários logados ou para um totem ativado (dado biométrico).
 - Recadastrar o rosto no totem exige a senha do aluno; 5 senhas erradas bloqueiam a matrícula por 15 minutos.
 - O tablet só vira totem com um código de ativação de uso único; o banco guarda apenas o hash do token.
 - Toda alteração no painel e na chamada fica registrada na auditoria.
 
 **Antes de usar com alunos reais, no mínimo:**
 - [ ] Trocar todas as senhas padrão (`python trocar_senha.py ...`); o terminal lista as que ainda são fracas.
-- [ ] Tirar as fotos de `static/` (hoje são servidas publicamente para quem souber o nome do arquivo) e servi-las só para usuários logados.
 - [ ] Coletar o consentimento de alunos e responsáveis, com política de retenção e exclusão dos dados faciais.
 
 ## 13. Próximos passos
