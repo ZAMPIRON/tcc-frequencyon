@@ -53,3 +53,36 @@ body.login-bg {
 .input-group:focus-within .input-group-text {
     border-color: #86b7fe;
 }
+
+/* Botão de voltar para a escolha de perfil, no canto do cartão de login */
+.btn-voltar {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.8rem 0.35rem 0.6rem;
+    border-radius: 999px;
+    background-color: #fff;
+    border: 1px solid #e2e8f0;
+    color: #64748b;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-voltar i {
+    transition: transform 0.2s ease-in-out;
+}
+
+.btn-voltar:hover {
+    color: #2563eb;
+    border-color: #bfdbfe;
+    background-color: #eff6ff;
+}
+
+.btn-voltar:hover i {
+    transform: translateX(-3px);
+}
