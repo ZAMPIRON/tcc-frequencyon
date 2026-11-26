@@ -8,15 +8,6 @@
     <p class="text-muted mb-0 small">Estudantes com frequência escolar abaixo do limite regulamentar (75%)</p>
 </div>
 
-{% with messages = get_flashed_messages(with_categories=true) %}
-  {% for category, message in messages %}
-    <div class="alert alert-{{ category }} alert-dismissible fade show small" role="alert">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
-    </div>
-  {% endfor %}
-{% endwith %}
-
 <div class="card border-0 shadow-sm rounded-3 mb-4">
     <div class="card-body small d-flex flex-wrap align-items-center justify-content-between gap-2">
         <div>

@@ -1,0 +1,597 @@
+{
+  "inicio": "2026-11-26T19:11:14.153Z",
+  "fim": "2026-11-26T19:14:07.792Z",
+  "navegador": "electron 146.0.7680.216",
+  "cypress": "16.2.1",
+  "sistema": "win32 Microsoft Windows 11 Education - 10.0.26300",
+  "totais": {
+    "testes": 83,
+    "aprovados": 83,
+    "falhas": 0,
+    "pendentes": 0,
+    "pulados": 0
+  },
+  "casos": [
+    {
+      "arquivo": "cypress\\e2e\\01-autenticacao.cy.js",
+      "caso": "Autenticação > CT-01 [RF10] Login de administrador com credenciais válidas",
+      "estado": "passed",
+      "duracao_ms": 4225,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\01-autenticacao.cy.js",
+      "caso": "Autenticação > CT-02 [RF10] Login de professor com credenciais válidas",
+      "estado": "passed",
+      "duracao_ms": 889,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\01-autenticacao.cy.js",
+      "caso": "Autenticação > CT-03 [RF18] Login de aluno usando a matrícula",
+      "estado": "passed",
+      "duracao_ms": 898,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\01-autenticacao.cy.js",
+      "caso": "Autenticação > CT-04 [RF10] Login com senha incorreta",
+      "estado": "passed",
+      "duracao_ms": 683,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\01-autenticacao.cy.js",
+      "caso": "Autenticação > CT-05 [RF10] Login com usuário e senha em branco",
+      "estado": "passed",
+      "duracao_ms": 296,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\01-autenticacao.cy.js",
+      "caso": "Autenticação > CT-06 [RNF01] Limite de tentativas de login (força bruta)",
+      "estado": "passed",
+      "duracao_ms": 2282,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\01-autenticacao.cy.js",
+      "caso": "Autenticação > CT-07 [RF10] Logout encerra a sessão",
+      "estado": "passed",
+      "duracao_ms": 3650,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\02-controle-acesso.cy.js",
+      "caso": "Controle de acesso e segurança > CT-08 [RNF01] Visitante sem login tenta abrir o painel do admin",
+      "estado": "passed",
+      "duracao_ms": 317,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\02-controle-acesso.cy.js",
+      "caso": "Controle de acesso e segurança > CT-09 [RNF01] Professor tenta abrir páginas do admin",
+      "estado": "passed",
+      "duracao_ms": 1264,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\02-controle-acesso.cy.js",
+      "caso": "Controle de acesso e segurança > CT-10 [RNF01] Aluno tenta abrir a chamada do professor",
+      "estado": "passed",
+      "duracao_ms": 908,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\02-controle-acesso.cy.js",
+      "caso": "Controle de acesso e segurança > CT-11 [RNF01] Formulário enviado sem token CSRF",
+      "estado": "passed",
+      "duracao_ms": 2523,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\02-controle-acesso.cy.js",
+      "caso": "Controle de acesso e segurança > CT-12 [RNF01] Cookie de sessão protegido",
+      "estado": "passed",
+      "duracao_ms": 1634,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\02-controle-acesso.cy.js",
+      "caso": "Controle de acesso e segurança > CT-13 [RNF07] Foto do rosto do aluno sem login",
+      "estado": "passed",
+      "duracao_ms": 1150,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\02-controle-acesso.cy.js",
+      "caso": "Controle de acesso e segurança > CT-14 [RNF01] Senha guardada com hash",
+      "estado": "passed",
+      "duracao_ms": 46,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\03-cadastros.cy.js",
+      "caso": "Cadastros (alunos, professores, turmas) > CT-15 [RF01] Cadastrar aluno com dados válidos",
+      "estado": "passed",
+      "duracao_ms": 5448,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\03-cadastros.cy.js",
+      "caso": "Cadastros (alunos, professores, turmas) > CT-16 [RF02] Cadastrar aluno com foto do rosto",
+      "estado": "passed",
+      "duracao_ms": 3255,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\03-cadastros.cy.js",
+      "caso": "Cadastros (alunos, professores, turmas) > CT-17 [RF12] Buscar aluno por nome e por matrícula",
+      "estado": "passed",
+      "duracao_ms": 2298,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\03-cadastros.cy.js",
+      "caso": "Cadastros (alunos, professores, turmas) > CT-18 [RF01] Cadastrar aluno com matrícula repetida",
+      "estado": "passed",
+      "duracao_ms": 1901,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\03-cadastros.cy.js",
+      "caso": "Cadastros (alunos, professores, turmas) > CT-19 [RNF01] Cadastrar aluno com senha fraca",
+      "estado": "passed",
+      "duracao_ms": 1829,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\03-cadastros.cy.js",
+      "caso": "Cadastros (alunos, professores, turmas) > CT-20 [RF01] Cadastrar aluno com nome só de espaços",
+      "estado": "passed",
+      "duracao_ms": 1678,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\03-cadastros.cy.js",
+      "caso": "Cadastros (alunos, professores, turmas) > CT-21 [RF08] Editar aluno com senha curta",
+      "estado": "passed",
+      "duracao_ms": 1942,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\03-cadastros.cy.js",
+      "caso": "Cadastros (alunos, professores, turmas) > CT-22 [RF08] Editar dados do aluno",
+      "estado": "passed",
+      "duracao_ms": 1848,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\03-cadastros.cy.js",
+      "caso": "Cadastros (alunos, professores, turmas) > CT-23 [RF10] Cadastrar professor com e-mail já usado (maiúsculas)",
+      "estado": "passed",
+      "duracao_ms": 2165,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\03-cadastros.cy.js",
+      "caso": "Cadastros (alunos, professores, turmas) > CT-24 [RNF01] Cadastrar professor com senha fraca",
+      "estado": "passed",
+      "duracao_ms": 2313,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\03-cadastros.cy.js",
+      "caso": "Cadastros (alunos, professores, turmas) > CT-25 [RF10] Editar professor",
+      "estado": "passed",
+      "duracao_ms": 1677,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\03-cadastros.cy.js",
+      "caso": "Cadastros (alunos, professores, turmas) > CT-26 [RF09] Criar turma com nome em branco",
+      "estado": "passed",
+      "duracao_ms": 2266,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\03-cadastros.cy.js",
+      "caso": "Cadastros (alunos, professores, turmas) > CT-27 [RF09] Turmas da mesma sala aparecem juntas",
+      "estado": "passed",
+      "duracao_ms": 1378,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\03-cadastros.cy.js",
+      "caso": "Cadastros (alunos, professores, turmas) > CT-28 [RF09] Excluir turma mantém os alunos",
+      "estado": "passed",
+      "duracao_ms": 3378,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\03-cadastros.cy.js",
+      "caso": "Cadastros (alunos, professores, turmas) > CT-29 [RF08] Excluir aluno apaga as presenças dele",
+      "estado": "passed",
+      "duracao_ms": 1929,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\04-horarios.cy.js",
+      "caso": "Horários das turmas > CT-30 [RF14] Horários padrão criados",
+      "estado": "passed",
+      "duracao_ms": 3187,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\04-horarios.cy.js",
+      "caso": "Horários das turmas > CT-31 [RF14] Salvar horário com aulas sobrepostas",
+      "estado": "passed",
+      "duracao_ms": 2799,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\04-horarios.cy.js",
+      "caso": "Horários das turmas > CT-32 [RF14] Salvar aula que termina antes de começar",
+      "estado": "passed",
+      "duracao_ms": 1751,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\04-horarios.cy.js",
+      "caso": "Horários das turmas > CT-33 [RF14] Remover horário que está em uso",
+      "estado": "passed",
+      "duracao_ms": 1144,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\04-horarios.cy.js",
+      "caso": "Horários das turmas > CT-34 [RF14] Trocar o horário da turma",
+      "estado": "passed",
+      "duracao_ms": 1767,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\05-regras-presenca.cy.js",
+      "caso": "Regras de presença (totem) > CT-37 [RF14] Aluno chega 3 min depois do início",
+      "estado": "passed",
+      "duracao_ms": 117,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\05-regras-presenca.cy.js",
+      "caso": "Regras de presença (totem) > CT-38 [RF14] Aluno chega no meio da segunda aula",
+      "estado": "passed",
+      "duracao_ms": 83,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\05-regras-presenca.cy.js",
+      "caso": "Regras de presença (totem) > CT-42 [RNF06] Aluno vai embora no almoço",
+      "estado": "passed",
+      "duracao_ms": 1996,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\05-regras-presenca.cy.js",
+      "caso": "Regras de presença (totem) > CT-43 [RNF06] Reconhecimento em dia sem aula",
+      "estado": "passed",
+      "duracao_ms": 64,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\05-regras-presenca.cy.js",
+      "caso": "Regras de presença (totem) > CT-44 [RNF06] Reconhecimento depois da última aula",
+      "estado": "passed",
+      "duracao_ms": 53,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\05-regras-presenca.cy.js",
+      "caso": "Regras de presença (totem) > CT-45 [RF14] Turma CAI (4 aulas de 60 min)",
+      "estado": "passed",
+      "duracao_ms": 115,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\05-regras-presenca.cy.js",
+      "caso": "Regras de presença (totem) > CT-46 [RF15] Totem não sobrescreve a chamada do professor",
+      "estado": "passed",
+      "duracao_ms": 109,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\05-regras-presenca.cy.js",
+      "caso": "Regras de presença (totem) > aluno que chega antes da aula e volta do almoço (mesmo aluno, em sequência) > CT-35 [RF04] Aluno chega antes da primeira aula",
+      "estado": "passed",
+      "duracao_ms": 68,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\05-regras-presenca.cy.js",
+      "caso": "Regras de presença (totem) > aluno que chega antes da aula e volta do almoço (mesmo aluno, em sequência) > CT-36 [RF04] Presença gravada com data e horário",
+      "estado": "passed",
+      "duracao_ms": 45,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\05-regras-presenca.cy.js",
+      "caso": "Regras de presença (totem) > aluno que chega antes da aula e volta do almoço (mesmo aluno, em sequência) > CT-39 [RF05] Aluno passa duas vezes no mesmo período",
+      "estado": "passed",
+      "duracao_ms": 51,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\05-regras-presenca.cy.js",
+      "caso": "Regras de presença (totem) > aluno que chega antes da aula e volta do almoço (mesmo aluno, em sequência) > CT-40 [RF05] Passagem no almoço, antes de abrir a tarde",
+      "estado": "passed",
+      "duracao_ms": 48,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\05-regras-presenca.cy.js",
+      "caso": "Regras de presença (totem) > aluno que chega antes da aula e volta do almoço (mesmo aluno, em sequência) > CT-41 [RF04] Aluno volta do almoço e passa no totem",
+      "estado": "passed",
+      "duracao_ms": 59,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\06-chamada-professor.cy.js",
+      "caso": "Chamada do professor > CT-47 [RF06] Abrir a chamada da turma",
+      "estado": "passed",
+      "duracao_ms": 1586,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\06-chamada-professor.cy.js",
+      "caso": "Chamada do professor > CT-48 [RF15] Marcar presença/falta hoje",
+      "estado": "passed",
+      "duracao_ms": 470,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\06-chamada-professor.cy.js",
+      "caso": "Chamada do professor > CT-49 [RF15] Marcar atraso numa aula da tarde",
+      "estado": "passed",
+      "duracao_ms": 500,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\06-chamada-professor.cy.js",
+      "caso": "Chamada do professor > CT-50 [RNF01] Alterar chamada de dia anterior sem senha do admin",
+      "estado": "passed",
+      "duracao_ms": 208,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\06-chamada-professor.cy.js",
+      "caso": "Chamada do professor > CT-51 [RF15] Alterar chamada de dia anterior com a senha do admin",
+      "estado": "passed",
+      "duracao_ms": 777,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\06-chamada-professor.cy.js",
+      "caso": "Chamada do professor > CT-52 [RF17] Alteração manual registra quem alterou e quando",
+      "estado": "passed",
+      "duracao_ms": 4276,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\06-chamada-professor.cy.js",
+      "caso": "Chamada do professor > CT-53 [RNF06] Alterar chamada de dia futuro",
+      "estado": "passed",
+      "duracao_ms": 192,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\06-chamada-professor.cy.js",
+      "caso": "Chamada do professor > CT-54 [RNF01] Professor altera aluno de turma que não é dele",
+      "estado": "passed",
+      "duracao_ms": 919,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\06-chamada-professor.cy.js",
+      "caso": "Chamada do professor > CT-55 [RNF06] Barra de aula inexistente",
+      "estado": "passed",
+      "duracao_ms": 219,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\07-area-aluno.cy.js",
+      "caso": "Área do aluno e justificativas > CT-56 [RF18] Aluno vê a própria frequência e o histórico",
+      "estado": "passed",
+      "duracao_ms": 1894,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\07-area-aluno.cy.js",
+      "caso": "Área do aluno e justificativas > CT-57 [RF11] Histórico guarda os dias anteriores",
+      "estado": "passed",
+      "duracao_ms": 302,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\07-area-aluno.cy.js",
+      "caso": "Área do aluno e justificativas > CT-58 [RF19] Exportar frequência em CSV",
+      "estado": "passed",
+      "duracao_ms": 199,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\07-area-aluno.cy.js",
+      "caso": "Área do aluno e justificativas > CT-59 [Extra] Justificar um dia com falta",
+      "estado": "passed",
+      "duracao_ms": 922,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\07-area-aluno.cy.js",
+      "caso": "Área do aluno e justificativas > CT-60 [Extra] Justificar um dia sem falta",
+      "estado": "passed",
+      "duracao_ms": 1596,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\07-area-aluno.cy.js",
+      "caso": "Área do aluno e justificativas > CT-61 [Extra] Justificativa com motivo muito curto",
+      "estado": "passed",
+      "duracao_ms": 2266,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\07-area-aluno.cy.js",
+      "caso": "Área do aluno e justificativas > CT-62 [Extra] Coordenação aceita a justificativa",
+      "estado": "passed",
+      "duracao_ms": 4509,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\08-painel-relatorios.cy.js",
+      "caso": "Painel e relatórios > CT-63 [RF07] Páginas do painel abrem sem erro",
+      "estado": "passed",
+      "duracao_ms": 8509,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\08-painel-relatorios.cy.js",
+      "caso": "Painel e relatórios > CT-64 [RF19] Exportar planilha de relatórios",
+      "estado": "passed",
+      "duracao_ms": 2233,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\08-painel-relatorios.cy.js",
+      "caso": "Painel e relatórios > CT-65 [RF07] Risco de evasão lista quem está abaixo de 75%",
+      "estado": "passed",
+      "duracao_ms": 3540,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\09-reconhecimento-facial.cy.js",
+      "caso": "Reconhecimento facial > CT-78 [RF02] Foto com um rosto gera o encoding do aluno",
+      "estado": "passed",
+      "duracao_ms": 1018,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\09-reconhecimento-facial.cy.js",
+      "caso": "Reconhecimento facial > CT-79 [RF03] Rostos de pessoas diferentes",
+      "estado": "passed",
+      "duracao_ms": 79,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\09-reconhecimento-facial.cy.js",
+      "caso": "Reconhecimento facial > CT-80 [RF03] Imagem sem rosto",
+      "estado": "passed",
+      "duracao_ms": 165,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\09-reconhecimento-facial.cy.js",
+      "caso": "Reconhecimento facial > CT-81 [RF16] Prova de vida: foto parada (simula foto impressa)",
+      "estado": "passed",
+      "duracao_ms": 14226,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\10-reconhecimento-rodada2.cy.js",
+      "caso": "Reconhecimento — rodada 2 (prova de vida desligada) > CT-82 [RF03, RNF02] Reconhecimento do aluno (prova de vida desligada só para o teste)",
+      "estado": "passed",
+      "duracao_ms": 12251,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\10-reconhecimento-rodada2.cy.js",
+      "caso": "Reconhecimento — rodada 2 (prova de vida desligada) > CT-83 [Extra] Professor libera o totem pelo rosto",
+      "estado": "passed",
+      "duracao_ms": 2970,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\11-totem.cy.js",
+      "caso": "Totem: ativação e liberação > CT-66 [Extra] Tablet sem ativação abre o totem",
+      "estado": "passed",
+      "duracao_ms": 348,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\11-totem.cy.js",
+      "caso": "Totem: ativação e liberação > CT-67 [RNF01] Ativar com código inválido",
+      "estado": "passed",
+      "duracao_ms": 410,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\11-totem.cy.js",
+      "caso": "Totem: ativação e liberação > CT-68 [Extra] Coordenação cria o totem e o tablet ativa com o código",
+      "estado": "passed",
+      "duracao_ms": 3717,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\11-totem.cy.js",
+      "caso": "Totem: ativação e liberação > CT-69 [RNF01] Reusar o mesmo código em outro tablet",
+      "estado": "passed",
+      "duracao_ms": 353,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\11-totem.cy.js",
+      "caso": "Totem: ativação e liberação > CT-70 [RNF01] Ativar com código vencido (mais de 24 h)",
+      "estado": "passed",
+      "duracao_ms": 1741,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\11-totem.cy.js",
+      "caso": "Totem: ativação e liberação > CT-71 [RNF01] Totem bloqueado não registra presença",
+      "estado": "passed",
+      "duracao_ms": 171,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\11-totem.cy.js",
+      "caso": "Totem: ativação e liberação > CT-72 [RNF01] Aluno tenta liberar o totem com e-mail e senha",
+      "estado": "passed",
+      "duracao_ms": 710,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\11-totem.cy.js",
+      "caso": "Totem: ativação e liberação > CT-73 [Extra] Professor libera o totem com e-mail e senha (plano B)",
+      "estado": "passed",
+      "duracao_ms": 824,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\11-totem.cy.js",
+      "caso": "Totem: ativação e liberação > CT-77 [Extra] Qualquer professor libera qualquer totem",
+      "estado": "passed",
+      "duracao_ms": 2943,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\11-totem.cy.js",
+      "caso": "Totem: ativação e liberação > CT-75 [RF02] Cadastro de rosto no totem com senha errada",
+      "estado": "passed",
+      "duracao_ms": 931,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\11-totem.cy.js",
+      "caso": "Totem: ativação e liberação > CT-76 [RNF01] Remover o totem desativa o tablet",
+      "estado": "passed",
+      "duracao_ms": 1642,
+      "erro": null
+    },
+    {
+      "arquivo": "cypress\\e2e\\11-totem.cy.js",
+      "caso": "Totem: ativação e liberação > CT-74 [RNF01] Senha errada várias vezes na liberação",
+      "estado": "passed",
+      "duracao_ms": 3754,
+      "erro": null
+    }
+  ]
+}

@@ -28,15 +28,6 @@
     </div>
 </div>
 
-{% with messages = get_flashed_messages(with_categories=true) %}
-  {% for category, message in messages %}
-    <div class="alert alert-{{ category }} alert-dismissible fade show small" role="alert">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
-    </div>
-  {% endfor %}
-{% endwith %}
-
 <!-- Cards de Métricas Principais Dinâmicos -->
 <div class="row g-3 mb-4">
     <div class="col-12 col-sm-6 col-xl-3">

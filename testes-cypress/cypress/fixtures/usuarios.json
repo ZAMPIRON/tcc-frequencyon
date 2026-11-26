@@ -1,0 +1,8 @@
+{
+  "admin": { "login": "admin@senai.com", "senha": "Admin@Teste2026", "tipo": "admin", "destino": "/admin/dashboard" },
+  "adminBloqueio": { "login": "qa.bloqueio@frequencyon.teste", "senha": "Admin@Teste2026", "tipo": "admin" },
+  "professor": { "login": "carlos@professor.senai.com", "senha": "Prof@Teste2026", "tipo": "professor", "destino": "/professor/chamada", "nome": "Carlos" },
+  "professorSemTurma": { "login": "prof.semturma@frequencyon.teste", "senha": "Prof@Teste2026", "tipo": "professor", "destino": "/professor/chamada", "nome": "Professor Sem Turma" },
+  "aluno": { "login": "2025002", "senha": "Aluno@Teste2026", "tipo": "aluno", "destino": "/aluno/", "nome": "Nicolas Luciani", "email": "nicolas@aluno.senai.com" },
+  "senhaAlunoTeste": "Aluno@Teste2026"
+}

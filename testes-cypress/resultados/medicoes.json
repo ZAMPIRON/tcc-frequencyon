@@ -1,0 +1,92 @@
+{
+  "CT-06": {
+    "respostas_erradas": [
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      429,
+      429,
+      429,
+      429,
+      429,
+      429,
+      429,
+      429,
+      429,
+      429,
+      429,
+      429,
+      429,
+      429,
+      429,
+      429,
+      429,
+      429,
+      429,
+      429
+    ],
+    "resposta_senha_certa": 429
+  },
+  "CT-65": {
+    "listados": 28,
+    "acima_de_75": 51
+  },
+  "CT-78": {
+    "distancia": 0.369,
+    "segundos": 0.87
+  },
+  "CT-79": {
+    "distancia": 0.593
+  },
+  "CT-81": {
+    "quadros_enviados": 35,
+    "duracao_ms": 7957,
+    "estados": [
+      "sem_rosto",
+      "pisque"
+    ],
+    "eventos": 0
+  },
+  "CT-82": {
+    "nome": "Nicolas Luciani",
+    "segundos": 0.584,
+    "status": "falta",
+    "mensagem": "Tarde · Aulas 6 a 10 · 12:40–16:40"
+  },
+  "CT-83": {
+    "nome": "Carlos",
+    "segundos": 0.572
+  },
+  "CT-75": {
+    "respostas": [
+      403,
+      403,
+      403,
+      403,
+      403,
+      429
+    ]
+  },
+  "CT-74": {
+    "respostas": [
+      403,
+      403,
+      403,
+      403,
+      403,
+      403,
+      403,
+      403,
+      403,
+      403,
+      429
+    ]
+  }
+}
