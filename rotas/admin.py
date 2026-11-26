@@ -177,7 +177,11 @@ def editar_aluno(id):
 @requer("admin")
 def detalhes_aluno(id):
     # a mesma tela que o aluno ve, mas com os botoes de aceitar/recusar justificativa
-    return render_detalhes(db.get_or_404(Aluno, id), "admin")
+    # voltar = pagina do admin de onde veio (lista, turma, risco); so aceita caminho interno do painel
+    voltar = request.args.get("voltar", "")
+    if not voltar.startswith("/admin/") or voltar.startswith("//"):
+        voltar = url_for("admin.alunos")
+    return render_detalhes(db.get_or_404(Aluno, id), "admin", voltar=voltar.rstrip("?"))
 
 
 @admin.route("/alunos/<int:id>/exportar")
@@ -541,7 +545,7 @@ def responder_justificativa(id, acao):
         j.status, j.respondida_em = acao, agora_local()
         db.session.commit()
         flash(f"Justificativa {acao}.", "success")
-    return redirect(url_for("admin.detalhes_aluno", id=j.aluno_id))
+    return redirect(url_for("admin.detalhes_aluno", id=j.aluno_id, voltar=request.args.get("voltar") or None))
 
 
 # ---------- totens (tablets) ----------

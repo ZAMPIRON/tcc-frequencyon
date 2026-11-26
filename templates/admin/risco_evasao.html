@@ -45,9 +45,9 @@
             </thead>
             <tbody class="small">
                 {% for aluno in alunos %}
-                <tr>
+                <tr data-href="{{ url_for('admin.detalhes_aluno', id=aluno.id, voltar=request.full_path) }}" title="Ver o painel do aluno">
                     <td class="fw-bold">{{ aluno.matricula }}</td>
-                    <td>{{ aluno.nome }}</td>
+                    <td><a href="{{ url_for('admin.detalhes_aluno', id=aluno.id, voltar=request.full_path) }}" class="link-aluno">{{ aluno.nome }}</a></td>
                     <td>{{ aluno.turma.nome if aluno.turma else 'Sem turma' }}</td>
                     <td class="fw-bold text-danger">{{ aluno.frequencia }}%</td>
                     <td>

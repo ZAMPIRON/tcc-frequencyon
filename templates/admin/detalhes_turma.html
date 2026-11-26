@@ -210,7 +210,7 @@
                 </thead>
                 <tbody class="small">
                     {% for aluno in turma.alunos %}
-                    <tr>
+                    <tr data-href="{{ url_for('admin.detalhes_aluno', id=aluno.id, voltar=request.full_path) }}" title="Ver o painel do aluno">
                         <td>
                             {% if aluno.foto | foto_existe %}
                                 <img src="{{ aluno.foto }}" alt="{{ aluno.nome }}" class="rounded-circle border object-fit-cover quadrado-36">
@@ -225,7 +225,7 @@
                         <td class="fw-bold">{{ aluno.matricula }}</td>
 
                         <!-- 3. NOME COMPLETO -->
-                        <td>{{ aluno.nome }}</td>
+                        <td><a href="{{ url_for('admin.detalhes_aluno', id=aluno.id, voltar=request.full_path) }}" class="link-aluno">{{ aluno.nome }}</a></td>
 
                         <!-- 4. E-MAIL -->
                         <td class="text-muted">{{ aluno.email or '-' }}</td>

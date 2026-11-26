@@ -55,7 +55,7 @@
                 </thead>
                 <tbody class="small">
                     {% for aluno in alunos %}
-                    <tr>
+                    <tr data-href="{{ url_for('admin.detalhes_aluno', id=aluno.id, voltar=request.full_path) }}" title="Ver o painel do aluno">
                         <td>
                             {% if aluno.foto | foto_existe %}
                                 <img src="{{ aluno.foto }}" alt="{{ aluno.nome }}" class="rounded-circle border object-fit-cover quadrado-36">
@@ -67,7 +67,7 @@
                         </td>
                         <td class="fw-bold text-muted">{{ aluno.numero_chamada or '-' }}</td>
                         <td class="fw-bold">{{ aluno.matricula }}</td>
-                        <td>{{ aluno.nome }}</td>
+                        <td><a href="{{ url_for('admin.detalhes_aluno', id=aluno.id, voltar=request.full_path) }}" class="link-aluno">{{ aluno.nome }}</a></td>
                         <td class="text-muted">{{ aluno.email or '-' }}</td>
                         <td>{{ aluno.turma.nome if aluno.turma else 'Sem turma' }}</td>
                         <td>
@@ -76,7 +76,7 @@
                             </span>
                         </td>
                         <td class="text-nowrap">
-                            <a href="{{ url_for('admin.detalhes_aluno', id=aluno.id) }}" class="btn btn-outline-primary btn-sm border-0" title="Ver detalhes">
+                            <a href="{{ url_for('admin.detalhes_aluno', id=aluno.id, voltar=request.full_path) }}" class="btn btn-outline-primary btn-sm border-0" title="Ver painel do aluno">
                                 <i class="fa-solid fa-eye"></i>
                             </a>
                             <button type="button" class="btn btn-outline-primary btn-sm border-0 btn-editar-aluno" title="Editar aluno"

@@ -137,6 +137,15 @@
             });
         })();
 
+        // linha de aluno: clicar em qualquer parte abre o painel dele (botões e formulários da linha continuam normais)
+        document.querySelectorAll('tr[data-href]').forEach((tr) => {
+            tr.addEventListener('click', (e) => {
+                if (e.target.closest('a, button, form, input, select, label')) return;
+                if (e.ctrlKey || e.metaKey) window.open(tr.dataset.href, '_blank');
+                else window.location = tr.dataset.href;
+            });
+        });
+
         // mensagens flash também aparecem como toast
         document.querySelectorAll('main.conteudo .alert-dismissible').forEach((a) => {
             const tipo = ['success', 'danger', 'warning', 'info'].find((t) => a.classList.contains('alert-' + t)) || 'info';

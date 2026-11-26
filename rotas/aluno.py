@@ -74,9 +74,10 @@ def historico_aluno(aluno):
     }
 
 
-def render_detalhes(aluno, visao):
+def render_detalhes(aluno, visao, voltar=None):
     # visao e "aluno" ou "admin", o template muda os botoes de acordo
-    return render_template("aluno/detalhes.html", aluno=aluno, visao=visao,
+    # voltar: para onde o botao Voltar leva o admin
+    return render_template("aluno/detalhes.html", aluno=aluno, visao=visao, voltar=voltar,
                            **historico_aluno(aluno))
 
 
