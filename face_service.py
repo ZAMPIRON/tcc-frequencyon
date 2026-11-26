@@ -40,16 +40,15 @@ TENTAR_DE_NOVO = 0.5     # rosto desconhecido: no máximo 2 encodings por segund
 REVERIFICAR = 1.5        # rosto já reconhecido: confere de novo a cada 1,5 s (percebe o próximo aluno da fila)
 MESMO_ROSTO_IOU = 0.4    # sobreposição mínima entre caixas p/ considerar o mesmo rosto
 
-# prova de vida passiva: rosto vivo pisca ou abre a boca; foto impressa não.
-# vivo = os olhos fecharam pelo menos VARIACAO_VIVO (relativo) ou a boca abriu de verdade, em até JANELA_VIVO frames.
+# prova de vida: o aluno tem que piscar; foto impressa não pisca.
+# piscada = olhos abertos -> fechados (abertura caiu pelo menos VARIACAO_VIVO) -> abertos de novo, em até JANELA_VIVO frames.
 # Os limites ficam acima do ruído: numa foto parada ou tremendo na mão, a abertura medida dos olhos oscila
 # 10-20% só por compressão e tremor (com 12% a foto passava); uma piscada real derruba 40-70%.
+# Exigir que o olho reabra evita contar uma foto inclinada (a abertura cai e fica baixa) como piscada.
 OLHO_ABERTO_MIN = 0.20
 VARIACAO_VIVO = float(os.getenv("VARIACAO_VIVO", "0.30"))
-BOCA_ABERTA_MIN = 0.15   # boca fechada mede ~0,0-0,08 (ruído); falando ou sorrindo passa de 0,15
-VARIACAO_BOCA = 0.5
+REABRIU = 0.85           # reabriu = voltou a pelo menos 85% da abertura de antes da piscada
 JANELA_VIVO = 8
-FRAMES_MIN_VIVO = 3
 
 DLIB_LOCK = threading.Lock()   # cadastro por foto (admin) roda no processo do site
 
@@ -111,34 +110,29 @@ def abertura_olhos(pontos):
     return vertical / horizontal if horizontal else 0.0
 
 
-def abertura_boca(top_lip, bottom_lip):
-    """Distância entre os lábios internos dividida pela largura da boca."""
-    t, b = np.asarray(top_lip, dtype=float), np.asarray(bottom_lip, dtype=float)
-    largura = np.linalg.norm(t[0] - t[6])
-    return np.linalg.norm(t[9] - b[9]) / largura if largura else 0.0
-
-
-def _variou(valores, piso, variacao):
-    hi = max(valores)
-    return hi >= piso and (hi - min(valores)) / hi >= variacao
+def piscou(olhos):
+    """True se a sequência de aberturas tem olho aberto, depois fechado e depois aberto de novo."""
+    aberto, fechou = 0.0, False
+    for ear in olhos:
+        if not fechou:
+            aberto = max(aberto, ear)
+            fechou = aberto >= OLHO_ABERTO_MIN and ear <= aberto * (1 - VARIACAO_VIVO)
+        elif ear >= aberto * REABRIU:
+            return True
+    return False
 
 
 def atualizar_vivo(trilha, marcos):
-    """Guarda olhos/boca dos últimos frames e marca trilha['vivo'] quando o rosto se mexe por conta própria."""
+    """Guarda a abertura dos olhos dos últimos frames e marca trilha['vivo'] quando o aluno pisca."""
     ear = (abertura_olhos(marcos["left_eye"]) + abertura_olhos(marcos["right_eye"])) / 2
-    boca = abertura_boca(marcos["top_lip"], marcos["bottom_lip"])
     trilha["olhos"].append(ear)
-    trilha["boca"].append(boca)
-    if len(trilha["olhos"]) < FRAMES_MIN_VIVO:
-        return
-    if (_variou(trilha["olhos"], OLHO_ABERTO_MIN, VARIACAO_VIVO)
-            or _variou(trilha["boca"], BOCA_ABERTA_MIN, VARIACAO_BOCA)):
+    if piscou(trilha["olhos"]):
         trilha["vivo"] = True
 
 
 def _nova_trilha(grupo="aluno"):
     return {"grupo": grupo, "aluno_id": None, "seq": 0, "confirmado": False, "t_enc": 0.0, "vivo": False,
-            "registrado": False, "olhos": deque(maxlen=JANELA_VIVO), "boca": deque(maxlen=JANELA_VIVO),
+            "registrado": False, "olhos": deque(maxlen=JANELA_VIVO),
             "token": uuid.uuid4().hex, "pendentes": 0}
 
 
@@ -265,10 +259,10 @@ def processo_reconhecimento(entrada, saida, prova_de_vida=True, ampliar=1, pedid
         if not perto:
             return caixa, None, "longe", False
 
-        # prova de vida passiva: mede olhos e boca em todo frame até ver o rosto se mexer
+        # prova de vida: mede a abertura dos olhos em todo frame até o aluno piscar
         if prova_de_vida and not trilha["vivo"]:
             marcos = fr.face_landmarks(rgb, [caixa])
-            if marcos and "left_eye" in marcos[0] and "top_lip" in marcos[0]:
+            if marcos and "left_eye" in marcos[0] and "right_eye" in marcos[0]:
                 atualizar_vivo(trilha, marcos[0])
 
         if sincrono or not paralelo:

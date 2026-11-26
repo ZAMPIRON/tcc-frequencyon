@@ -411,10 +411,10 @@ Frequência (%) = aulas com status presente ou atraso
 | Cooldown | o mesmo aluno não é processado de novo por **8 s**; pausa de **0,5 s** após cada registro | |
 | Frame velho | um frame com mais de 2 s é descartado | |
 
-**Prova de vida passiva (anti-spoofing):**
-- **Medidas:** a cada frame o sistema calcula o **EAR (Eye Aspect Ratio)** dos dois olhos, que fica perto de 0,3 aberto e de 0,1 fechado. Também calcula a abertura da boca (distância entre os lábios internos ÷ largura da boca).
-- **Janela:** são guardados os últimos 8 frames, e são exigidos no mínimo 3.
-- **Critério de vida:** o rosto é considerado **vivo** quando os olhos **piscam**, ou seja, a abertura cai pelo menos **30%** (`VARIACAO_VIVO`) depois de terem estado abertos (EAR ≥ 0,20), ou quando a boca abre de verdade (abertura ≥ 0,15 com variação de 50%).
+**Prova de vida por piscada (anti-spoofing):**
+- **Medida:** a cada frame o sistema calcula o **EAR (Eye Aspect Ratio)** dos dois olhos, que fica perto de 0,3 aberto e de 0,1 fechado.
+- **Janela:** são guardados os últimos 8 frames.
+- **Critério de vida:** o rosto é considerado **vivo** quando o aluno **pisca**, nesta ordem: olhos abertos (EAR ≥ 0,20), olhos fechados (a abertura cai pelo menos **30%**, `VARIACAO_VIVO`) e olhos abertos de novo (voltam a pelo menos 85% da abertura de antes). Exigir que o olho reabra impede que uma foto inclinada, em que a abertura medida cai e fica baixa, conte como piscada.
 - **Por que 30%:** num teste com 11 fotos simulando uma foto impressa (parada, com tremor leve, médio e forte, ruído e compressão JPEG), a abertura medida dos olhos oscilou 10 a 20% só por ruído. Com o limite antigo de 12%, a maioria das fotos passava; com 30%, nenhuma passou. Uma piscada real derruba a abertura em 40 a 70%.
 - **Foto impressa:** não pisca e não é aceita. Enquanto não houver vida, a tela pede **"Pisque os olhos"** (estado `pisque`) desde o momento em que o rosto aparece, para a piscada acontecer enquanto o encoding é calculado.
 - **Desligar:** `PROVA_DE_VIDA=0` desliga a prova de vida, só para testes.

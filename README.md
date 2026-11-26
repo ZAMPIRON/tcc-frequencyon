@@ -215,7 +215,7 @@ flowchart LR
 
 1. O tablet envia frames ao servidor. Um processo separado (`face_service.py`) detecta rostos com o detector **HOG** do dlib e transforma cada rosto em um vetor de **128 números** (encoding).
 2. O encoding é comparado com o de todos os alunos cadastrados pela **distância euclidiana**. É aceito com distância ≤ **0,50** em **2 frames seguidos**. O mesmo aluno não é processado de novo por **8 segundos**.
-3. **Prova de vida passiva**: o rosto precisa piscar (a abertura dos olhos cai pelo menos `VARIACAO_VIVO`, 30%) ou abrir a boca de verdade. O totem já pede "Pisque os olhos" enquanto calcula o encoding. Uma foto impressa, parada ou tremendo na mão, varia só 10-20% por ruído e é recusada.
+3. **Prova de vida**: o aluno precisa piscar. Os olhos têm que estar abertos, fechar (a abertura cai pelo menos `VARIACAO_VIVO`, 30%) e abrir de novo. O totem já pede "Pisque os olhos" enquanto calcula o encoding. Uma foto impressa, parada ou tremendo na mão, varia só 10-20% por ruído e é recusada.
 4. O reconhecimento grava um registro por aula do período atual (`presente` / `atraso` / `falta`) para o aluno e o dia, e devolve um evento que a tela do totem mostra.
 5. Professor, aluno e coordenação leem os mesmos registros, então todas as telas mostram os mesmos números.
 
