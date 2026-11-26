@@ -90,7 +90,8 @@
 ### 5.3 Requisitos não funcionais atendidos
 
 - **Desempenho:** o reconhecimento roda em um processo separado (multiprocessing), então o site não trava.
-  - O detector HOG roda em todo frame, porque é barato. O encoding, que custa cerca de 0,3 s, só é calculado quando necessário.
+  - O detector HOG roda em todo frame, porque é barato. O encoding (a rede neural, cerca de 0,6 a 1,2 s no notebook do projeto) roda em 2 processos auxiliares (`FACE_TRABALHADORES`), então a detecção e a prova de vida não param enquanto ele é calculado. Enquanto um encoding está em andamento, o HOG roda só a cada 0,5 s e a última caixa é reaproveitada.
+  - Tempo medido no notebook do projeto: o aluno é registrado em 0,6 a 0,7 s depois de aparecer na câmera (sem contar a piscada); o próximo da fila, em até cerca de 2 s.
   - Os encodings ficam em memória numa matriz NumPy, e a comparação é vetorizada.
 - **Escalabilidade:** cache de dias com chamada (RNF09). O banco pode ser trocado via `DATABASE_URL`.
 - **Disponibilidade:** fila offline, backup diário, monitoramento dos totens e rota de saúde.
@@ -405,16 +406,17 @@ Frequência (%) = aulas com status presente ou atraso
 | Encoding | rede ResNet do dlib (via `face_recognition`) | vetor de 128 dimensões |
 | Comparação | distância euclidiana contra todos os cadastrados (NumPy vetorizado) | aceita se ≤ **0,50** |
 | Confirmação | mesmo aluno em **2 encodings seguidos**, ou 1 só se a distância for ≤ **0,42** | |
-| Reverificação | rosto já reconhecido é conferido de novo a cada 3 s; se a pessoa trocou, recomeça | |
-| Ritmo | rosto desconhecido: no máximo 2 encodings/s (cada um custa cerca de 0,3 s) | |
-| Cooldown | o mesmo aluno não é processado de novo por **8 s**; pausa de **3 s** após cada registro | |
+| Reverificação | rosto já reconhecido é conferido de novo a cada 1,5 s (e logo após a pausa depois de um registro); se a pessoa trocou, recomeça | |
+| Ritmo | um encoding por rosto de cada vez, em processo auxiliar; rosto desconhecido: nova tentativa a cada 0,5 s | |
+| Cooldown | o mesmo aluno não é processado de novo por **8 s**; pausa de **0,5 s** após cada registro | |
 | Frame velho | um frame com mais de 2 s é descartado | |
 
 **Prova de vida passiva (anti-spoofing):**
 - **Medidas:** a cada frame o sistema calcula o **EAR (Eye Aspect Ratio)** dos dois olhos, que fica perto de 0,3 aberto e de 0,1 fechado. Também calcula a abertura da boca (distância entre os lábios internos ÷ largura da boca).
 - **Janela:** são guardados os últimos 8 frames, e são exigidos no mínimo 3.
-- **Critério de vida:** o rosto é considerado **vivo** quando a abertura dos olhos ou da boca varia mais que **12%** (`VARIACAO_VIVO`). Para os olhos, eles também precisam ter estado abertos (EAR ≥ 0,20).
-- **Foto impressa:** fica parada e não é aceita. Enquanto não houver vida, a tela pede para o aluno piscar (estado `pisque`).
+- **Critério de vida:** o rosto é considerado **vivo** quando os olhos **piscam**, ou seja, a abertura cai pelo menos **30%** (`VARIACAO_VIVO`) depois de terem estado abertos (EAR ≥ 0,20), ou quando a boca abre de verdade (abertura ≥ 0,15 com variação de 50%).
+- **Por que 30%:** num teste com 11 fotos simulando uma foto impressa (parada, com tremor leve, médio e forte, ruído e compressão JPEG), a abertura medida dos olhos oscilou 10 a 20% só por ruído. Com o limite antigo de 12%, a maioria das fotos passava; com 30%, nenhuma passou. Uma piscada real derruba a abertura em 40 a 70%.
+- **Foto impressa:** não pisca e não é aceita. Enquanto não houver vida, a tela pede **"Pisque os olhos"** (estado `pisque`) desde o momento em que o rosto aparece, para a piscada acontecer enquanto o encoding é calculado.
 - **Desligar:** `PROVA_DE_VIDA=0` desliga a prova de vida, só para testes.
 
 **Estados que o totem mostra:** `sem_rosto`, `longe`, `verificando`, `desconhecido`, `pisque`, `ok`. Depois do registro aparecem presente, atrasado, fora do horário, sem aula ou já registrado.
