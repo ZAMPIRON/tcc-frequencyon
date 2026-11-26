@@ -12,7 +12,10 @@
 
 <body class="login-bg d-flex align-items-center justify-content-center min-vh-100 p-3">
 
-    <div class="card login-card formulario border-0 shadow-lg p-4 p-sm-5 rounded-4 w-100">
+    <div class="card login-card formulario border-0 shadow-lg p-4 p-sm-5 rounded-4 w-100 position-relative">
+        <a href="{{ url_for('index') }}" class="btn-voltar" title="Voltar para a escolha de perfil" aria-label="Voltar">
+            <i class="bi bi-arrow-left"></i><span>Voltar</span>
+        </a>
         <form action="{{ papel_action }}" method="POST">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 

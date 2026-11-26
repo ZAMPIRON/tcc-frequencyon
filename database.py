@@ -213,7 +213,7 @@ class Bloco:
 class Turma(db.Model):
     __tablename__ = "turmas"
     id = db.Column(db.Integer, primary_key=True)
-    nome = db.Column(db.String(120), nullable=False)   # ex: C13 (turmas com o mesmo nome aparecem juntas)
+    nome = db.Column(db.String(120), nullable=False)   # ex: Logística A (turmas com o mesmo nome aparecem juntas)
     curso = db.Column(db.String(120), nullable=False)
     modelo_id = db.Column(db.Integer, db.ForeignKey("modelos_horario.id"))
     modelo = db.relationship("ModeloHorario", back_populates="turmas")

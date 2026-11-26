@@ -43,7 +43,7 @@ def popular_banco():
         print("Criando Turma...")
         # horario tecnico (10 aulas de 45 min), criado pelo create_app
         tecnico = ModeloHorario.query.filter(ModeloHorario.nome.like("Técnico%")).first() or ModeloHorario.query.first()
-        turma = Turma(nome="Dev 2", curso="Análise de Desenvolvimento de Sistemas", modelo=tecnico)
+        turma = Turma(nome="Desenvolvimento de Sistemas A", curso="Desenvolvimento de Sistemas", modelo=tecnico)
         db.session.add(turma)
         # Vincula o professor à turma com os dias de aula dele (1 = terça, 3 = quinta)
         turma.vinculos.append(ProfessorTurma(professor=prof, dias="1,3"))
