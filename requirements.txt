@@ -4,9 +4,10 @@ flask-wtf>=1.2
 cryptography>=42
 numpy
 openpyxl
-opencv-python
+opencv-python-headless
 dlib-bin
 face_recognition_models
 setuptools<81
 face_recognition
 reportlab
+gunicorn
