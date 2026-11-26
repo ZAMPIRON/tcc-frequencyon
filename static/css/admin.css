@@ -79,8 +79,22 @@ main.conteudo { padding: 1.5rem 12px 2rem; }
 .progress-fina { height: 10px; }
 
 /* barras do gráfico "Frequência por curso" (altura vem do HTML em --altura) */
+.coluna-curso { flex: 1 1 0; min-width: 0; }
+.trilho-curso { min-height: 0; }
+.rotulo-curso {             /* nome do curso em até 2 linhas, mesma altura em todas as colunas */
+    width: 100%;
+    height: 2.4em;
+    line-height: 1.2;
+    text-align: center;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow-wrap: anywhere;
+}
 .barra-curso {
-    width: 38px;
+    width: min(38px, 100%);
+    max-height: calc(100% - 1.75rem);   /* sobra espaço para o número em cima */
     height: var(--altura, 0%);
     border-radius: 6px 6px 0 0 !important;
 }
