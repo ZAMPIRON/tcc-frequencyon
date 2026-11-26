@@ -215,7 +215,7 @@ flowchart LR
 
 1. O tablet envia frames ao servidor. Um processo separado (`face_service.py`) detecta rostos com o detector **HOG** do dlib e transforma cada rosto em um vetor de **128 números** (encoding).
 2. O encoding é comparado com o de todos os alunos cadastrados pela **distância euclidiana**. É aceito com distância ≤ **0,50** em **2 frames seguidos**. O mesmo aluno não é processado de novo por **8 segundos**.
-3. **Prova de vida passiva**: a abertura dos olhos ou da boca precisa variar mais que `VARIACAO_VIVO` (12%) entre frames. Uma foto impressa fica parada e é recusada.
+3. **Prova de vida**: o aluno precisa piscar. Os olhos têm que estar abertos, fechar (a abertura cai pelo menos `VARIACAO_VIVO`, 30%) e abrir de novo. O totem já pede "Pisque os olhos" enquanto calcula o encoding. Uma foto impressa, parada ou tremendo na mão, varia só 10-20% por ruído e é recusada.
 4. O reconhecimento grava um registro por aula do período atual (`presente` / `atraso` / `falta`) para o aluno e o dia, e devolve um evento que a tela do totem mostra.
 5. Professor, aluno e coordenação leem os mesmos registros, então todas as telas mostram os mesmos números.
 
@@ -319,7 +319,8 @@ Todas as configurações são variáveis de ambiente. Elas também podem ficar e
 | `TOTEM_FONTE` | `tablet` | `tablet` usa a câmera do aparelho que abre `/totem`; `camera` usa uma webcam ligada ao servidor (desenvolvimento). |
 | `TOTEM_CAMERA` | `0` | Índice da webcam do servidor (só no modo `camera`). |
 | `PROVA_DE_VIDA` | `1` | `0` desliga a prova de vida (só para testes). |
-| `VARIACAO_VIVO` | `0.12` | Quanto olhos/boca precisam variar para o rosto contar como vivo. |
+| `VARIACAO_VIVO` | `0.30` | Quanto a abertura dos olhos precisa cair (piscada) para o rosto contar como vivo. |
+| `FACE_TRABALHADORES` | `2` | Processos auxiliares que calculam os encodings (a parte lenta) sem travar a detecção. |
 | `HTTPS` | `1` | `0` desliga o HTTPS e serve HTTP puro em `PORTA` (só para testes locais). |
 | `PORTA_HTTPS` / `PORTA` | `5443` / `5000` | Porta HTTPS e porta HTTP que redireciona para ela. |
 | `SSL_CERT` / `SSL_KEY` | *(CA local)* | Caminhos de um certificado e chave reais. |

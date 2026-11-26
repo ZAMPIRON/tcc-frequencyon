@@ -8,13 +8,26 @@
     <link href="{{ url_for('static', filename='css/aluno.css') }}" rel="stylesheet">
 </head>
 <body>
-{% set url_voltar = url_for('admin.alunos') if visao == 'admin' else url_for('logout') %}
+{% set url_voltar = (voltar or url_for('admin.alunos')) if visao == 'admin' else url_for('logout') %}
 {% set texto_voltar = 'Voltar' if visao == 'admin' else 'Sair' %}
 {% set icone_voltar = 'bi-arrow-left-circle' if visao == 'admin' else 'bi-box-arrow-left' %}
 {% set url_exportar = url_for('admin.exportar_aluno', id=aluno.id) if visao == 'admin' else url_for('aluno.exportar') %}
 
+{% if visao == 'admin' %}
+<!-- admin vendo o painel do aluno: deixa claro de quem é a tela e como voltar -->
+<div class="faixa-admin sticky-top">
+    <div class="container-xl d-flex flex-wrap align-items-center justify-content-between gap-2 py-2">
+        <div class="d-flex align-items-center gap-2 small">
+            <i class="bi bi-eye-fill"></i>
+            <span>Você está vendo o painel de <b>{{ aluno.nome }}</b> como o aluno vê{% if aluno.turma %} &middot; {{ aluno.turma.nome }}{% endif %} &middot; matrícula {{ aluno.matricula }}</span>
+        </div>
+        <a href="{{ url_voltar }}" class="btn btn-light btn-sm py-0 px-3 fw-semibold"><i class="bi bi-arrow-left me-1"></i> Voltar ao painel administrativo</a>
+    </div>
+</div>
+{% endif %}
+
 <!-- ================= TOPO ================= -->
-<header class="topo sticky-top">
+<header class="topo {{ 'sticky-top' if visao != 'admin' }}">
     <div class="container-xl py-2">
         <!-- desktop -->
         <div class="d-none d-lg-flex align-items-center justify-content-between">
@@ -183,11 +196,11 @@
                     <div class="text-muted mt-1">{{ j.motivo }}</div>
                     {% if visao == 'admin' and j.status == 'pendente' %}
                     <div class="d-flex gap-2 mt-2">
-                        <form method="POST" action="{{ url_for('admin.responder_justificativa', id=j.id, acao='aceita') }}">
+                        <form method="POST" action="{{ url_for('admin.responder_justificativa', id=j.id, acao='aceita', voltar=voltar) }}">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button class="btn btn-success btn-sm py-0"><i class="bi bi-check-lg"></i> Aceitar</button>
                         </form>
-                        <form method="POST" action="{{ url_for('admin.responder_justificativa', id=j.id, acao='recusada') }}">
+                        <form method="POST" action="{{ url_for('admin.responder_justificativa', id=j.id, acao='recusada', voltar=voltar) }}">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button class="btn btn-outline-danger btn-sm py-0"><i class="bi bi-x-lg"></i> Recusar</button>
                         </form>

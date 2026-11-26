@@ -88,3 +88,10 @@
 
 .altura-min-38 { min-height: 38px; }
 .espaco-38 { width: 38px; }
+
+/* faixa do admin vendo o painel de um aluno */
+.faixa-admin {
+    top: env(safe-area-inset-top, 0px); z-index: 1030;
+    background: linear-gradient(90deg, var(--fo-primary), #6f42c1); color: #fff;
+}
+.faixa-admin .btn-light { color: var(--fo-primary); }

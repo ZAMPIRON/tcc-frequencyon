@@ -98,12 +98,14 @@
             <div class="card-body p-4 d-flex flex-column justify-content-between">
                 <h6 class="fw-bold text-dark mb-3">Frequência por Curso (%)</h6>
                 
-                <div class="d-flex align-items-end justify-content-between px-2 pt-4 area-grafico">
+                <div class="d-flex align-items-end gap-2 px-1 pt-4 area-grafico">
                     {% for curso, media in frequencia_por_curso %}
-                    <div class="d-flex flex-column align-items-center h-100 justify-content-end gap-2">
-                        <span class="small fw-bold {% if media < 75 %}text-danger{% else %}text-primary{% endif %}">{{ media|round|int }}%</span>
-                        <div class="{% if media < 75 %}bg-danger{% else %}bg-primary{% endif %} rounded-top fo-bar-grow barra-curso" style="--altura: {{ media|round|int }}%; --atraso: {{ loop.index0 * 120 }}ms"></div>
-                        <span class="text-muted fw-medium texto-mini">{{ curso }}</span>
+                    <div class="coluna-curso d-flex flex-column align-items-center h-100 gap-2">
+                        <div class="d-flex flex-column align-items-center justify-content-end flex-grow-1 w-100 gap-2 trilho-curso">
+                            <span class="small fw-bold {% if media < 75 %}text-danger{% else %}text-primary{% endif %}">{{ media|round|int }}%</span>
+                            <div class="{% if media < 75 %}bg-danger{% else %}bg-primary{% endif %} rounded-top fo-bar-grow barra-curso" style="--altura: {{ media|round|int }}%; --atraso: {{ loop.index0 * 120 }}ms"></div>
+                        </div>
+                        <span class="text-muted fw-medium texto-mini rotulo-curso" title="{{ curso }}">{{ curso }}</span>
                     </div>
                     {% else %}
                     <p class="text-muted small">Nenhum dado cadastrado.</p>
