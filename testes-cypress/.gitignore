@@ -1,0 +1,5 @@
+node_modules/
+.tmp/
+cypress/screenshots/
+cypress/videos/
+cypress/downloads/

@@ -1,0 +1,14 @@
+{
+  "name": "frequencyon-testes-cypress",
+  "version": "2.0.0",
+  "description": "Suíte de testes automatizados (Cypress) do FrequencyON, baseada na Seção 4 do relatório de testes TSR-FON-2026-01",
+  "private": true,
+  "scripts": {
+    "test": "cypress run",
+    "test:chrome": "cypress run --browser chrome",
+    "cy:open": "cypress open"
+  },
+  "devDependencies": {
+    "cypress": "16.2.1"
+  }
+}

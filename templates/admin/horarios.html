@@ -13,15 +13,6 @@
     </button>
 </div>
 
-{% with messages = get_flashed_messages(with_categories=true) %}
-  {% for category, message in messages %}
-    <div class="alert alert-{{ category }} alert-dismissible fade show small" role="alert">
-        {{ message }}
-        <button type="button" class="btn-close" aria-label="Fechar" data-bs-dismiss="alert"></button>
-    </div>
-  {% endfor %}
-{% endwith %}
-
 <div class="card border-0 shadow-sm rounded-3 mb-4">
     <div class="card-body small text-muted">
         <strong class="text-dark">Como o totem usa o horário:</strong>

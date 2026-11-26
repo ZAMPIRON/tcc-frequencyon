@@ -13,17 +13,6 @@
     </button>
 </div>
 
-{% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    {% for category, message in messages %}
-      <div class="alert alert-{{ category }} alert-dismissible fade show small" role="alert">
-        {{ message }}
-        <button type="button" class="btn-close" aria-label="Fechar" data-bs-dismiss="alert"></button>
-      </div>
-    {% endfor %}
-  {% endif %}
-{% endwith %}
-
 <div class="row g-3">
     {% for turma in turmas %}
     <div class="col-md-6 col-xl-4" data-busca-item>
